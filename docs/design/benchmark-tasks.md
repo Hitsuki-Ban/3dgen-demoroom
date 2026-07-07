@@ -41,6 +41,21 @@
 
 カテゴリ内訳: 有機 2 / ハードサーフェス小物・家具 5 / 武器 2 / 素材ストレス 3 / トポロジ・植生 3 / 建築 1 / 文字 1 / 乗り物 2 / キャラ・クリーチャー 2。スタイライズ系とリアル系はほぼ半々。
 
+## 2.1 アニメ調トラック(5 課題、2026-07-08 追加)
+
+オーナー要望による拡張。日本のゲーム開発で需要の大きい**セルルック(アニメ調)アセット**の生成可否を検証する。3D 生成モデルの学習分布はリアル PBR 寄りなので、「セル調のベタ塗り・描き込みハイライトをテクスチャとして維持できるか、それとも物理ベース的なグラデーションに劣化するか」がトラック全体の共通検証テーマ。
+
+| # | id | カテゴリ | プロンプト(正準・EN) | 検証ポイント | 難易度 |
+|---|---|---|---|---|---|
+| 21 | `anime-slime-mascot` | アニメ調・基礎 | A cute anime-style blue slime mascot with a simple happy face, cel-shaded flat colors with a single crisp highlight | セル調ベタ塗り+単一ハイライトの維持(PBR 的グラデーション化しないか)。最単純形状でのスタイル保持 | ★ |
+| 22 | `anime-katana` | アニメ調・武器 | An anime-style katana with a glowing pale-blue blade, ornate gold guard and dark red wrapped hilt, cel-shaded with crisp two-tone shadows | 極薄ブレード+エミッシブ+セル調 2 段影。輪郭線・影のテクスチャ焼き込みの有無 | ★★ |
+| 23 | `anime-ramen-bowl` | アニメ調・小物 | An anime-style bowl of steaming ramen with painted glossy highlights, flat cel-shaded colors, chopsticks resting across the rim | アニメ的「描き込みハイライト」(非物理的な光沢表現)の扱い、器+具+箸の複合 | ★★ |
+| 24 | `anime-vending-machine` | アニメ調・背景プロップ | A Japanese drink vending machine in anime background-art style, soft cel shading, glowing panel and colorful drink cans behind glass | 背景美術調の箱物、ガラス越しの中身、ラベル類、エミッシブパネル | ★★ |
+| 25 | `anime-heroine-character` | アニメ調・キャラクター | An original anime-style heroine character with large expressive eyes, short teal hair, a sailor-style school uniform, cel-shaded flat colors, standing in a neutral pose | アニメ顔の扱い(目をテクスチャで描くか立体化するか)、髪の房ジオメトリ、セル調衣装。学習分布との乖離が最大の課題 | ★★★ |
+
+- 費用影響: 25 課題 × 11 モデル。consumer GPU 統一なら追加は数ドル規模
+- 既存 20 課題の `toon-knight-character` / `cartoon-apple` は西洋カートゥーン調であり、本トラック(日本アニメのセルルック)とは別の検証軸として両方残す
+
 ## 3. リファレンス画像仕様
 
 image-to-3D モデルの学習分布に合わせ、全課題で統一する:
@@ -51,6 +66,14 @@ image-to-3D モデルの学習分布に合わせ、全課題で統一する:
 - カメラは **3/4 ビュー(前方斜め、やや見下ろし)**
 - **柔らかい均一照明**。強い影・被写界深度・モーションブラー禁止
 - 生成に使ったモデル名・プロンプト・シード・日付を課題メタデータに記録する(出所の追跡可能性)
+
+**アニメ調トラック(#21〜25)の追加スタイル指定:**
+
+- セルシェーディング(2〜3 段のシャープな影)、ベタ塗り、アニメ的な描き込みハイライト
+- 輪郭線は薄く自然に(強い黒線は image-to-3D の前景抽出を乱す可能性があるため控えめに)
+- 写実的な PBR 質感・写真調ライティングは避ける(このトラックの検証対象そのものを消してしまうため)
+- レイアウト制約(解像度・背景・カメラ・マージン)は上記の共通仕様に従う
+- キャラクター課題は**完全オリジナルデザイン**とし、既存アニメ・ゲームのキャラクターに似せない(権利クリアの徹底)
 
 リファレンス画像の生成は Codex に発注する(別 Issue、確定版になってから)。
 
