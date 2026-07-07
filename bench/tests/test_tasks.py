@@ -38,7 +38,7 @@ def test_repository_tasks_match_runner_contract() -> None:
     repo_root = Path(__file__).resolve().parents[2]
     tasks = load_tasks(repo_root / "tasks" / "tasks.json")
 
-    assert len(tasks) == 20
+    assert len(tasks) == 25
     assert tasks[0] == TaskDefinition(
         id="cartoon-apple",
         prompt="A stylized cartoon red apple with a green leaf on the stem, smooth glossy surface",
@@ -47,6 +47,11 @@ def test_repository_tasks_match_runner_contract() -> None:
     )
     assert {task.id for task in tasks} == {
         "arcade-cabinet",
+        "anime-heroine-character",
+        "anime-katana",
+        "anime-ramen-bowl",
+        "anime-slime-mascot",
+        "anime-vending-machine",
         "cartoon-apple",
         "chained-anchor",
         "chrome-espresso-machine",

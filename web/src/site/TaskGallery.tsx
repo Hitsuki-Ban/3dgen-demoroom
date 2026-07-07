@@ -26,7 +26,7 @@ function TaskCard({ task, onSelect }: { task: TaskInfo; onSelect: (id: string) =
 export function TaskGallery({ onSelect }: { onSelect: (id: string) => void }) {
   return (
     <section>
-      <h2 className="text-lg font-semibold pt-6 pb-3">ベンチマーク課題(20)</h2>
+      <h2 className="text-lg font-semibold pt-6 pb-3">ベンチマーク課題({TASKS.length})</h2>
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         {TASKS.map((t) => (
           <TaskCard key={t.id} task={t} onSelect={onSelect} />

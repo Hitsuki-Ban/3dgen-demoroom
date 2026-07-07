@@ -138,5 +138,40 @@
     "seed": null,
     "generated_at": "2026-07-08",
     "postprocess": "Resized from 1254x1254 to 1024x1024 PNG with ImageMagick."
+  },
+  "anime-slime-mascot": {
+    "generator": "Codex built-in image_gen tool (OpenAI image generation; exact backend model/version not exposed by tool)",
+    "prompt_used": "A cute anime-style blue slime mascot with a simple happy face, cel-shaded flat colors with a single crisp highlight. Render as a clean isolated anime cel-shaded game asset reference on a perfectly flat solid light gray #E8E8E8 background, single centered object, 3/4 front view, slightly elevated camera, 10-15% margin, flat colors, 2 crisp shadow steps, subtle thin natural outline, painted highlight marks, no extra props, no text, no logo, no watermark, no real character resemblance.",
+    "seed": null,
+    "generated_at": "2026-07-08",
+    "postprocess": "Generated at 1254x1254, edge flood-filled to transparency, trimmed, resized to fit within 820x820, and composited onto a 1024x1024 #E8E8E8 PNG with ImageMagick."
+  },
+  "anime-katana": {
+    "generator": "Codex built-in image_gen tool (OpenAI image generation; exact backend model/version not exposed by tool)",
+    "prompt_used": "An anime-style katana with a glowing pale-blue blade, ornate gold guard and dark red wrapped hilt, cel-shaded with crisp two-tone shadows. Render as a clean isolated anime cel-shaded game weapon asset reference on a perfectly flat solid light gray #E8E8E8 background, single centered object, diagonal 3/4 front view, full blade and hilt visible, 10-15% margin, flat colors, subtle thin natural outline, painted glow highlight, no real sword maker marks, no kanji, no readable letters, no brand, no logo, no watermark, no character hand, no sheath.",
+    "seed": null,
+    "generated_at": "2026-07-08",
+    "postprocess": "Generated at 1254x1254, edge flood-filled to transparency, trimmed, resized to fit within 820x820, and composited onto a 1024x1024 #E8E8E8 PNG with ImageMagick."
+  },
+  "anime-ramen-bowl": {
+    "generator": "Codex built-in image_gen tool (OpenAI image generation; exact backend model/version not exposed by tool)",
+    "prompt_used": "An anime-style bowl of steaming ramen with painted glossy highlights, flat cel-shaded colors, chopsticks resting across the rim. Render as a clean isolated anime cel-shaded game prop reference on a perfectly flat solid light gray #E8E8E8 background, single centered object, 3/4 front view, slightly elevated camera, 10-15% margin, flat colors, crisp 2-3 step shadows, painted glossy highlight strokes, no tableware besides chopsticks, no logos, no Japanese characters, no readable text, no watermark, no real restaurant branding.",
+    "seed": null,
+    "generated_at": "2026-07-08",
+    "postprocess": "Generated at 1254x1254, edge flood-filled to transparency, trimmed, resized to fit within 820x820, and composited onto a 1024x1024 #E8E8E8 PNG with ImageMagick."
+  },
+  "anime-vending-machine": {
+    "generator": "Codex built-in image_gen tool (OpenAI image generation; exact backend model/version not exposed by tool)",
+    "prompt_used": "A Japanese drink vending machine in anime background-art style, soft cel shading, glowing panel and colorful drink cans behind glass. Render as a clean isolated anime cel-shaded background prop reference on a perfectly flat solid light gray #E8E8E8 background, single centered object, 3/4 front view, full vending machine visible, 10-15% margin, flat colors, crisp 2-step shadows, subtle thin natural outlines, painted glass highlights, generic drink cans with abstract symbols only, no real brands, no logos, no readable text, no Japanese characters, no currency labels, no existing IP, no watermark.",
+    "seed": null,
+    "generated_at": "2026-07-08",
+    "postprocess": "Generated at 1254x1254, edge flood-filled to transparency, trimmed, resized to fit within 820x820, and composited onto a 1024x1024 #E8E8E8 PNG with ImageMagick."
+  },
+  "anime-heroine-character": {
+    "generator": "Codex built-in image_gen tool (OpenAI image generation; exact backend model/version not exposed by tool)",
+    "prompt_used": "An original anime-style heroine character with large expressive eyes, short teal hair, a sailor-style school uniform, cel-shaded flat colors, standing in a neutral pose. Render as a clean isolated original anime cel-shaded character model reference on a perfectly flat solid light gray #E8E8E8 background, single centered character, 3/4 front view, full body visible, 10-15% margin, flat colors, crisp 2-3 step shadows, subtle thin natural outline, painted hair and eye highlights, no school emblem, no logo, no readable text, no watermark, no accessories tied to a known IP, no extra characters, no resemblance to existing anime, game, manga, VTuber, idol, or franchise characters.",
+    "seed": null,
+    "generated_at": "2026-07-08",
+    "postprocess": "Generated at 1254x1254, edge flood-filled to transparency, trimmed, resized to fit within 820x820, and composited onto a 1024x1024 #E8E8E8 PNG with ImageMagick."
   }
 }
