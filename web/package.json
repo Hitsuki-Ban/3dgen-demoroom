@@ -4,8 +4,8 @@
   "version": "0.0.1",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -p tsconfig.json && vite build && node scripts/copy-references.mjs",
+    "dev": "node scripts/build-manifest.mjs && vite",
+    "build": "node scripts/build-manifest.mjs && tsc -p tsconfig.json && vite build && node scripts/copy-references.mjs && node scripts/copy-runs.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

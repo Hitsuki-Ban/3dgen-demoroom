@@ -77,16 +77,16 @@ export interface GeometryStats {
 export interface RunResult {
   taskId: string;
   modelId: string;
-  /** 最適化済み GLB の URL(geo 制限モデルは /restricted/ プレフィックス) */
+  /** GLB の URL(geo 制限モデルは /restricted/ プレフィックス) */
   glbUrl: string;
+  glbSizeBytes: number;
   meta: RunMeta;
-  stats: GeometryStats;
+  /** 最適化パイプライン導入後に付与される */
+  stats?: GeometryStats;
 }
 
-/** ビルド時に生成される単一 manifest(サイトはこれだけを読む) */
+/** ビルド時に生成される manifest(scripts/build-manifest.mjs が出力) */
 export interface SiteManifest {
   generatedAt: string;
-  tasks: TaskInfo[];
-  models: ModelInfo[];
   results: RunResult[];
 }
