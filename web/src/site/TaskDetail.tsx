@@ -1,10 +1,22 @@
 import { MODELS } from '../data/models';
 import { TASKS } from '../data/tasks';
+import { useManifest } from '../data/useManifest';
+import { loadModel } from '../viewer/loadModel';
+import { ViewerPane } from '../viewer/ViewerPane';
 import { ModelCard } from './ModelCard';
+import { ViewerToolbar } from './ViewerToolbar';
+
+function formatResultInfo(wallClock: number, peakVram: number, sizeBytes: number, gpu: string): string {
+  return `${wallClock.toFixed(1)}s / VRAM ${(peakVram / 2 ** 30).toFixed(1)}GB / ${(sizeBytes / 2 ** 20).toFixed(1)}MB / ${gpu}`;
+}
 
 export function TaskDetail({ taskId, onBack }: { taskId: string; onBack: () => void }) {
   const task = TASKS.find((t) => t.id === taskId);
+  const { results } = useManifest();
   if (!task) return null;
+
+  const resultByModel = new Map(results.filter((r) => r.taskId === taskId).map((r) => [r.modelId, r]));
+  const doneCount = resultByModel.size;
 
   return (
     <section className="pt-6">
@@ -25,13 +37,29 @@ export function TaskDetail({ taskId, onBack }: { taskId: string; onBack: () => v
           </div>
         </div>
         <div>
-          <h3 className="text-sm font-semibold text-slate-300 pb-2">
-            モデル別出力(ベンチ実行後、ここが 3D ビューアの横並びになります)
+          <h3 className="text-sm font-semibold text-slate-300">
+            モデル別出力({doneCount}/{MODELS.length} 完了)
           </h3>
+          {doneCount > 0 && <ViewerToolbar />}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {MODELS.map((m) => (
-              <ModelCard key={m.id} model={m} />
-            ))}
+            {MODELS.map((m) => {
+              const result = resultByModel.get(m.id);
+              if (!result) return <ModelCard key={m.id} model={m} />;
+              return (
+                <ViewerPane
+                  key={m.id}
+                  title={m.name}
+                  badge={m.badges.includes('geometry-only') ? 'geometry-only' : undefined}
+                  loadObject={() => loadModel(result.glbUrl)}
+                  extraInfo={formatResultInfo(
+                    result.meta.wall_clock_seconds,
+                    result.meta.peak_vram_bytes,
+                    result.glbSizeBytes,
+                    result.meta.gpu_name,
+                  )}
+                />
+              );
+            })}
           </div>
         </div>
       </div>

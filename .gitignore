@@ -19,6 +19,9 @@ outputs/
 *.ply
 *.splat
 
+# Generated site manifest
+web/public/manifest.json
+
 # OS / editor
 .DS_Store
 Thumbs.db

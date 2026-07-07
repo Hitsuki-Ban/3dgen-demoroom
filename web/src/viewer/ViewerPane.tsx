@@ -8,9 +8,11 @@ interface Props {
   /** ペイン mount 時に一度呼ばれ、表示するモデルを返す(GLB ロードやダミー生成) */
   loadObject: () => Promise<THREE.Object3D> | THREE.Object3D;
   badge?: string;
+  /** 生成時間・VRAM 等の追加表示(フッター2行目) */
+  extraInfo?: string;
 }
 
-export function ViewerPane({ title, loadObject, badge }: Props) {
+export function ViewerPane({ title, loadObject, badge, extraInfo }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const viewer = useViewer();
   const [stats, setStats] = useState<PaneStats | null>(null);
@@ -51,6 +53,7 @@ export function ViewerPane({ title, loadObject, badge }: Props) {
           : stats
             ? <span>{stats.triangles.toLocaleString()} tris / {stats.vertices.toLocaleString()} verts</span>
             : 'loading…'}
+        {extraInfo && <div className="text-slate-500 mt-0.5">{extraInfo}</div>}
       </div>
     </div>
   );

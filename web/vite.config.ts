@@ -5,10 +5,9 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import fs from 'node:fs';
 
-const referencesDir = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  '../tasks/references',
-);
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const referencesDir = path.join(repoRoot, 'tasks', 'references');
+const runsDir = path.join(repoRoot, 'outputs', 'site-data');
 
 /**
  * dev 時にリポジトリ側の tasks/references/*.png を /assets/references/ で配信する。
@@ -32,6 +31,25 @@ function serveTaskReferences(): Plugin {
   };
 }
 
+/** dev 時に outputs/site-data/ のベンチ成果物 GLB を /assets/runs/ で配信する */
+function serveRunOutputs(): Plugin {
+  return {
+    name: 'serve-run-outputs',
+    configureServer(server) {
+      server.middlewares.use('/assets/runs', (req, res, next) => {
+        const rel = decodeURIComponent((req.url ?? '').split('?')[0].replace(/^\//, ''));
+        if (!/^[a-z0-9-]+\/[a-z0-9-]+\/output\.glb$/.test(rel)) return next();
+        fs.readFile(path.join(runsDir, rel), (err, data) => {
+          if (err) return next();
+          res.setHeader('Content-Type', 'model/gltf-binary');
+          res.setHeader('Cache-Control', 'no-cache');
+          res.end(data);
+        });
+      });
+    },
+  };
+}
+
 export default defineConfig({
-  plugins: [react(), tailwindcss(), serveTaskReferences()],
+  plugins: [react(), tailwindcss(), serveTaskReferences(), serveRunOutputs()],
 });
