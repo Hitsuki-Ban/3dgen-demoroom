@@ -1,0 +1,24 @@
+# Node
+node_modules/
+dist/
+.pnpm-store/
+
+# Python
+__pycache__/
+.venv/
+*.egg-info/
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# Benchmark outputs (large binaries live in R2, not git)
+outputs/
+*.glb
+*.ply
+*.splat
+
+# OS / editor
+.DS_Store
+Thumbs.db
