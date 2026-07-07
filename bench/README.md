@@ -28,6 +28,12 @@ uv run bench-harness output-validate <path-to-task-output-dir>
 uv run bench-harness upload-local <source-dir> <target-root> runs/<model>/<gpu>/<timestamp>
 ```
 
+## Model Runners
+
+Implemented runner containers:
+
+- `models/triposr/` — TripoSR image-to-3D runner. Builds a pinned CUDA 12.8 + torch 2.7 image and writes the benchmark output contract for each task.
+
 ## Cost Guardrails
 
 - `MAX_RUNTIME_MIN` defaults to `60`, as specified in Issue #11. Non-positive values fail fast.
