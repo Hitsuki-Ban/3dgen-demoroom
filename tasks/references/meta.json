@@ -1,0 +1,142 @@
+{
+  "cartoon-apple": {
+    "generator": "Codex built-in image_gen tool (OpenAI image generation; exact backend model/version not exposed by tool)",
+    "prompt_used": "A stylized cartoon red apple with a green leaf on the stem, smooth glossy surface. Render as a clean isolated 3D asset reference on a perfectly flat solid light gray #E8E8E8 background, single centered object, 3/4 front view, slightly elevated camera, 10-15% margin, soft uniform studio lighting, no text, no logo, no watermark, no strong shadow, no depth of field, no motion blur.",
+    "seed": null,
+    "generated_at": "2026-07-08",
+    "postprocess": "Resized from 1254x1254 to 1024x1024 PNG with ImageMagick."
+  },
+  "crusty-bread-loaf": {
+    "generator": "Codex built-in image_gen tool (OpenAI image generation; exact backend model/version not exposed by tool)",
+    "prompt_used": "A rustic crusty bread loaf with flour dusting and deep score marks on top. Render as a clean isolated 3D asset reference on a perfectly flat solid light gray #E8E8E8 background, single centered object, 3/4 front view, slightly elevated camera, 10-15% margin, soft uniform studio lighting, no plate, no basket, no text, no logo, no watermark, no strong shadow, no depth of field, no motion blur.",
+    "seed": null,
+    "generated_at": "2026-07-08",
+    "postprocess": "Resized from 1254x1254 to 1024x1024 PNG with ImageMagick."
+  },
+  "scifi-supply-crate": {
+    "generator": "Codex built-in image_gen tool (OpenAI image generation; exact backend model/version not exposed by tool)",
+    "prompt_used": "A weathered sci-fi military supply crate with a glowing orange status panel, worn metal edges and abstract stenciled markings. Render as a clean isolated hard-surface 3D asset reference on a perfectly flat solid light gray #E8E8E8 background, single centered object, 3/4 front view, slightly elevated camera, 10-15% margin, soft uniform studio lighting, no readable words, no real insignia, no brand, no logo, no watermark.",
+    "seed": null,
+    "generated_at": "2026-07-08",
+    "postprocess": "Resized from 1254x1254 to 1024x1024 PNG with ImageMagick."
+  },
+  "ornate-treasure-chest": {
+    "generator": "Codex built-in image_gen tool (OpenAI image generation; exact backend model/version not exposed by tool)",
+    "prompt_used": "An ornate fantasy treasure chest with gold filigree, dark oak wood and iron bands, lid slightly open with gold coins spilling out. Render as a clean isolated 3D asset reference on a perfectly flat solid light gray #E8E8E8 background, single centered object, 3/4 front view, slightly elevated camera, 10-15% margin, soft uniform studio lighting, no text, no logo, no watermark.",
+    "seed": null,
+    "generated_at": "2026-07-08",
+    "postprocess": "Resized from 1254x1254 to 1024x1024 PNG with ImageMagick."
+  },
+  "medieval-longsword": {
+    "generator": "Codex built-in image_gen tool (OpenAI image generation; exact backend model/version not exposed by tool)",
+    "prompt_used": "A medieval longsword with an engraved steel blade, leather-wrapped grip and bronze crossguard, standing upright. Render as a clean isolated 3D weapon asset reference on a perfectly flat solid light gray #E8E8E8 background, single centered object, 3/4 front view, entire sword visible, 10-15% margin, soft uniform studio lighting, abstract engravings only, no readable letters, no text, no logo, no watermark.",
+    "seed": null,
+    "generated_at": "2026-07-08",
+    "postprocess": "Resized from 1254x1254 to 1024x1024 PNG with ImageMagick."
+  },
+  "plasma-rifle": {
+    "generator": "Codex built-in image_gen tool (OpenAI image generation; exact backend model/version not exposed by tool)",
+    "prompt_used": "A bulky sci-fi plasma rifle with glowing cyan energy cells, matte black polymer body and metallic rails. Render as a clean isolated fictional 3D weapon asset reference on a perfectly flat solid light gray #E8E8E8 background, single centered object, 3/4 front-side view, 10-15% margin, soft uniform studio lighting, no real firearm branding, no readable text, no logo, no watermark.",
+    "seed": null,
+    "generated_at": "2026-07-08",
+    "postprocess": "Resized from 1254x1254 to 1024x1024 PNG with ImageMagick."
+  },
+  "victorian-street-lamp": {
+    "generator": "Codex built-in image_gen tool (OpenAI image generation; exact backend model/version not exposed by tool)",
+    "prompt_used": "A Victorian cast-iron street lamp with a frosted glass lantern and ornate scrollwork, lit warm glow. Render as a clean isolated 3D prop asset reference on a perfectly flat solid light gray #E8E8E8 background, single centered object, 3/4 front view, entire lamp visible, 10-15% margin, soft uniform studio lighting, no environment, no text, no logo, no watermark.",
+    "seed": null,
+    "generated_at": "2026-07-08",
+    "postprocess": "Resized from 1254x1254 to 1024x1024 PNG with ImageMagick."
+  },
+  "wooden-rocking-chair": {
+    "generator": "Codex built-in image_gen tool (OpenAI image generation; exact backend model/version not exposed by tool)",
+    "prompt_used": "A wooden rocking chair with thin turned spindles and curved rockers, warm walnut finish. Render as a clean isolated 3D furniture asset reference on a perfectly flat solid light gray #E8E8E8 background, single centered object, 3/4 front view, 10-15% margin, soft uniform studio lighting, no cushion, no room, no text, no logo, no watermark.",
+    "seed": null,
+    "generated_at": "2026-07-08",
+    "postprocess": "Resized from 1254x1254 to 1024x1024 PNG with ImageMagick."
+  },
+  "chrome-espresso-machine": {
+    "generator": "Codex built-in image_gen tool (OpenAI image generation; exact backend model/version not exposed by tool)",
+    "prompt_used": "A polished chrome espresso machine with black bakelite handles and a pressure gauge. Render as a clean isolated 3D prop asset reference on a perfectly flat solid light gray #E8E8E8 background, single centered object, 3/4 front view, 10-15% margin, soft uniform studio lighting, no cup, no beans, no brand mark, no readable text, no logo, no watermark.",
+    "seed": null,
+    "generated_at": "2026-07-08",
+    "postprocess": "Resized from 1254x1254 to 1024x1024 PNG with ImageMagick."
+  },
+  "stained-glass-lantern": {
+    "generator": "Codex built-in image_gen tool (OpenAI image generation; exact backend model/version not exposed by tool)",
+    "prompt_used": "A hexagonal stained-glass lantern with colorful translucent panels in a dark bronze frame. Render as a clean isolated 3D prop asset reference on a perfectly flat solid light gray #E8E8E8 background, single centered object, 3/4 front view, 10-15% margin, soft uniform studio lighting, controlled internal warm glow, no environment, no text, no logo, no watermark.",
+    "seed": null,
+    "generated_at": "2026-07-08",
+    "postprocess": "Resized from 1254x1254 to 1024x1024 PNG with ImageMagick."
+  },
+  "fluffy-monster-plush": {
+    "generator": "Codex built-in image_gen tool (OpenAI image generation; exact backend model/version not exposed by tool)",
+    "prompt_used": "A fluffy pastel-blue monster plush toy with stubby horns, button eyes and a stitched smile. Render as a clean isolated original 3D toy asset reference on a perfectly flat solid light gray #E8E8E8 background, single centered object, 3/4 front view, 10-15% margin, soft uniform studio lighting, no real character resemblance, no text, no logo, no watermark.",
+    "seed": null,
+    "generated_at": "2026-07-08",
+    "postprocess": "Resized from 1254x1254 to 1024x1024 PNG with ImageMagick."
+  },
+  "chained-anchor": {
+    "generator": "Codex built-in image_gen tool (OpenAI image generation; exact backend model/version not exposed by tool)",
+    "prompt_used": "A heavy iron ship anchor wrapped in a thick chain with interlocking links. Render as a clean isolated 3D prop asset reference on a perfectly flat solid light gray #E8E8E8 background, single centered combined object, 3/4 front view, 10-15% margin, soft uniform studio lighting, clear separated chain links, no ship, no rope, no ocean, no text, no logo, no watermark.",
+    "seed": null,
+    "generated_at": "2026-07-08",
+    "postprocess": "Resized from 1254x1254 to 1024x1024 PNG with ImageMagick."
+  },
+  "potted-monstera": {
+    "generator": "Codex built-in image_gen tool (OpenAI image generation; exact backend model/version not exposed by tool)",
+    "prompt_used": "A monstera plant in a terracotta pot with large split leaves with natural holes. Render as a clean isolated 3D plant asset reference on a perfectly flat solid light gray #E8E8E8 background, single centered object, 3/4 front view, 10-15% margin, soft uniform studio lighting, leaf splits and holes clearly visible, no table, no room, no text, no logo, no watermark.",
+    "seed": null,
+    "generated_at": "2026-07-08",
+    "postprocess": "Resized from 1254x1254 to 1024x1024 PNG with ImageMagick."
+  },
+  "old-oak-tree": {
+    "generator": "Codex built-in image_gen tool (OpenAI image generation; exact backend model/version not exposed by tool)",
+    "prompt_used": "A gnarled old oak tree with twisted branches and dense foliage clumps. Render as a clean isolated 3D environment prop asset reference on a perfectly flat solid light gray #E8E8E8 background, single centered tree, 3/4 front view, 10-15% margin, soft uniform studio lighting, no ground patch, no forest, no birds, no text, no logo, no watermark.",
+    "seed": null,
+    "generated_at": "2026-07-08",
+    "postprocess": "Resized from 1254x1254 to 1024x1024 PNG with ImageMagick."
+  },
+  "modular-dungeon-gate": {
+    "generator": "Codex built-in image_gen tool (OpenAI image generation; exact backend model/version not exposed by tool)",
+    "prompt_used": "A modular stone dungeon archway with an iron portcullis gate, moss in the crevices. Render as a clean isolated 3D modular environment asset reference on a perfectly flat solid light gray #E8E8E8 background, single centered object, 3/4 front view, 10-15% margin, soft uniform studio lighting, no surrounding wall, no floor tiles, no characters, no text, no logo, no watermark.",
+    "seed": null,
+    "generated_at": "2026-07-08",
+    "postprocess": "Resized from 1254x1254 to 1024x1024 PNG with ImageMagick."
+  },
+  "arcade-cabinet": {
+    "generator": "Codex built-in image_gen tool (OpenAI image generation; exact backend model/version not exposed by tool)",
+    "prompt_used": "A retro 1980s arcade cabinet with colorful marquee art, a CRT screen and a joystick panel. Render as a clean isolated original 3D prop asset reference on a perfectly flat solid light gray #E8E8E8 background, single centered object, 3/4 front view, 10-15% margin, soft uniform studio lighting. Text verbatim: PIXEL on the marquee only. No real game logo, no real brand, no extra text, no existing IP, no watermark.",
+    "seed": null,
+    "generated_at": "2026-07-08",
+    "postprocess": "Resized from 1254x1254 to 1024x1024 PNG with ImageMagick."
+  },
+  "stylized-hover-bike": {
+    "generator": "Codex built-in image_gen tool (OpenAI image generation; exact backend model/version not exposed by tool)",
+    "prompt_used": "A stylized sci-fi hover bike with a sleek aerodynamic body, exposed turbine and neon underglow. Render as a clean isolated original 3D vehicle asset reference on a perfectly flat solid light gray #E8E8E8 background, single centered object, 3/4 front-side view, 10-15% margin, soft uniform studio lighting, no rider, no real brand, no readable text, no logo, no watermark.",
+    "seed": null,
+    "generated_at": "2026-07-08",
+    "postprocess": "Resized from 1254x1254 to 1024x1024 PNG with ImageMagick."
+  },
+  "rusty-pickup-truck": {
+    "generator": "Codex built-in image_gen tool (OpenAI image generation; exact backend model/version not exposed by tool)",
+    "prompt_used": "A rusty 1950s pickup truck with faded teal paint, a cracked windshield and a wooden cargo bed. Render as a clean isolated original 3D vehicle asset reference on a perfectly flat solid light gray #E8E8E8 background, single centered object, 3/4 front-side view, 10-15% margin, soft uniform studio lighting, no driver, no road, no real brand badge, no readable text, no logo, no license plate text, no watermark.",
+    "seed": null,
+    "generated_at": "2026-07-08",
+    "postprocess": "Resized from 1254x1254 to 1024x1024 PNG with ImageMagick."
+  },
+  "toon-knight-character": {
+    "generator": "Codex built-in image_gen tool (OpenAI image generation; exact backend model/version not exposed by tool)",
+    "prompt_used": "A chibi-style cartoon knight character in full plate armor, standing in a neutral pose, big head and small body. Render as a clean isolated original 3D character asset reference on a perfectly flat solid light gray #E8E8E8 background, single centered character, 3/4 front view, 10-15% margin, soft uniform studio lighting, no franchise resemblance, no text, no logo, no watermark.",
+    "seed": null,
+    "generated_at": "2026-07-08",
+    "postprocess": "Resized from 1254x1254 to 1024x1024 PNG with ImageMagick."
+  },
+  "forest-goblin-creature": {
+    "generator": "Codex built-in image_gen tool (OpenAI image generation; exact backend model/version not exposed by tool)",
+    "prompt_used": "A hunched forest goblin creature with mottled green skin, large pointed ears and tattered cloth garments. Render as a clean isolated original 3D creature asset reference on a perfectly flat solid light gray #E8E8E8 background, single centered creature, 3/4 front view, 10-15% margin, soft uniform studio lighting, no weapon, no forest background, no blood, no real IP resemblance, no text, no logo, no watermark.",
+    "seed": null,
+    "generated_at": "2026-07-08",
+    "postprocess": "Resized from 1254x1254 to 1024x1024 PNG with ImageMagick."
+  }
+}
