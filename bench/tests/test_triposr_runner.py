@@ -41,7 +41,6 @@ def test_triposr_model_spec_records_current_pins() -> None:
             "foreground_ratio": 0.85,
             "mc_resolution": 256,
             "model_save_format": "glb",
-            "no_remove_bg": True,
             "pretrained_model_name_or_path": "/opt/weights/TripoSR",
         },
     }
@@ -54,11 +53,12 @@ def test_dockerfile_uses_required_cuda_base_and_pins() -> None:
     assert "ARG TRIPOSR_COMMIT=107cefdc244c39106fa830359024f6a2f1c78871" in dockerfile
     assert "ARG TRIPOSR_WEIGHTS_REVISION=5b521936b01fbe1890f6f9baed0254ab6351c04a" in dockerfile
     assert 'revision=os.environ["TRIPOSR_WEIGHTS_REVISION"]' in dockerfile
+    assert "rembg.new_session()" in dockerfile
     assert "uv pip install --system" in dockerfile
     assert "RUN pip install" not in dockerfile
 
 
-def test_build_triposr_command_uses_local_pinned_weights(tmp_path: Path) -> None:
+def test_build_triposr_command_uses_local_pinned_weights_and_official_preprocessing(tmp_path: Path) -> None:
     runner = _load_runner()
     command = runner.build_triposr_command(
         image_path=tmp_path / "input.png",
@@ -82,8 +82,8 @@ def test_build_triposr_command_uses_local_pinned_weights(tmp_path: Path) -> None
         "256",
         "--foreground-ratio",
         "0.85",
-        "--no-remove-bg",
     ]
+    assert "--no-remove-bg" not in command
 
 
 def test_create_raw_output_dir_precreates_official_image_slot(tmp_path: Path) -> None:

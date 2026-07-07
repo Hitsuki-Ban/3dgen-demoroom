@@ -39,6 +39,12 @@ RUN uv pip install --system \
     && uv pip install --system --no-build-isolation-package torchmcubes -r /opt/TripoSR/requirements.txt \
     && uv pip install --system onnxruntime
 
+RUN python3 - <<'PY'
+import rembg
+
+rembg.new_session()
+PY
+
 RUN TRIPOSR_WEIGHTS_REVISION="${TRIPOSR_WEIGHTS_REVISION}" python3 - <<'PY'
 import os
 

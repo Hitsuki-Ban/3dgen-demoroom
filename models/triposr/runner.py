@@ -26,7 +26,6 @@ DEFAULT_PARAMETERS = {
     "foreground_ratio": 0.85,
     "mc_resolution": 256,
     "model_save_format": "glb",
-    "no_remove_bg": True,
     "pretrained_model_name_or_path": TRIPOSR_WEIGHTS_PATH,
 }
 
@@ -158,8 +157,6 @@ def build_triposr_command(image_path: Path, raw_output_dir: Path, parameters: di
         "--foreground-ratio",
         str(parameters["foreground_ratio"]),
     ]
-    if parameters["no_remove_bg"] is True:
-        command.append("--no-remove-bg")
     return command
 
 
