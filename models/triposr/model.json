@@ -1,0 +1,18 @@
+{
+  "id": "triposr",
+  "name": "TripoSR",
+  "input": "image",
+  "output": "textured-mesh",
+  "code_repo": "https://github.com/VAST-AI-Research/TripoSR",
+  "code_commit": "107cefdc244c39106fa830359024f6a2f1c78871",
+  "weights_repo": "stabilityai/TripoSR",
+  "weights_revision": "5b521936b01fbe1890f6f9baed0254ab6351c04a",
+  "license": "MIT",
+  "default_parameters": {
+    "chunk_size": 8192,
+    "foreground_ratio": 0.85,
+    "mc_resolution": 256,
+    "model_save_format": "glb",
+    "pretrained_model_name_or_path": "/opt/weights/TripoSR"
+  }
+}
