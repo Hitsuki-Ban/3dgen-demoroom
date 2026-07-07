@@ -1,0 +1,122 @@
+[
+  {
+    "id": "cartoon-apple",
+    "prompt": "A stylized cartoon red apple with a green leaf on the stem, smooth glossy surface",
+    "image": "references/cartoon-apple.png",
+    "seed": 20260708
+  },
+  {
+    "id": "crusty-bread-loaf",
+    "prompt": "A rustic crusty bread loaf with flour dusting and deep score marks on top",
+    "image": "references/crusty-bread-loaf.png",
+    "seed": 20260708
+  },
+  {
+    "id": "scifi-supply-crate",
+    "prompt": "A weathered sci-fi military supply crate with a glowing orange status panel, worn metal edges and stenciled markings",
+    "image": "references/scifi-supply-crate.png",
+    "seed": 20260708
+  },
+  {
+    "id": "ornate-treasure-chest",
+    "prompt": "An ornate fantasy treasure chest with gold filigree, dark oak wood and iron bands, lid slightly open with gold coins spilling out",
+    "image": "references/ornate-treasure-chest.png",
+    "seed": 20260708
+  },
+  {
+    "id": "medieval-longsword",
+    "prompt": "A medieval longsword with an engraved steel blade, leather-wrapped grip and bronze crossguard, standing upright",
+    "image": "references/medieval-longsword.png",
+    "seed": 20260708
+  },
+  {
+    "id": "plasma-rifle",
+    "prompt": "A bulky sci-fi plasma rifle with glowing cyan energy cells, matte black polymer body and metallic rails",
+    "image": "references/plasma-rifle.png",
+    "seed": 20260708
+  },
+  {
+    "id": "victorian-street-lamp",
+    "prompt": "A Victorian cast-iron street lamp with a frosted glass lantern and ornate scrollwork, lit warm glow",
+    "image": "references/victorian-street-lamp.png",
+    "seed": 20260708
+  },
+  {
+    "id": "wooden-rocking-chair",
+    "prompt": "A wooden rocking chair with thin turned spindles and curved rockers, warm walnut finish",
+    "image": "references/wooden-rocking-chair.png",
+    "seed": 20260708
+  },
+  {
+    "id": "chrome-espresso-machine",
+    "prompt": "A polished chrome espresso machine with black bakelite handles and a pressure gauge",
+    "image": "references/chrome-espresso-machine.png",
+    "seed": 20260708
+  },
+  {
+    "id": "stained-glass-lantern",
+    "prompt": "A hexagonal stained-glass lantern with colorful translucent panels in a dark bronze frame",
+    "image": "references/stained-glass-lantern.png",
+    "seed": 20260708
+  },
+  {
+    "id": "fluffy-monster-plush",
+    "prompt": "A fluffy pastel-blue monster plush toy with stubby horns, button eyes and a stitched smile",
+    "image": "references/fluffy-monster-plush.png",
+    "seed": 20260708
+  },
+  {
+    "id": "chained-anchor",
+    "prompt": "A heavy iron ship anchor wrapped in a thick chain with interlocking links",
+    "image": "references/chained-anchor.png",
+    "seed": 20260708
+  },
+  {
+    "id": "potted-monstera",
+    "prompt": "A monstera plant in a terracotta pot with large split leaves with natural holes",
+    "image": "references/potted-monstera.png",
+    "seed": 20260708
+  },
+  {
+    "id": "old-oak-tree",
+    "prompt": "A gnarled old oak tree with twisted branches and dense foliage clumps",
+    "image": "references/old-oak-tree.png",
+    "seed": 20260708
+  },
+  {
+    "id": "modular-dungeon-gate",
+    "prompt": "A modular stone dungeon archway with an iron portcullis gate, moss in the crevices",
+    "image": "references/modular-dungeon-gate.png",
+    "seed": 20260708
+  },
+  {
+    "id": "arcade-cabinet",
+    "prompt": "A retro 1980s arcade cabinet with colorful marquee art, a CRT screen and a joystick panel",
+    "image": "references/arcade-cabinet.png",
+    "seed": 20260708
+  },
+  {
+    "id": "stylized-hover-bike",
+    "prompt": "A stylized sci-fi hover bike with a sleek aerodynamic body, exposed turbine and neon underglow",
+    "image": "references/stylized-hover-bike.png",
+    "seed": 20260708
+  },
+  {
+    "id": "rusty-pickup-truck",
+    "prompt": "A rusty 1950s pickup truck with faded teal paint, a cracked windshield and a wooden cargo bed",
+    "image": "references/rusty-pickup-truck.png",
+    "seed": 20260708
+  },
+  {
+    "id": "toon-knight-character",
+    "prompt": "A chibi-style cartoon knight character in full plate armor, standing in a neutral pose, big head and small body",
+    "image": "references/toon-knight-character.png",
+    "seed": 20260708
+  },
+  {
+    "id": "forest-goblin-creature",
+    "prompt": "A hunched forest goblin creature with mottled green skin, large pointed ears and tattered cloth garments",
+    "image": "references/forest-goblin-creature.png",
+    "seed": 20260708
+  }
+]
