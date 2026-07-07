@@ -3,8 +3,8 @@ import type { TaskInfo } from './types';
 const REF_BASE = '/assets/references';
 
 /**
- * 課題セット v1(20 課題)。
- * 根拠: docs/design/benchmark-tasks.md §2(確定 2026-07-08)
+ * 課題セット v1(25 課題)。
+ * 根拠: docs/design/benchmark-tasks.md §2 / §2.1(確定 2026-07-08)
  * prompt は tasks/tasks.json(runner 契約)と同一であること。
  */
 export const TASKS: TaskInfo[] = [
@@ -167,5 +167,45 @@ export const TASKS: TaskInfo[] = [
     probe: '有機的な非対称形状、皮膚テクスチャ、布との複合',
     difficulty: 3,
     referenceImage: `${REF_BASE}/forest-goblin-creature.png`,
+  },
+  {
+    id: 'anime-slime-mascot',
+    category: 'アニメ調・基礎',
+    prompt: 'A cute anime-style blue slime mascot with a simple happy face, cel-shaded flat colors with a single crisp highlight',
+    probe: 'セル調ベタ塗り+単一ハイライトの維持(PBR 的グラデーション化しないか)。最単純形状でのスタイル保持',
+    difficulty: 1,
+    referenceImage: `${REF_BASE}/anime-slime-mascot.png`,
+  },
+  {
+    id: 'anime-katana',
+    category: 'アニメ調・武器',
+    prompt: 'An anime-style katana with a glowing pale-blue blade, ornate gold guard and dark red wrapped hilt, cel-shaded with crisp two-tone shadows',
+    probe: '極薄ブレード+エミッシブ+セル調 2 段影。輪郭線・影のテクスチャ焼き込みの有無',
+    difficulty: 2,
+    referenceImage: `${REF_BASE}/anime-katana.png`,
+  },
+  {
+    id: 'anime-ramen-bowl',
+    category: 'アニメ調・小物',
+    prompt: 'An anime-style bowl of steaming ramen with painted glossy highlights, flat cel-shaded colors, chopsticks resting across the rim',
+    probe: 'アニメ的「描き込みハイライト」(非物理的な光沢表現)の扱い、器+具+箸の複合',
+    difficulty: 2,
+    referenceImage: `${REF_BASE}/anime-ramen-bowl.png`,
+  },
+  {
+    id: 'anime-vending-machine',
+    category: 'アニメ調・背景プロップ',
+    prompt: 'A Japanese drink vending machine in anime background-art style, soft cel shading, glowing panel and colorful drink cans behind glass',
+    probe: '背景美術調の箱物、ガラス越しの中身、ラベル類、エミッシブパネル',
+    difficulty: 2,
+    referenceImage: `${REF_BASE}/anime-vending-machine.png`,
+  },
+  {
+    id: 'anime-heroine-character',
+    category: 'アニメ調・キャラクター',
+    prompt: 'An original anime-style heroine character with large expressive eyes, short teal hair, a sailor-style school uniform, cel-shaded flat colors, standing in a neutral pose',
+    probe: 'アニメ顔の扱い(目をテクスチャで描くか立体化するか)、髪の房ジオメトリ、セル調衣装。学習分布との乖離が最大の課題',
+    difficulty: 3,
+    referenceImage: `${REF_BASE}/anime-heroine-character.png`,
   },
 ];

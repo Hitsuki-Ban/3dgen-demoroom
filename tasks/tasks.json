@@ -118,5 +118,35 @@
     "prompt": "A hunched forest goblin creature with mottled green skin, large pointed ears and tattered cloth garments",
     "image": "references/forest-goblin-creature.png",
     "seed": 20260708
+  },
+  {
+    "id": "anime-slime-mascot",
+    "prompt": "A cute anime-style blue slime mascot with a simple happy face, cel-shaded flat colors with a single crisp highlight",
+    "image": "references/anime-slime-mascot.png",
+    "seed": 20260708
+  },
+  {
+    "id": "anime-katana",
+    "prompt": "An anime-style katana with a glowing pale-blue blade, ornate gold guard and dark red wrapped hilt, cel-shaded with crisp two-tone shadows",
+    "image": "references/anime-katana.png",
+    "seed": 20260708
+  },
+  {
+    "id": "anime-ramen-bowl",
+    "prompt": "An anime-style bowl of steaming ramen with painted glossy highlights, flat cel-shaded colors, chopsticks resting across the rim",
+    "image": "references/anime-ramen-bowl.png",
+    "seed": 20260708
+  },
+  {
+    "id": "anime-vending-machine",
+    "prompt": "A Japanese drink vending machine in anime background-art style, soft cel shading, glowing panel and colorful drink cans behind glass",
+    "image": "references/anime-vending-machine.png",
+    "seed": 20260708
+  },
+  {
+    "id": "anime-heroine-character",
+    "prompt": "An original anime-style heroine character with large expressive eyes, short teal hair, a sailor-style school uniform, cel-shaded flat colors, standing in a neutral pose",
+    "image": "references/anime-heroine-character.png",
+    "seed": 20260708
   }
 ]
