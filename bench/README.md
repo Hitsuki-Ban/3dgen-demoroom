@@ -41,7 +41,7 @@ uv run bench-harness runpod-pods
 RunPod launch commands additionally require `RUNPOD_API_KEY`:
 
 ```powershell
-uv run bench-harness runpod-launch triposg ghcr.io/hitsuki-ban/3dgen-triposg@sha256:<digest> s3://3dgen-runs/runs/triposg/rtx-5090/<timestamp> --name 3dgen-triposg-wave1
+uv run bench-harness runpod-launch triposg ghcr.io/hitsuki-ban/3dgen-triposg@sha256:<digest> s3://3dgen-runs/runs/triposg/rtx-5090/<timestamp> --name 3dgen-triposg-wave1 --container-registry-auth-id <runpod-registry-auth-id>
 uv run bench-harness runpod-terminate <pod-id>
 ```
 
@@ -91,6 +91,7 @@ The local 12GB RTX 4070 Ti validation gate is for lightweight runners first. Tri
 - When `RUNPOD_POD_ID` is present, RunPod self-termination requires `RUNPOD_API_KEY`; missing credentials fail fast.
 - Remote RunPod launch checks `clientBalance` before creating a pod. The default minimum balance is `$5`, or override it with `RUNPOD_MIN_BALANCE_USD` / `--min-balance-usd`.
 - The default cloud GPU priority is RTX 5090 followed by RTX 4090, with `allowedCudaVersions=("12.8",)`.
+- Private GHCR images require an explicit RunPod `--container-registry-auth-id`; the launcher writes it to `containerRegistryAuthId` in the pod payload.
 - The launcher injects `RUNPOD_API_KEY` plus the three R2 environment variables into the pod so the runner can self-terminate and upload before exit.
 - TripoSG and PartCrafter retry each failed task once; after the retry fails, they write `failure.json` instead of aborting the whole 25-task batch.
 
