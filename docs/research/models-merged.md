@@ -47,6 +47,7 @@
 
 ### 関連事実
 
+- **実行インフラの制約(2026-07-08 追記)**: 5(c) 条は Output の表示だけでなく Works の「使用」も Territory 内に限定するため、**Hunyuan3D 2.1 の推論を EU / UK / 韓国所在のクラウド DC で実行してはならない**。RunPod の 5090 在庫が EU 系 DC に偏っている時期があるので(2026-07-08 実測: 5090 Secure 在庫は EU-RO-1 / EU-CZ-1 / EUR-IS-1 / EUR-IS-2 のみ)、wave 2 で Hunyuan を回す際は**非 EU DC の選定+専用 network volume** が必要
 - **HY-World 2.0、Hunyuan3D-Part も同一テンプレート条項**(2026-07-08 確認)— Tencent 3D 系を追加する場合は同じ geo 制限パスに載せる
 - Hunyuan3D 2.5 / 3.0 / PolyGen は重み非公開のまま(issue #111 未回答)
 - サイトには「Hunyuan3D の表示が地域制限される理由」を説明するセクションを設ける(読者が必ず疑問に思う点であり、ライセンス比較自体が本サイトの価値になる)
