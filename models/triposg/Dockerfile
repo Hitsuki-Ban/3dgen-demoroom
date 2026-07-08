@@ -7,8 +7,12 @@ ARG UV_VERSION=0.11.19
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
-    HF_HOME=/opt/hf-cache \
+    HF_HOME=/workspace/hf \
+    HF_HUB_OFFLINE=1 \
+    TRANSFORMERS_OFFLINE=1 \
     PYTHONPATH=/opt/bench/src \
+    TRIPOSG_WEIGHTS_PATH=/workspace/weights/TripoSG \
+    RMBG_WEIGHTS_PATH=/workspace/weights/RMBG-1.4 \
     TORCH_CUDA_ARCH_LIST="8.9;12.0" \
     CUDA_HOME=/usr/local/cuda \
     FORCE_CUDA=1 \
@@ -42,25 +46,6 @@ RUN uv pip install --system \
         --index-url https://download.pytorch.org/whl/cu128 \
     && uv pip install --system boto3 scikit-build-core cmake ninja pybind11 \
     && uv pip install --system --no-build-isolation-package diso -r /opt/TripoSG/requirements.txt
-
-RUN TRIPOSG_WEIGHTS_REVISION="${TRIPOSG_WEIGHTS_REVISION}" \
-    RMBG_WEIGHTS_REVISION="${RMBG_WEIGHTS_REVISION}" \
-    python3 - <<'PY'
-import os
-
-from huggingface_hub import snapshot_download
-
-snapshot_download(
-    repo_id="VAST-AI/TripoSG",
-    revision=os.environ["TRIPOSG_WEIGHTS_REVISION"],
-    local_dir="/opt/weights/TripoSG",
-)
-snapshot_download(
-    repo_id="briaai/RMBG-1.4",
-    revision=os.environ["RMBG_WEIGHTS_REVISION"],
-    local_dir="/opt/weights/RMBG-1.4",
-)
-PY
 
 COPY bench/src /opt/bench/src
 COPY tasks /opt/3dgen-tasks

@@ -18,6 +18,7 @@ Implemented the local code needed for the first RunPod/R2 cloud wave and pushed 
 - GHCR packages were created as private by default. RunPod private registry auth has been provisioned as `cmrc1l2gc00847uotrnjn2des`.
 - RunPod pod `6o5yduivsud4yt` was launched for TripoSG at 2026-07-08T12:50:25Z and terminated manually after log inspection; `bench-harness runpod-pods` then returned `[]`.
 - There are no cloud artifacts from that pod because the container never reached runner execution.
+- RunPod network volume `b01dms1lva` (`3dgen-wave1-weights-us-il-1`) was created on 2026-07-08 in data center `US-IL-1`, size 30GB. The selected data center was chosen after `runpodctl datacenter list` showed both RTX 5090 and RTX 4090 availability there.
 
 ## GHCR Images
 
@@ -37,6 +38,11 @@ Implemented the local code needed for the first RunPod/R2 cloud wave and pushed 
 - Root `.dockerignore` excludes `.git`, `.worktrees`, `.docker-build`, `outputs`, and local Python/Node build directories from model image contexts.
 - RunPod HTTP calls now set a project User-Agent. Without it, RunPod's fronting protection can reject Python `urllib` calls with HTTP 403 / error code 1010.
 - `bench-harness runpod-pods` now accepts the RunPod REST API's JSON array response. The previous object-only parser failed on the empty-pod `[]` response.
+- The cloud launcher now requires `--network-volume-id`, injects `networkVolumeId`, mounts the volume at `/workspace`, and sets model weight paths under `/workspace/weights`.
+- The cloud launcher also requires `--data-center-id` and writes `dataCenterIds` / `dataCenterPriority=custom`, so pod placement stays in the same data center as the network volume.
+- The cloud launcher now has a pre-container startup watchdog: it polls `GET /pods/<id>` until `publicIp` appears, and terminates the pod if `--startup-timeout-min` expires first.
+- TripoSG and PartCrafter cloud images are now runtime-only with respect to model weights; their Dockerfiles no longer download Hugging Face snapshots into image layers.
+- TripoSG and PartCrafter runners now fail fast unless explicit weight path environment variables are present.
 
 ## TripoSG Launch Attempt
 
@@ -48,7 +54,10 @@ uv run bench-harness runpod-launch triposg `
   s3://3dgen-runs/runs/triposg/rtx-5090/20260708T125024Z `
   --name 3dgen-triposg-wave1-20260708T125024Z `
   --min-balance-usd 12 `
-  --container-registry-auth-id cmrc1l2gc00847uotrnjn2des
+  --container-registry-auth-id cmrc1l2gc00847uotrnjn2des `
+  --network-volume-id <runpod-network-volume-id> `
+  --data-center-id <runpod-data-center-id> `
+  --startup-timeout-min <minutes>
 ```
 
 Observed:
@@ -64,7 +73,7 @@ Observed:
 
 Conclusion: private registry auth worked far enough for RunPod to begin pulling the image, but the current image/layer shape is too heavy for the intended 90-minute wave guardrail. The next run should reduce or pre-warm image transfer before launching another full 25-task pod.
 
-See also: [RunPod large artifact handling: Codex notes](../research/runpod-large-artifacts-codex.md). The recommended path is to switch from baked-weight GHCR layers to runtime-only images plus a pre-populated RunPod network volume.
+See also: [RunPod large artifact handling: Codex notes](../research/runpod-large-artifacts-codex.md). The implemented path now uses runtime-only images plus a pre-populated RunPod network volume instead of baked-weight GHCR layers.
 
 ## Log Access Notes
 
@@ -81,19 +90,21 @@ See also: [RunPod large artifact handling: Codex notes](../research/runpod-large
 - `MAX_RUNTIME_MIN`: `90`
 - `gpuTypeIds`: `NVIDIA GeForce RTX 5090`, then `NVIDIA GeForce RTX 4090`
 - `gpuTypePriority`: `custom`
+- `dataCenterIds`: `US-IL-1`
+- `dataCenterPriority`: `custom`
 - `allowedCudaVersions`: `12.8`
 - `containerRegistryAuthId`: `cmrc1l2gc00847uotrnjn2des`
+- `networkVolumeId`: `b01dms1lva`
+- `startupTimeoutMin`: required per launch, launcher-side pre-container watchdog
 - `cloudType`: `SECURE`
 - `computeType`: `GPU`
 - `interruptible`: `false`
 
 ## Follow-up Before Full 25-Task Runs
 
-1. Shrink or restructure TripoSG/PartCrafter cloud images before another full run. The first observed pull was dominated by an 8.073GB layer and was not compatible with the intended launch guardrail.
-2. Prefer runtime-only images plus a RunPod network volume pre-populated with pinned model revisions. Avoid another full launch with baked-weight image layers.
-3. Add launcher support for `networkVolumeId` / volume mount path and runner support for env-configured weight paths.
-4. Add a launcher-side wall-clock watchdog for the pre-container phase, because `MAX_RUNTIME_MIN` only runs inside the container and cannot stop a pod stuck while pulling an image.
-5. Launch one model at a time with `--container-registry-auth-id cmrc1l2gc00847uotrnjn2des`, verify `bench-harness runpod-pods` after completion, and sync uploaded artifacts into `outputs/site-data/<model-id>/<task-id>/`.
+1. Pre-populate pinned revisions under `/workspace/weights` on network volume `b01dms1lva`.
+2. Rebuild and push runtime-only TripoSG/PartCrafter images from the updated Dockerfiles.
+3. Launch one model at a time with `--container-registry-auth-id cmrc1l2gc00847uotrnjn2des`, `--network-volume-id b01dms1lva`, `--data-center-id US-IL-1`, and `--startup-timeout-min <minutes>`, verify `bench-harness runpod-pods` after completion, and sync uploaded artifacts into `outputs/site-data/<model-id>/<task-id>/`.
 
 ## Source Checks
 

@@ -80,6 +80,9 @@ def test_build_pod_payload_uses_on_demand_gpu_priority_and_runtime_env() -> None
             gpu_type_ids=("NVIDIA GeForce RTX 5090", "NVIDIA GeForce RTX 4090"),
             allowed_cuda_versions=("12.8",),
             r2_credentials=make_r2_credentials(),
+            network_volume_id="volume-123",
+            data_center_id="US-IL-1",
+            startup_timeout_min=10,
         ),
         runpod_api_key="token",
     )
@@ -92,10 +95,20 @@ def test_build_pod_payload_uses_on_demand_gpu_priority_and_runtime_env() -> None
     assert payload["gpuTypePriority"] == "custom"
     assert payload["allowedCudaVersions"] == ["12.8"]
     assert payload["interruptible"] is False
+    assert payload["dataCenterIds"] == ["US-IL-1"]
+    assert payload["dataCenterPriority"] == "custom"
+    assert payload["networkVolumeId"] == "volume-123"
+    assert payload["volumeMountPath"] == "/workspace"
     assert "containerRegistryAuthId" not in payload
+    assert "volumeInGb" not in payload
     assert payload["env"]["MAX_RUNTIME_MIN"] == "90"
     assert payload["env"]["RUNPOD_RUN_MODEL_ID"] == "triposg"
     assert payload["env"]["RUNPOD_API_KEY"] == "token"
+    assert payload["env"]["HF_HOME"] == "/workspace/hf"
+    assert payload["env"]["HF_HUB_OFFLINE"] == "1"
+    assert payload["env"]["TRANSFORMERS_OFFLINE"] == "1"
+    assert payload["env"]["TRIPOSG_WEIGHTS_PATH"] == "/workspace/weights/TripoSG"
+    assert payload["env"]["RMBG_WEIGHTS_PATH"] == "/workspace/weights/RMBG-1.4"
     assert payload["env"]["R2_ENDPOINT"] == "https://example.r2.cloudflarestorage.com"
     assert payload["env"]["R2_ACCESS_KEY_ID"] == "access-key"
     assert payload["env"]["R2_SECRET_ACCESS_KEY"] == "secret-key"
@@ -115,6 +128,9 @@ def test_build_pod_payload_uses_container_registry_auth_id_when_provided() -> No
             allowed_cuda_versions=("12.8",),
             r2_credentials=make_r2_credentials(),
             container_registry_auth_id="cmrc1l2gc00847uotrnjn2des",
+            network_volume_id="volume-123",
+            data_center_id="US-IL-1",
+            startup_timeout_min=10,
         ),
         runpod_api_key="token",
     )
@@ -135,9 +151,75 @@ def test_build_pod_payload_rejects_empty_container_registry_auth_id() -> None:
                 allowed_cuda_versions=("12.8",),
                 r2_credentials=make_r2_credentials(),
                 container_registry_auth_id=" ",
+                network_volume_id="volume-123",
+                data_center_id="US-IL-1",
+                startup_timeout_min=10,
             ),
             runpod_api_key="token",
         )
+
+
+def test_build_pod_payload_rejects_empty_network_volume_id() -> None:
+    with pytest.raises(ValueError, match="network_volume_id"):
+        build_pod_payload(
+            RunPodLaunchConfig(
+                name="3dgen-triposg-wave1",
+                image_name="ghcr.io/hitsuki-ban/3dgen-triposg@sha256:abc",
+                model_id="triposg",
+                s3_target="s3://3dgen-runs/runs/triposg/rtx-5090/20260708T000000Z",
+                max_runtime_min=90,
+                gpu_type_ids=("NVIDIA GeForce RTX 5090",),
+                allowed_cuda_versions=("12.8",),
+                r2_credentials=make_r2_credentials(),
+                network_volume_id=" ",
+                data_center_id="US-IL-1",
+                startup_timeout_min=10,
+            ),
+            runpod_api_key="token",
+        )
+
+
+def test_build_pod_payload_rejects_empty_data_center_id() -> None:
+    with pytest.raises(ValueError, match="data_center_id"):
+        build_pod_payload(
+            RunPodLaunchConfig(
+                name="3dgen-triposg-wave1",
+                image_name="ghcr.io/hitsuki-ban/3dgen-triposg@sha256:abc",
+                model_id="triposg",
+                s3_target="s3://3dgen-runs/runs/triposg/rtx-5090/20260708T000000Z",
+                max_runtime_min=90,
+                gpu_type_ids=("NVIDIA GeForce RTX 5090",),
+                allowed_cuda_versions=("12.8",),
+                r2_credentials=make_r2_credentials(),
+                network_volume_id="volume-123",
+                data_center_id=" ",
+                startup_timeout_min=10,
+            ),
+            runpod_api_key="token",
+        )
+
+
+def test_build_pod_payload_uses_partcrafter_volume_weight_paths() -> None:
+    payload = build_pod_payload(
+        RunPodLaunchConfig(
+            name="3dgen-partcrafter-wave1",
+            image_name="ghcr.io/hitsuki-ban/3dgen-partcrafter@sha256:abc",
+            model_id="partcrafter",
+            s3_target="s3://3dgen-runs/runs/partcrafter/rtx-5090/20260708T000000Z",
+            max_runtime_min=90,
+            gpu_type_ids=("NVIDIA GeForce RTX 5090",),
+            allowed_cuda_versions=("12.8",),
+            r2_credentials=make_r2_credentials(),
+            network_volume_id="volume-123",
+            data_center_id="US-IL-1",
+            startup_timeout_min=10,
+        ),
+        runpod_api_key="token",
+    )
+
+    assert payload["env"]["PARTCRAFTER_WEIGHTS_PATH"] == "/workspace/weights/PartCrafter"
+    assert payload["env"]["RMBG_WEIGHTS_PATH"] == "/workspace/weights/RMBG-1.4"
+    assert "TRIPOSG_WEIGHTS_PATH" not in payload["env"]
 
 
 def test_r2_credentials_are_loaded_from_explicit_env() -> None:
@@ -178,6 +260,8 @@ def test_runpod_client_checks_balance_before_creating_pod() -> None:
             return {"data": {"myself": {"clientBalance": 20.0}}}
         if url == "https://rest.runpod.io/v1/pods":
             return {"id": "pod-123", "desiredStatus": "RUNNING"}
+        if url == "https://rest.runpod.io/v1/pods/pod-123":
+            return {"id": "pod-123", "publicIp": "100.65.0.119", "desiredStatus": "RUNNING"}
         raise AssertionError(url)
 
     client = RunPodClient(api_key="token", request_json=fake_request)
@@ -191,17 +275,71 @@ def test_runpod_client_checks_balance_before_creating_pod() -> None:
             gpu_type_ids=("NVIDIA GeForce RTX 5090", "NVIDIA GeForce RTX 4090"),
             allowed_cuda_versions=("12.8",),
             r2_credentials=make_r2_credentials(),
+            network_volume_id="volume-123",
+            data_center_id="US-IL-1",
+            startup_timeout_min=10,
+            startup_poll_seconds=0,
         ),
         min_balance_usd=5.0,
     )
 
-    assert pod == {"id": "pod-123", "desiredStatus": "RUNNING"}
+    assert pod == {"id": "pod-123", "publicIp": "100.65.0.119", "desiredStatus": "RUNNING"}
     assert calls[0][0:2] == ("POST", "https://api.runpod.io/graphql")
     assert calls[1][0:2] == ("POST", "https://rest.runpod.io/v1/pods")
+    assert calls[2][0:2] == ("GET", "https://rest.runpod.io/v1/pods/pod-123")
     assert calls[0][2] == {"Authorization": "Bearer token"}
     assert calls[1][2] == {"Authorization": "Bearer token"}
     assert calls[1][3]["env"]["RUNPOD_API_KEY"] == "token"
     assert calls[1][3]["env"]["R2_ENDPOINT"] == "https://example.r2.cloudflarestorage.com"
+
+
+def test_runpod_client_terminates_pod_when_startup_watchdog_expires(monkeypatch) -> None:
+    calls = []
+    clock = iter([0.0, 0.0, 601.0])
+
+    def fake_monotonic() -> float:
+        return next(clock)
+
+    def fake_sleep(seconds: float) -> None:
+        calls.append(("SLEEP", seconds, {}, None))
+
+    def fake_request(method: str, url: str, headers: dict[str, str], body: dict[str, object] | None) -> dict[str, object]:
+        calls.append((method, url, headers, body))
+        if url == "https://api.runpod.io/graphql":
+            return {"data": {"myself": {"clientBalance": 20.0}}}
+        if method == "POST" and url == "https://rest.runpod.io/v1/pods":
+            return {"id": "pod-123", "desiredStatus": "RUNNING"}
+        if method == "GET" and url == "https://rest.runpod.io/v1/pods/pod-123":
+            return {"id": "pod-123", "publicIp": "", "desiredStatus": "RUNNING"}
+        if method == "DELETE" and url == "https://rest.runpod.io/v1/pods/pod-123":
+            return {}
+        raise AssertionError((method, url))
+
+    monkeypatch.setattr("bench_harness.runpod.time.monotonic", fake_monotonic)
+    monkeypatch.setattr("bench_harness.runpod.time.sleep", fake_sleep)
+
+    client = RunPodClient(api_key="token", request_json=fake_request)
+
+    with pytest.raises(TimeoutError, match="did not expose publicIp"):
+        client.launch_pod(
+            RunPodLaunchConfig(
+                name="3dgen-triposg-wave1",
+                image_name="ghcr.io/hitsuki-ban/3dgen-triposg@sha256:abc",
+                model_id="triposg",
+                s3_target="s3://3dgen-runs/runs/triposg/rtx-5090/20260708T000000Z",
+                max_runtime_min=90,
+                gpu_type_ids=("NVIDIA GeForce RTX 5090",),
+                allowed_cuda_versions=("12.8",),
+                r2_credentials=make_r2_credentials(),
+                network_volume_id="volume-123",
+                data_center_id="US-IL-1",
+                startup_timeout_min=10,
+                startup_poll_seconds=15,
+            ),
+            min_balance_usd=5.0,
+        )
+
+    assert calls[-1][0:2] == ("DELETE", "https://rest.runpod.io/v1/pods/pod-123")
 
 
 def test_runpod_client_terminates_pod_idempotently() -> None:

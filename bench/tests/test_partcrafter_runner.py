@@ -13,7 +13,9 @@ MODEL_SPEC_PATH = REPO_ROOT / "models" / "partcrafter" / "model.json"
 DOCKERFILE_PATH = REPO_ROOT / "models" / "partcrafter" / "Dockerfile"
 
 
-def _load_runner():
+def _load_runner(monkeypatch):
+    monkeypatch.setenv("PARTCRAFTER_WEIGHTS_PATH", "/workspace/weights/PartCrafter")
+    monkeypatch.setenv("RMBG_WEIGHTS_PATH", "/workspace/weights/RMBG-1.4")
     spec = importlib.util.spec_from_file_location("partcrafter_runner", RUNNER_PATH)
     assert spec is not None
     assert spec.loader is not None
@@ -51,8 +53,8 @@ def test_partcrafter_model_spec_records_current_pins() -> None:
             "part_suggest": False,
             "style_transfer": False,
             "dtype": "float16",
-            "partcrafter_weights_path": "/opt/weights/PartCrafter",
-            "rmbg_weights_path": "/opt/weights/RMBG-1.4",
+            "partcrafter_weights_path": "/workspace/weights/PartCrafter",
+            "rmbg_weights_path": "/workspace/weights/RMBG-1.4",
         },
     }
 
@@ -64,8 +66,9 @@ def test_partcrafter_dockerfile_uses_required_cuda_base_and_pins() -> None:
     assert "ARG PARTCRAFTER_COMMIT=3d773bf02fad51c7ab31a5615573fec93b287b30" in dockerfile
     assert "ARG PARTCRAFTER_WEIGHTS_REVISION=69a0ffc1dad5e48e7e5ed91c0609f2b1276eb31f" in dockerfile
     assert "ARG RMBG_WEIGHTS_REVISION=2ceba5a5efaec153162aedea169f76caf9b46cf8" in dockerfile
-    assert 'revision=os.environ["PARTCRAFTER_WEIGHTS_REVISION"]' in dockerfile
-    assert 'revision=os.environ["RMBG_WEIGHTS_REVISION"]' in dockerfile
+    assert "snapshot_download(" not in dockerfile
+    assert "PARTCRAFTER_WEIGHTS_PATH=/workspace/weights/PartCrafter" in dockerfile
+    assert "RMBG_WEIGHTS_PATH=/workspace/weights/RMBG-1.4" in dockerfile
     assert "torch==2.7.0" in dockerfile
     assert "torchvision==0.22.0" in dockerfile
     assert "https://download.pytorch.org/whl/cu128" in dockerfile
@@ -81,8 +84,12 @@ def test_partcrafter_dockerfile_uses_required_cuda_base_and_pins() -> None:
     assert "COPY models/partcrafter/runner.py /opt/3dgen-runner/partcrafter_runner.py" in dockerfile
 
 
-def test_build_partcrafter_command_uses_local_pinned_weights_and_no_external_api(tmp_path: Path) -> None:
-    runner = _load_runner()
+def test_build_partcrafter_command_uses_volume_pinned_weights_and_no_external_api(
+    monkeypatch, tmp_path: Path
+    ) -> None:
+    runner = _load_runner(monkeypatch)
+    assert runner.PARTCRAFTER_WEIGHTS_PATH == "/workspace/weights/PartCrafter"
+    assert runner.RMBG_WEIGHTS_PATH == "/workspace/weights/RMBG-1.4"
     command = runner.build_partcrafter_command(
         image_path=tmp_path / "input.png",
         raw_output_dir=tmp_path / "raw",
@@ -110,17 +117,35 @@ def test_build_partcrafter_command_uses_local_pinned_weights_and_no_external_api
         "--infer-max-num-expanded-coords",
         "1000000000",
         "--infer-partcrafter-weights-path",
-        "/opt/weights/PartCrafter",
+        "/workspace/weights/PartCrafter",
         "--infer-rmbg-weights-path",
-        "/opt/weights/RMBG-1.4",
+        "/workspace/weights/RMBG-1.4",
         "--infer-rmbg",
     ]
     assert "--part_suggest" not in command
     assert "--style_transfer" not in command
 
 
-def test_prepare_task_output_writes_partcrafter_contract_files(tmp_path: Path) -> None:
-    runner = _load_runner()
+def test_partcrafter_runner_requires_explicit_weight_env(monkeypatch) -> None:
+    monkeypatch.delenv("PARTCRAFTER_WEIGHTS_PATH", raising=False)
+    monkeypatch.delenv("RMBG_WEIGHTS_PATH", raising=False)
+
+    spec = importlib.util.spec_from_file_location("partcrafter_runner_missing_env", RUNNER_PATH)
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules["partcrafter_runner_missing_env"] = module
+
+    try:
+        spec.loader.exec_module(module)
+    except ValueError as exc:
+        assert "PARTCRAFTER_WEIGHTS_PATH" in str(exc)
+    else:
+        raise AssertionError("runner import should fail without explicit weight env")
+
+
+def test_prepare_task_output_writes_partcrafter_contract_files(monkeypatch, tmp_path: Path) -> None:
+    runner = _load_runner(monkeypatch)
     task = TaskDefinition(
         id="cartoon-apple",
         prompt="A stylized cartoon red apple",
@@ -177,7 +202,7 @@ def test_prepare_task_output_writes_partcrafter_contract_files(tmp_path: Path) -
 
 
 def test_run_task_retries_once_and_records_retry_count(monkeypatch, tmp_path: Path) -> None:
-    runner = _load_runner()
+    runner = _load_runner(monkeypatch)
     input_root = tmp_path / "input"
     output_root = tmp_path / "output"
     input_root.mkdir()
@@ -232,7 +257,7 @@ def test_run_task_retries_once_and_records_retry_count(monkeypatch, tmp_path: Pa
 
 
 def test_run_task_writes_failure_record_after_retry(monkeypatch, tmp_path: Path) -> None:
-    runner = _load_runner()
+    runner = _load_runner(monkeypatch)
     input_root = tmp_path / "input"
     output_root = tmp_path / "output"
     input_root.mkdir()
@@ -269,7 +294,7 @@ def test_run_task_writes_failure_record_after_retry(monkeypatch, tmp_path: Path)
 
 
 def test_terminate_runpod_if_needed_sends_harness_user_agent(monkeypatch) -> None:
-    runner = _load_runner()
+    runner = _load_runner(monkeypatch)
     captured = {}
 
     class FakeResponse:

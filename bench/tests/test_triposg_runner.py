@@ -13,7 +13,9 @@ MODEL_SPEC_PATH = REPO_ROOT / "models" / "triposg" / "model.json"
 DOCKERFILE_PATH = REPO_ROOT / "models" / "triposg" / "Dockerfile"
 
 
-def _load_runner():
+def _load_runner(monkeypatch):
+    monkeypatch.setenv("TRIPOSG_WEIGHTS_PATH", "/workspace/weights/TripoSG")
+    monkeypatch.setenv("RMBG_WEIGHTS_PATH", "/workspace/weights/RMBG-1.4")
     spec = importlib.util.spec_from_file_location("triposg_runner", RUNNER_PATH)
     assert spec is not None
     assert spec.loader is not None
@@ -50,8 +52,8 @@ def test_triposg_model_spec_records_current_pins() -> None:
             "use_flash_decoder": True,
             "faces": -1,
             "dtype": "float16",
-            "triposg_weights_path": "/opt/weights/TripoSG",
-            "rmbg_weights_path": "/opt/weights/RMBG-1.4",
+            "triposg_weights_path": "/workspace/weights/TripoSG",
+            "rmbg_weights_path": "/workspace/weights/RMBG-1.4",
         },
     }
 
@@ -63,8 +65,9 @@ def test_triposg_dockerfile_uses_required_cuda_base_and_pins() -> None:
     assert "ARG TRIPOSG_COMMIT=fc5c40990181e2a756c4e0b1c2f4d6b5202faf8c" in dockerfile
     assert "ARG TRIPOSG_WEIGHTS_REVISION=2c1c516d22d58db486a058d98d31bb6177344e06" in dockerfile
     assert "ARG RMBG_WEIGHTS_REVISION=2ceba5a5efaec153162aedea169f76caf9b46cf8" in dockerfile
-    assert 'revision=os.environ["TRIPOSG_WEIGHTS_REVISION"]' in dockerfile
-    assert 'revision=os.environ["RMBG_WEIGHTS_REVISION"]' in dockerfile
+    assert "snapshot_download(" not in dockerfile
+    assert "TRIPOSG_WEIGHTS_PATH=/workspace/weights/TripoSG" in dockerfile
+    assert "RMBG_WEIGHTS_PATH=/workspace/weights/RMBG-1.4" in dockerfile
     assert "torch==2.7.1" in dockerfile
     assert "torchvision==0.22.1" in dockerfile
     assert "https://download.pytorch.org/whl/cu128" in dockerfile
@@ -81,8 +84,10 @@ def test_triposg_dockerfile_uses_required_cuda_base_and_pins() -> None:
     assert "COPY models/triposg/runner.py /opt/3dgen-runner/triposg_runner.py" in dockerfile
 
 
-def test_build_triposg_command_uses_local_pinned_weights(tmp_path: Path) -> None:
-    runner = _load_runner()
+def test_build_triposg_command_uses_volume_pinned_weights(monkeypatch, tmp_path: Path) -> None:
+    runner = _load_runner(monkeypatch)
+    assert runner.TRIPOSG_WEIGHTS_PATH == "/workspace/weights/TripoSG"
+    assert runner.RMBG_WEIGHTS_PATH == "/workspace/weights/RMBG-1.4"
     command = runner.build_triposg_command(
         image_path=tmp_path / "input.png",
         raw_output_dir=tmp_path / "raw",
@@ -115,14 +120,32 @@ def test_build_triposg_command_uses_local_pinned_weights(tmp_path: Path) -> None
         "--infer-faces",
         "-1",
         "--infer-triposg-weights-path",
-        "/opt/weights/TripoSG",
+        "/workspace/weights/TripoSG",
         "--infer-rmbg-weights-path",
-        "/opt/weights/RMBG-1.4",
+        "/workspace/weights/RMBG-1.4",
     ]
 
 
-def test_prepare_task_output_writes_triposg_contract_files(tmp_path: Path) -> None:
-    runner = _load_runner()
+def test_triposg_runner_requires_explicit_weight_env(monkeypatch) -> None:
+    monkeypatch.delenv("TRIPOSG_WEIGHTS_PATH", raising=False)
+    monkeypatch.delenv("RMBG_WEIGHTS_PATH", raising=False)
+
+    spec = importlib.util.spec_from_file_location("triposg_runner_missing_env", RUNNER_PATH)
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules["triposg_runner_missing_env"] = module
+
+    try:
+        spec.loader.exec_module(module)
+    except ValueError as exc:
+        assert "TRIPOSG_WEIGHTS_PATH" in str(exc)
+    else:
+        raise AssertionError("runner import should fail without explicit weight env")
+
+
+def test_prepare_task_output_writes_triposg_contract_files(monkeypatch, tmp_path: Path) -> None:
+    runner = _load_runner(monkeypatch)
     task = TaskDefinition(
         id="cartoon-apple",
         prompt="A stylized cartoon red apple",
@@ -177,7 +200,7 @@ def test_prepare_task_output_writes_triposg_contract_files(tmp_path: Path) -> No
 
 
 def test_run_task_retries_once_and_records_retry_count(monkeypatch, tmp_path: Path) -> None:
-    runner = _load_runner()
+    runner = _load_runner(monkeypatch)
     input_root = tmp_path / "input"
     output_root = tmp_path / "output"
     input_root.mkdir()
@@ -230,7 +253,7 @@ def test_run_task_retries_once_and_records_retry_count(monkeypatch, tmp_path: Pa
 
 
 def test_run_task_writes_failure_record_after_retry(monkeypatch, tmp_path: Path) -> None:
-    runner = _load_runner()
+    runner = _load_runner(monkeypatch)
     input_root = tmp_path / "input"
     output_root = tmp_path / "output"
     input_root.mkdir()
@@ -268,7 +291,7 @@ def test_run_task_writes_failure_record_after_retry(monkeypatch, tmp_path: Path)
 
 
 def test_terminate_runpod_if_needed_sends_harness_user_agent(monkeypatch) -> None:
-    runner = _load_runner()
+    runner = _load_runner(monkeypatch)
     captured = {}
 
     class FakeResponse:
