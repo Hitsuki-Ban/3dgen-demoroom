@@ -90,6 +90,54 @@ def test_runpod_launch_command_uses_env_credentials_and_issue_defaults(monkeypat
     assert capsys.readouterr().out == '{"desiredStatus": "RUNNING", "id": "pod-123"}\n'
 
 
+def test_runpod_launch_command_redacts_pod_env_from_output(monkeypatch, capsys) -> None:
+    class FakeRunPodClient:
+        def __init__(self, api_key: str) -> None:
+            pass
+
+        def launch_pod(self, config: RunPodLaunchConfig, min_balance_usd: float) -> dict[str, object]:
+            return {
+                "id": "pod-123",
+                "desiredStatus": "RUNNING",
+                "env": {
+                    "RUNPOD_API_KEY": "runpod-secret",
+                    "R2_SECRET_ACCESS_KEY": "r2-secret",
+                },
+            }
+
+    monkeypatch.setattr(cli, "RunPodClient", FakeRunPodClient)
+    monkeypatch.setenv("RUNPOD_API_KEY", "token")
+    monkeypatch.setenv("R2_ENDPOINT", "https://example.r2.cloudflarestorage.com")
+    monkeypatch.setenv("R2_ACCESS_KEY_ID", "access-key")
+    monkeypatch.setenv("R2_SECRET_ACCESS_KEY", "secret-key")
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "bench-harness",
+            "runpod-launch",
+            "triposg",
+            "ghcr.io/hitsuki-ban/3dgen-triposg@sha256:abc",
+            "s3://3dgen-runs/runs/triposg/rtx-5090/20260708T000000Z",
+            "--name",
+            "3dgen-triposg-wave1",
+            "--network-volume-id",
+            "volume-123",
+            "--startup-timeout-min",
+            "20",
+            "--data-center-id",
+            "US-IL-1",
+        ],
+    )
+
+    cli.main()
+
+    output = capsys.readouterr().out
+    assert "runpod-secret" not in output
+    assert "r2-secret" not in output
+    assert "env" not in output
+    assert output == '{"desiredStatus": "RUNNING", "id": "pod-123"}\n'
+
+
 def test_runpod_pods_command_lists_pods(monkeypatch, capsys) -> None:
     captured: dict[str, object] = {}
 
@@ -108,6 +156,32 @@ def test_runpod_pods_command_lists_pods(monkeypatch, capsys) -> None:
 
     assert captured["api_key"] == "token"
     assert capsys.readouterr().out == '{"pods": []}\n'
+
+
+def test_runpod_pods_command_redacts_pod_env_from_output(monkeypatch, capsys) -> None:
+    class FakeRunPodClient:
+        def __init__(self, api_key: str) -> None:
+            pass
+
+        def list_pods(self) -> list[dict[str, object]]:
+            return [
+                {
+                    "id": "pod-123",
+                    "desiredStatus": "RUNNING",
+                    "env": {"R2_SECRET_ACCESS_KEY": "r2-secret"},
+                }
+            ]
+
+    monkeypatch.setattr(cli, "RunPodClient", FakeRunPodClient)
+    monkeypatch.setenv("RUNPOD_API_KEY", "token")
+    monkeypatch.setattr("sys.argv", ["bench-harness", "runpod-pods"])
+
+    cli.main()
+
+    output = capsys.readouterr().out
+    assert "r2-secret" not in output
+    assert "env" not in output
+    assert output == '[{"desiredStatus": "RUNNING", "id": "pod-123"}]\n'
 
 
 def test_runpod_terminate_command_deletes_pod(monkeypatch, capsys) -> None:

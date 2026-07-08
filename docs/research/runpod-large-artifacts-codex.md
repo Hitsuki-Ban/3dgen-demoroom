@@ -85,17 +85,19 @@ Still needed before the next paid benchmark pod:
 
 Created volume:
 
-- ID: `b01dms1lva`
-- Name: `3dgen-wave1-weights-us-il-1`
-- Data center: `US-IL-1`
+- ID: `cwcjs6bz6j`
+- Name: `3dgen-wave1-weights-us-nc-1`
+- Data center: `US-NC-1`
 - Size: 30GB
 - Created: 2026-07-08
+- Staged weights report: `runs/staging/20260708T144842Z/network-volume-cwcjs6bz6j.json`
 
 ## Recommended implementation plan
 
 1. Add a small staging script that downloads pinned Hugging Face revisions into the mounted network volume and writes manifest files containing repo id, revision, expected local path, and checked timestamp.
 2. Make benchmark runners validate those manifest files before starting the first task.
 3. Keep the old baked-weight images only as historical artifacts; do not spend more GPU time testing them.
+4. Keep the launcher command observable: upload a `runpod-status.json` file even when the model runner exits non-zero, then terminate the pod from local monitoring if self-termination does not complete.
 
 ## Candidate staging commands
 

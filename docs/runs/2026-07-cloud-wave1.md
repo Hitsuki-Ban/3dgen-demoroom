@@ -18,7 +18,9 @@ Implemented the local code needed for the first RunPod/R2 cloud wave and pushed 
 - GHCR packages were created as private by default. RunPod private registry auth has been provisioned as `cmrc1l2gc00847uotrnjn2des`.
 - RunPod pod `6o5yduivsud4yt` was launched for TripoSG at 2026-07-08T12:50:25Z and terminated manually after log inspection; `bench-harness runpod-pods` then returned `[]`.
 - There are no cloud artifacts from that pod because the container never reached runner execution.
-- RunPod network volume `b01dms1lva` (`3dgen-wave1-weights-us-il-1`) was created on 2026-07-08 in data center `US-IL-1`, size 30GB. The selected data center was chosen after `runpodctl datacenter list` showed both RTX 5090 and RTX 4090 availability there.
+- The old empty RunPod network volume `b01dms1lva` in `US-IL-1` was deleted after Fable's review noted that volume placement must follow actual 5090 data center availability.
+- Current retained RunPod network volume: `cwcjs6bz6j` (`3dgen-wave1-weights-us-nc-1`) in data center `US-NC-1`, size 30GB. It was CPU-staged successfully with TripoSG, PartCrafter, and RMBG pinned weights. R2 staging report: `runs/staging/20260708T144842Z/network-volume-cwcjs6bz6j.json`.
+- A paid TripoSG runtime-only launch on `US-NC-1` reached public IP, then lost public IP/port mappings while `/pods` still reported `RUNNING`; it was manually terminated with no R2 benchmark artifacts. This exposed a launcher observability gap: runner failures did not upload a status report because the command used `runner && upload-s3`.
 
 ## GHCR Images
 
@@ -26,6 +28,8 @@ Implemented the local code needed for the first RunPod/R2 cloud wave and pushed 
 | --- | --- | --- | --- |
 | TripoSG | `ghcr.io/hitsuki-ban/3dgen-triposg:2026-07-cloud-wave1` | `sha256:20683da63af15a45e64d6f4dfcb2c92763b6bc33f71bb046c0c852c2aae7e6b9` | private |
 | PartCrafter | `ghcr.io/hitsuki-ban/3dgen-partcrafter:2026-07-cloud-wave1` | `sha256:b84791ae147f43dc5556bb8d853b2b16f311c657a96fecdff6f1706bd3b2df9b` | private |
+| TripoSG runtime-only | `ghcr.io/hitsuki-ban/3dgen-triposg:2026-07-cloud-wave1-runtime-volume` | `sha256:d210db2e5c0aa22cc788129de6e4a8484e0380346ce1f9d2169ce25dcd5d640e` | private |
+| PartCrafter runtime-only | `ghcr.io/hitsuki-ban/3dgen-partcrafter:2026-07-cloud-wave1-runtime-volume` | `sha256:bb9e7bff54ca1688c1584f1de0e12c11153caa3d4a32f2073068e9ef27ce0eb0` | private |
 
 ## Implemented
 
@@ -43,6 +47,8 @@ Implemented the local code needed for the first RunPod/R2 cloud wave and pushed 
 - The cloud launcher now has a pre-container startup watchdog: it polls `GET /pods/<id>` until `publicIp` appears, and terminates the pod if `--startup-timeout-min` expires first.
 - TripoSG and PartCrafter cloud images are now runtime-only with respect to model weights; their Dockerfiles no longer download Hugging Face snapshots into image layers.
 - TripoSG and PartCrafter runners now fail fast unless explicit weight path environment variables are present.
+- RunPod cloud commands now write `runpod-status.json`, upload the output directory even when the runner exits non-zero, and then attempt best-effort self-termination. Upload/status failures take precedence over runner failures because a missing R2 report is an infrastructure failure.
+- `bench-harness runpod-launch` and `runpod-pods` now strip RunPod `env` fields before printing pod responses, so local logs do not contain injected R2 or RunPod secrets.
 
 ## TripoSG Launch Attempt
 
@@ -75,6 +81,37 @@ Conclusion: private registry auth worked far enough for RunPod to begin pulling 
 
 See also: [RunPod large artifact handling: Codex notes](../research/runpod-large-artifacts-codex.md). The implemented path now uses runtime-only images plus a pre-populated RunPod network volume instead of baked-weight GHCR layers.
 
+## TripoSG Runtime-Only Launch Attempt
+
+Command shape:
+
+```powershell
+uv run bench-harness runpod-launch triposg `
+  ghcr.io/hitsuki-ban/3dgen-triposg:2026-07-cloud-wave1-runtime-volume `
+  s3://3dgen-runs/runs/triposg/wave1/20260708T145633Z `
+  --name 3dgen-triposg-wave1-20260708T145633Z `
+  --min-balance-usd 12 `
+  --container-registry-auth-id cmrc1l2gc00847uotrnjn2des `
+  --network-volume-id cwcjs6bz6j `
+  --data-center-id US-NC-1 `
+  --startup-timeout-min 25
+```
+
+Observed:
+
+- Pod id: `3n74xwryczc907`
+- Created at: 2026-07-08T14:56:33Z
+- Cost reported by RunPod: `$0.99/hr`
+- Data center: `US-NC-1`
+- Network volume: `cwcjs6bz6j`
+- R2 prefix: `runs/triposg/wave1/20260708T145633Z/`
+- Startup watchdog passed: `publicIp` appeared at about 2026-07-08T14:58:58Z.
+- R2 object count stayed `0`.
+- During monitoring, `publicIp` and `portMappings` disappeared while `/pods` still showed `desiredStatus=RUNNING`; SSH was unavailable.
+- The pod was manually terminated to stop spend.
+
+Conclusion: the runtime-only image fixed the pre-container pull delay, but the command did not produce enough failure telemetry. The launcher command now uploads a `runpod-status.json` file even when the runner fails, and treats upload/status failures as infrastructure failures, so the next paid retry should produce an R2 status artifact instead of a blank prefix.
+
 ## Log Access Notes
 
 - `runpodctl` v2.6.1 was installed locally under gitignored `.docker-build/tools/runpodctl-2.6.1`; checksum matched the official release checksum.
@@ -90,11 +127,11 @@ See also: [RunPod large artifact handling: Codex notes](../research/runpod-large
 - `MAX_RUNTIME_MIN`: `90`
 - `gpuTypeIds`: `NVIDIA GeForce RTX 5090`, then `NVIDIA GeForce RTX 4090`
 - `gpuTypePriority`: `custom`
-- `dataCenterIds`: `US-IL-1`
+- `dataCenterIds`: current retry volume is in `US-NC-1`
 - `dataCenterPriority`: `custom`
-- `allowedCudaVersions`: `12.8`
+- `allowedCudaVersions`: code default is `12.8`; the successful pod allocation used `13.0`, `12.9`, `12.8` to avoid over-filtering available 5090 machines
 - `containerRegistryAuthId`: `cmrc1l2gc00847uotrnjn2des`
-- `networkVolumeId`: `b01dms1lva`
+- `networkVolumeId`: `cwcjs6bz6j`
 - `startupTimeoutMin`: required per launch, launcher-side pre-container watchdog
 - `cloudType`: `SECURE`
 - `computeType`: `GPU`
@@ -102,9 +139,9 @@ See also: [RunPod large artifact handling: Codex notes](../research/runpod-large
 
 ## Follow-up Before Full 25-Task Runs
 
-1. Pre-populate pinned revisions under `/workspace/weights` on network volume `b01dms1lva`.
-2. Rebuild and push runtime-only TripoSG/PartCrafter images from the updated Dockerfiles.
-3. Launch one model at a time with `--container-registry-auth-id cmrc1l2gc00847uotrnjn2des`, `--network-volume-id b01dms1lva`, `--data-center-id US-IL-1`, and `--startup-timeout-min <minutes>`, verify `bench-harness runpod-pods` after completion, and sync uploaded artifacts into `outputs/site-data/<model-id>/<task-id>/`.
+1. Retry TripoSG with `--container-registry-auth-id cmrc1l2gc00847uotrnjn2des`, `--network-volume-id cwcjs6bz6j`, `--data-center-id US-NC-1`, and `--startup-timeout-min 25`.
+2. Confirm that every retry uploads either task outputs or `runpod-status.json` under the run prefix before considering the pod attempt diagnosable.
+3. After a successful TripoSG run, validate every task with `output-validate`, sync artifacts into `outputs/site-data/triposg/<task-id>/`, then run PartCrafter with the same volume.
 
 ## Source Checks
 

@@ -101,6 +101,8 @@ The local 12GB RTX 4070 Ti validation gate is for lightweight runners first. Tri
 - Cloud benchmark launches require an explicit RunPod `--network-volume-id`, `--data-center-id`, and `--startup-timeout-min`. The launcher writes `networkVolumeId`, constrains pod placement to the same single data center, mounts the volume at `/workspace`, and injects `/workspace/weights/...` model paths instead of using baked image weight layers.
 - After pod creation, the launcher polls `GET /pods/<id>` until `publicIp` appears. If startup exceeds `--startup-timeout-min`, it terminates the pod before the container-side watchdog can start.
 - The launcher injects `RUNPOD_API_KEY` plus the three R2 environment variables into the pod so the runner can self-terminate and upload before exit.
+- The pod command writes `runpod-status.json`, uploads the output directory even if the model runner exits non-zero, and then attempts best-effort self-termination. Upload/status failures take precedence over the runner exit code because a missing R2 report is an infrastructure failure, not a model result.
+- CLI output strips RunPod `env` fields before printing pod responses. Do not use raw RunPod pod JSON in reports because it can contain injected secrets.
 - TripoSG and PartCrafter retry each failed task once; after the retry fails, they write `failure.json` instead of aborting the whole 25-task batch.
 
 ## Source Pins Checked On 2026-07-08

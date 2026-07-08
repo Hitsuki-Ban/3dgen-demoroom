@@ -211,16 +211,84 @@ def build_cloud_run_command(model_id: str, output_root: str, s3_target: str) -> 
         raise ValueError(f"unknown model for RunPod cloud run: {model_id}") from exc
     if not s3_target.startswith("s3://"):
         raise ValueError("RunPod cloud run S3 target must use s3://")
+    quoted_output_root = quote(output_root)
+    quoted_s3_target = quote(s3_target)
+    quoted_model_id = quote(model_id)
     run_command = (
         f"python3 {quote(runner_path)} "
         f"--input-root {quote('/opt/3dgen-tasks')} "
-        f"--output-root {quote(output_root)}"
+        f"--output-root {quoted_output_root}"
+    )
+    status_command = (
+        "python3 - "
+        f"{quoted_output_root} {quoted_model_id} {quoted_s3_target} "
+        '"$runner_exit_code" <<\'PY_RUNPOD_STATUS\'\n'
+        "from __future__ import annotations\n"
+        "import json\n"
+        "import os\n"
+        "import sys\n"
+        "from datetime import datetime, timezone\n"
+        "from pathlib import Path\n"
+        "\n"
+        "output_root = Path(sys.argv[1])\n"
+        "model_id = sys.argv[2]\n"
+        "s3_target = sys.argv[3]\n"
+        "runner_exit_code = int(sys.argv[4])\n"
+        "output_root.mkdir(parents=True, exist_ok=True)\n"
+        "status = {\n"
+        "    'finished_at': datetime.now(timezone.utc).isoformat(),\n"
+        "    'model_id': model_id,\n"
+        "    'pod_id': os.environ.get('RUNPOD_POD_ID'),\n"
+        "    'runner_exit_code': runner_exit_code,\n"
+        "    'self_termination_configured': bool(os.environ.get('RUNPOD_POD_ID') and os.environ.get('RUNPOD_API_KEY')),\n"
+        "    's3_target': s3_target,\n"
+        "    'status': 'ok' if runner_exit_code == 0 else 'failed',\n"
+        "}\n"
+        "(output_root / 'runpod-status.json').write_text(json.dumps(status, indent=2, sort_keys=True) + '\\n', encoding='utf-8')\n"
+        "PY_RUNPOD_STATUS"
     )
     upload_command = (
         "PYTHONPATH=/opt/bench/src "
-        f"python3 -m bench_harness.cli upload-s3 {quote(output_root)} {quote(s3_target)}"
+        f"python3 -m bench_harness.cli upload-s3 {quoted_output_root} {quoted_s3_target}"
     )
-    return f"{run_command} && {upload_command}"
+    terminate_command = (
+        "python3 - <<'PY_RUNPOD_TERMINATE'\n"
+        "from __future__ import annotations\n"
+        "import os\n"
+        "import urllib.request\n"
+        "\n"
+        "pod_id = os.environ.get('RUNPOD_POD_ID')\n"
+        "api_key = os.environ.get('RUNPOD_API_KEY')\n"
+        "if not pod_id or not api_key:\n"
+        "    print('RunPod self-termination warning: RUNPOD_POD_ID or RUNPOD_API_KEY is missing', flush=True)\n"
+        "else:\n"
+        "    request = urllib.request.Request(\n"
+        "        f'https://rest.runpod.io/v1/pods/{pod_id}',\n"
+        "        method='DELETE',\n"
+        "        headers={\n"
+        "            'Authorization': f'Bearer {api_key}',\n"
+        "            'User-Agent': '3dgen-demoroom-bench-harness/0.1',\n"
+        "        },\n"
+        "    )\n"
+        "    try:\n"
+        "        urllib.request.urlopen(request, timeout=30).read()\n"
+        "    except Exception as exc:\n"
+        "        print(f'RunPod self-termination warning: {exc}', flush=True)\n"
+        "PY_RUNPOD_TERMINATE"
+    )
+    return (
+        "set +e\n"
+        f"{run_command}\n"
+        "runner_exit_code=$?\n"
+        f"{status_command}\n"
+        "status_exit_code=$?\n"
+        f"{upload_command}\n"
+        "upload_exit_code=$?\n"
+        f"{terminate_command}\n"
+        'if [ "$upload_exit_code" -ne 0 ]; then exit "$upload_exit_code"; fi\n'
+        'if [ "$status_exit_code" -ne 0 ]; then exit "$status_exit_code"; fi\n'
+        'exit "$runner_exit_code"'
+    )
 
 
 def build_model_weight_env(model_id: str) -> dict[str, str]:

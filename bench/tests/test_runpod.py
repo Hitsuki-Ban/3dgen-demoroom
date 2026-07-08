@@ -1,4 +1,7 @@
 import pytest
+import os
+import shutil
+import subprocess
 
 from bench_harness.runpod import (
     DEFAULT_ALLOWED_CUDA_VERSIONS,
@@ -58,6 +61,51 @@ def test_build_cloud_run_command_runs_model_then_uploads_to_s3() -> None:
     assert "--output-root /work/output" in command
     assert "python3 -m bench_harness.cli upload-s3" in command
     assert "s3://3dgen-runs/runs/triposg/rtx-5090/20260708T000000Z" in command
+
+
+def test_build_cloud_run_command_uploads_status_even_when_runner_fails() -> None:
+    command = build_cloud_run_command(
+        model_id="triposg",
+        output_root="/work/output",
+        s3_target="s3://3dgen-runs/runs/triposg/wave1/20260708T000000Z",
+    )
+
+    assert "runner_exit_code=$?" in command
+    assert "runpod-status.json" in command
+    assert "upload_exit_code=$?" in command
+    assert "status_exit_code=$?" in command
+    assert "bench_harness.cli upload-s3" in command
+    assert command.index("runner_exit_code=$?") < command.index("bench_harness.cli upload-s3")
+    assert "https://rest.runpod.io/v1/pods/" in command
+    assert 'if [ "$upload_exit_code" -ne 0 ]; then exit "$upload_exit_code"; fi' in command
+    assert 'if [ "$status_exit_code" -ne 0 ]; then exit "$status_exit_code"; fi' in command
+    assert "exit \"$runner_exit_code\"" in command
+    assert "&& PYTHONPATH=/opt/bench/src" not in command
+
+
+def test_build_cloud_run_command_has_valid_bash_syntax(tmp_path) -> None:
+    bash = shutil.which("bash")
+    if bash is None:
+        pytest.skip("bash is not available")
+    script_path = tmp_path / "runpod-command.sh"
+    script_path.write_text(
+        build_cloud_run_command(
+            model_id="triposg",
+            output_root="/work/output",
+            s3_target="s3://3dgen-runs/runs/triposg/wave1/20260708T000000Z",
+        ),
+        encoding="utf-8",
+        newline="\n",
+    )
+
+    bash_script_path = str(script_path)
+    if os.name == "nt" and bash.lower().endswith("bash.exe"):
+        bash_script_path = subprocess.check_output(
+            ["wsl", "wslpath", "-a", script_path.as_posix()],
+            text=True,
+        ).strip()
+
+    subprocess.run([bash, "-n", bash_script_path], check=True)
 
 
 def test_build_cloud_run_command_rejects_unknown_model() -> None:
