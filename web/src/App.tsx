@@ -1,29 +1,83 @@
 import { useState } from 'react';
 import { ViewerProvider } from './viewer/ViewerContext';
+import { MODELS } from './data/models';
+import { TASKS } from './data/tasks';
+import { useManifest } from './data/useManifest';
 import { TaskGallery } from './site/TaskGallery';
 import { TaskDetail } from './site/TaskDetail';
-import { ViewerDemo } from './site/ViewerDemo';
+import { ModelsOverview } from './site/ModelsOverview';
+import { MethodNote } from './site/MethodNote';
+
+const REPO_URL = 'https://github.com/Hitsuki-Ban/3dgen-demoroom';
+
+function Hero() {
+  const { results } = useManifest();
+  const doneModels = new Set(results.map((r) => r.modelId)).size;
+
+  return (
+    <header className="pt-10 pb-2">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">3DGen DemoRoom</h1>
+          <p className="text-slate-400 mt-2 max-w-2xl leading-relaxed">
+            オープンソースの 3D 生成モデル(text/image-to-3D)を同一課題でベンチマークし、
+            生成メッシュ<span className="text-slate-200">そのもの</span>を比較できる展示室。
+            ゲームグラフィックス開発の視点で「いま実際にどこまでできるのか」を、無修正の実測データで示します。
+          </p>
+        </div>
+        <a
+          href={REPO_URL}
+          target="_blank"
+          rel="noreferrer"
+          className="shrink-0 text-sm px-3 py-1.5 rounded-md border border-slate-600 text-slate-300 hover:bg-slate-800"
+        >
+          GitHub
+        </a>
+      </div>
+      <div className="flex flex-wrap gap-2 mt-4">
+        <span className="text-xs px-2.5 py-1 rounded-full bg-slate-800 text-slate-300">{TASKS.length} 課題(アニメ調トラック含む)</span>
+        <span className="text-xs px-2.5 py-1 rounded-full bg-sky-900/60 text-sky-200">モデル {doneModels}/{MODELS.length} 実測済み・順次追加中</span>
+        <span className="text-xs px-2.5 py-1 rounded-full bg-slate-800 text-slate-300">公式デフォルト・無修正・全メタデータ公開</span>
+      </div>
+    </header>
+  );
+}
+
+function Footer() {
+  return (
+    <footer className="mt-16 border-t border-slate-800 pt-6 pb-10 text-xs text-slate-500 leading-relaxed">
+      <p>
+        本サイトに掲載されている 3D モデルはすべて、各オープンソース生成モデルによる AI 生成物です(入力画像も AI 生成のオリジナル)。
+        各生成モデルのコード・重みのライセンスと利用条件は「収録モデル」の各カードおよびモデル詳細を参照してください。
+        一部モデルの生成物にはライセンス上の地域制限があります。
+      </p>
+      <p className="mt-2">
+        ベンチマーク手順・実行コード・調査記録:{' '}
+        <a className="text-sky-500 hover:underline" href={REPO_URL} target="_blank" rel="noreferrer">
+          {REPO_URL.replace('https://', '')}
+        </a>
+      </p>
+    </footer>
+  );
+}
 
 export default function App() {
   const [selectedTask, setSelectedTask] = useState<string | null>(null);
 
   return (
     <ViewerProvider>
-      <div id="app-content" className="max-w-6xl mx-auto px-4 pb-16">
-        <header className="pt-8 pb-2">
-          <h1 className="text-2xl font-bold">3DGen DemoRoom</h1>
-          <p className="text-slate-400 text-sm mt-1">
-            オープンソース 3D 生成モデル 11 本を同一課題でベンチマークし、実物のメッシュで比較する
-          </p>
-        </header>
+      <div id="app-content" className="max-w-6xl mx-auto px-4">
+        <Hero />
         {selectedTask ? (
           <TaskDetail taskId={selectedTask} onBack={() => setSelectedTask(null)} />
         ) : (
           <>
             <TaskGallery onSelect={setSelectedTask} />
-            <ViewerDemo />
+            <ModelsOverview />
+            <MethodNote />
           </>
         )}
+        <Footer />
       </div>
     </ViewerProvider>
   );
