@@ -1,0 +1,8 @@
+packages:
+  - '.'
+
+# wrangler の依存のビルドスクリプトを許可 (pnpm 11: allowBuilds)
+allowBuilds:
+  esbuild: true
+  workerd: true
+  sharp: true
