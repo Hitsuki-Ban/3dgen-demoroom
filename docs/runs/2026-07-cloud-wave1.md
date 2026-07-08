@@ -34,6 +34,7 @@ Implemented the local code needed for the first RunPod/R2 cloud wave and pushed 
 | PartCrafter | `ghcr.io/hitsuki-ban/3dgen-partcrafter:2026-07-cloud-wave1` | `sha256:b84791ae147f43dc5556bb8d853b2b16f311c657a96fecdff6f1706bd3b2df9b` | private |
 | TripoSG runtime-only | `ghcr.io/hitsuki-ban/3dgen-triposg:2026-07-cloud-wave1-runtime-volume` | `sha256:d210db2e5c0aa22cc788129de6e4a8484e0380346ce1f9d2169ce25dcd5d640e` | private |
 | PartCrafter runtime-only | `ghcr.io/hitsuki-ban/3dgen-partcrafter:2026-07-cloud-wave1-runtime-volume` | `sha256:bb9e7bff54ca1688c1584f1de0e12c11153caa3d4a32f2073068e9ef27ce0eb0` | private |
+| TripoSG weight-free runtime package | `ghcr.io/hitsuki-ban/3dgen-triposg-runtime:2026-07-cloud-wave1` | `sha256:d4bc56e23a07bea440eff269216998d790c1b5af697ec335fd74e8ed17a5d332` | private; package was created separately from historical baked-weight tags, but GitHub package visibility still needs UI change to become anonymous-pullable |
 
 ## Implemented
 
@@ -205,6 +206,19 @@ Observed:
 
 Conclusion: EU-RO-1 has usable 4090 capacity and the network volume is staged, but `publicIp` alone is not a valid startup readiness signal. The launcher now waits for a reachable mapped SSH TCP port before considering startup complete. If the next attempt still times out before SSH is reachable, the remaining bottleneck is likely private GHCR runtime image pull or container bootstrap, not model weights.
 
+## Weight-Free Runtime Package Split
+
+Documented at 2026-07-08T16:47Z after pushing the package and clearing local Docker cache.
+
+- Pushed TripoSG's current runtime-only Dockerfile output to a new package name that has never contained baked model weights: `ghcr.io/hitsuki-ban/3dgen-triposg-runtime:2026-07-cloud-wave1`.
+- Digest: `sha256:d4bc56e23a07bea440eff269216998d790c1b5af697ec335fd74e8ed17a5d332`.
+- The package is still `private` in GitHub Packages immediately after push.
+- Anonymous manifest probe returned HTTP 401 for `https://ghcr.io/v2/hitsuki-ban/3dgen-triposg-runtime/manifests/2026-07-cloud-wave1`, so RunPod still needs registry auth until visibility is changed.
+- REST attempts against `/user/packages/container/3dgen-triposg-runtime/visibility` returned 404, and GraphQL has no visible container package visibility mutation in the current schema. Treat public visibility as a GitHub UI step unless Fable has another package-management path.
+- Docker daemon was cleaned afterward: `docker system df` returned `0` images, `0` containers, `0` build cache.
+
+Conclusion: the package split is ready for a public runtime-only path, but it has not yet removed private GHCR pull from RunPod because GitHub Packages visibility is still private.
+
 ## Log Access Notes
 
 - `runpodctl` v2.6.1 was installed locally under gitignored `.docker-build/tools/runpodctl-2.6.1`; checksum matched the official release checksum.
@@ -232,10 +246,10 @@ Conclusion: EU-RO-1 has usable 4090 capacity and the network volume is staged, b
 
 ## Follow-up Before Full 25-Task Runs
 
-1. Retry TripoSG from EU-RO-1 only after the SSH-port startup watchdog change is reviewed, or prepare a smaller/public runtime-only image path if Fable wants to reduce private GHCR pull risk first.
-2. Keep using `--container-registry-auth-id cmrc1l2gc00847uotrnjn2des`, `--network-volume-id wnqijpazd5`, `--data-center-id EU-RO-1`, `--startup-timeout-min 25`, and `--min-balance-usd 12`.
+1. Change `ghcr.io/hitsuki-ban/3dgen-triposg-runtime` to public in GitHub Packages UI, then verify anonymous manifest access returns 200 before another paid retry.
+2. Retry TripoSG from EU-RO-1 with `ghcr.io/hitsuki-ban/3dgen-triposg-runtime@sha256:d4bc56e23a07bea440eff269216998d790c1b5af697ec335fd74e8ed17a5d332`, `--network-volume-id wnqijpazd5`, `--data-center-id EU-RO-1`, `--startup-timeout-min 25`, and `--min-balance-usd 12`. Registry auth should not be necessary after the public probe passes.
 3. Confirm that every started pod reaches a reachable mapped SSH port, then uploads either task outputs or `runpod-status.json` under the run prefix before considering the pod attempt diagnosable.
-4. After a successful TripoSG run, validate every task with `output-validate`, sync artifacts into `outputs/site-data/triposg/<task-id>/`, then run PartCrafter with the same volume.
+4. After a successful TripoSG run, validate every task with `output-validate`, sync artifacts into `outputs/site-data/triposg/<task-id>/`, then run PartCrafter with the same volume and a matching weight-free runtime package.
 
 ## Source Checks
 

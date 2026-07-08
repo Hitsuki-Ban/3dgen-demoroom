@@ -91,12 +91,19 @@ Retired volume:
 
 - `cwcjs6bz6j` in `US-NC-1` was deleted after EU-RO-1 staging succeeded, because actual create capacity in US-NC-1 was unavailable.
 
+Weight-free runtime package:
+
+- `ghcr.io/hitsuki-ban/3dgen-triposg-runtime:2026-07-cloud-wave1`
+- Digest: `sha256:d4bc56e23a07bea440eff269216998d790c1b5af697ec335fd74e8ed17a5d332`
+- The package was split from the historical `3dgen-triposg` package so it does not expose baked-weight tags when made public.
+- Current status: still private; anonymous GHCR manifest probe returned HTTP 401.
+
 ## Recommended implementation plan
 
 1. Make benchmark runners validate the staging report or expected weight files before starting the first task.
 2. Keep the old baked-weight images only as historical artifacts; do not spend more GPU time testing them.
 3. Keep the launcher command observable: upload a `runpod-status.json` file even when the model runner exits non-zero, then terminate the pod from local monitoring if self-termination does not complete.
-4. If private GHCR runtime image pulls keep exceeding the startup window, move runtime-only images to a weight-free public package name or another registry path that does not expose the historical baked-weight tags.
+4. Make the weight-free runtime package public through GitHub Packages UI, verify anonymous manifest access, then retry TripoSG without RunPod private registry auth.
 
 ## Candidate staging commands
 
