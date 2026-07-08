@@ -106,6 +106,7 @@ Weight-free runtime package:
 - The SSH + incremental TripoSG retry completed all 25 tasks on RTX 4090, with 100 task objects preserved in R2 under `runs/triposg/wave1/20260708T182152Z/` and all synced local task outputs passing `output-validate`.
 - Final `runpod-status.json` was still absent after pod cleanup, so final status writing needs its own incremental or earlier persistence path.
 - Current PartCrafter retry image: `ghcr.io/hitsuki-ban/3dgen-partcrafter-runtime:2026-07-cloud-wave1-ssh-incremental` at digest `sha256:8d890742d62c1b69db59c9bc7545a28aa340fd6538b5c3605c1bcd6091fab277`.
+- The PartCrafter SSH + incremental run preserved all 25 task directories in R2 under `runs/partcrafter/wave1/20260708T190306Z/`: 24 passed `output-validate`, and `chrome-espresso-machine` produced a model failure record after retry.
 
 ## Recommended implementation plan
 

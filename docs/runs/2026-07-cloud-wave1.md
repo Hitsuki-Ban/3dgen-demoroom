@@ -447,6 +447,70 @@ uv run bench-harness runpod-launch partcrafter `
   --allowed-cuda-version 12.8
 ```
 
+## PartCrafter SSH + Incremental Full Run
+
+Documented at 2026-07-09T04:32Z after active pods returned to `[]`, R2 was rechecked, and local outputs were validated.
+
+Image:
+
+- `ghcr.io/hitsuki-ban/3dgen-partcrafter-runtime@sha256:8d890742d62c1b69db59c9bc7545a28aa340fd6538b5c3605c1bcd6091fab277`
+
+Observed:
+
+- First create attempt at prefix `runs/partcrafter/wave1/20260708T190058Z/` failed before pod id with RunPod HTTP 500 body: `create pod: Something went wrong. Please try again later or contact support.` Active pods stayed `[]` and R2 stayed empty.
+- Successful retry pod id: `oufefx0lu5zoyb`
+- Cost reported by RunPod: `$0.69/hr`
+- GPU: RTX 4090 x1
+- Data center: `EU-RO-1`
+- Network volume: `wnqijpazd5`
+- Public SSH endpoint during run: `213.173.102.238:14124`
+- R2 prefix: `runs/partcrafter/wave1/20260708T190306Z/`
+- Active pods after completion: `[]`
+- Balance moved from `$18.1795905287` before the successful retry to `$17.7871055305` after completion, an observed delta of about `$0.39248`.
+- R2 contains 193 objects across all 25 task directories.
+- R2 does not contain a final `runpod-status.json`; as with TripoSG, final status writing remains vulnerable around pod cleanup.
+- Local sync target: `outputs/site-data/partcrafter/<task-id>/`.
+- `bench-harness output-validate` passed for 24 synced task directories.
+- `chrome-espresso-machine` produced `failure.json` after one retry. Error type: `CalledProcessError`; the PartCrafter infer subprocess returned exit status 1 twice for the same input.
+
+Metrics from synced successful `meta.json` files:
+
+- Successful task count: 24
+- Failure count: 1
+- Total successful task wall-clock seconds: `1198.58`
+- Average successful task wall-clock seconds: `49.94`
+- Max peak VRAM: `17,345,544,192` bytes, about `16.15 GiB`
+- GPU name in metadata: `NVIDIA GeForce RTX 4090`
+
+Per-task metrics for successful tasks:
+
+| Task | Seconds | Peak VRAM GiB |
+| --- | ---: | ---: |
+| `anime-heroine-character` | 52.44 | 8.97 |
+| `anime-katana` | 32.27 | 8.97 |
+| `anime-ramen-bowl` | 42.11 | 8.97 |
+| `anime-slime-mascot` | 34.84 | 8.97 |
+| `anime-vending-machine` | 41.66 | 10.11 |
+| `arcade-cabinet` | 56.66 | 8.97 |
+| `cartoon-apple` | 64.85 | 8.97 |
+| `chained-anchor` | 51.90 | 8.97 |
+| `crusty-bread-loaf` | 64.87 | 8.97 |
+| `fluffy-monster-plush` | 45.27 | 9.45 |
+| `forest-goblin-creature` | 34.85 | 8.97 |
+| `medieval-longsword` | 51.94 | 8.97 |
+| `modular-dungeon-gate` | 57.07 | 8.97 |
+| `old-oak-tree` | 83.05 | 16.15 |
+| `ornate-treasure-chest` | 68.50 | 10.13 |
+| `plasma-rifle` | 48.29 | 8.97 |
+| `potted-monstera` | 53.51 | 8.97 |
+| `rusty-pickup-truck` | 35.36 | 8.97 |
+| `scifi-supply-crate` | 56.56 | 8.97 |
+| `stained-glass-lantern` | 35.91 | 8.97 |
+| `stylized-hover-bike` | 50.35 | 8.97 |
+| `toon-knight-character` | 34.91 | 8.97 |
+| `victorian-street-lamp` | 49.42 | 8.97 |
+| `wooden-rocking-chair` | 51.98 | 8.97 |
+
 ## Log Access Notes
 
 - `runpodctl` v2.6.1 was installed locally under gitignored `.docker-build/tools/runpodctl-2.6.1`; checksum matched the official release checksum.
@@ -474,9 +538,9 @@ uv run bench-harness runpod-launch partcrafter `
 
 ## Follow-up Before Full 25-Task Runs
 
-1. Run PartCrafter with `ghcr.io/hitsuki-ban/3dgen-partcrafter-runtime@sha256:8d890742d62c1b69db59c9bc7545a28aa340fd6538b5c3605c1bcd6091fab277` against the same EU-RO-1 / `wnqijpazd5` volume.
-2. Add a follow-up hardening change so final `runpod-status.json` is also uploaded incrementally or written before self-termination; task outputs are complete, but the final status file is still vulnerable to pod disappearance.
-3. After PartCrafter succeeds, validate every task with `output-validate`, sync artifacts into `outputs/site-data/partcrafter/<task-id>/`, and hand the synced site data to the frontend comparison page flow.
+1. Add a follow-up hardening change so final `runpod-status.json` is also uploaded incrementally or written before self-termination; task outputs are preserved, but the final status file is still vulnerable to pod disappearance.
+2. Decide whether to investigate `partcrafter/chrome-espresso-machine` as a model-specific failure. The batch result is usable because `failure.json` is present, but the public comparison UI should show that task as failed for PartCrafter unless a later rerun succeeds.
+3. Hand the synced site data under `outputs/site-data/triposg/<task-id>/` and `outputs/site-data/partcrafter/<task-id>/` to the frontend comparison page flow.
 
 ## Source Checks
 
