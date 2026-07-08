@@ -140,3 +140,27 @@ def test_prepare_task_output_writes_contract_files(tmp_path: Path) -> None:
     assert (task_output_dir / "output.glb").read_bytes() == b"glTF"
     assert (task_output_dir / "LICENSE").read_text(encoding="utf-8") == "MIT\n"
     assert (task_output_dir / "raw" / "triposr" / "0" / "mesh.glb").read_bytes() == b"glTF"
+
+
+def test_terminate_runpod_if_needed_sends_harness_user_agent(monkeypatch) -> None:
+    runner = _load_runner()
+    captured = {}
+
+    class FakeResponse:
+        status = 200
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc_value, traceback) -> None:
+            pass
+
+    def fake_urlopen(request, timeout: int):
+        captured["user_agent"] = request.get_header("User-agent")
+        return FakeResponse()
+
+    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+
+    runner.terminate_runpod_if_needed({"RUNPOD_POD_ID": "pod-123", "RUNPOD_API_KEY": "token"})
+
+    assert captured["user_agent"] == "3dgen-demoroom-bench-harness/0.1"
