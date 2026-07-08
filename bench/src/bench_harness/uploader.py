@@ -78,7 +78,7 @@ class S3Uploader:
                 part
                 for part in (
                     self.config.prefix,
-                    relative_path.as_posix() if str(relative_path) else "",
+                    relative_path.as_posix() if relative_path.parts else "",
                     source_file.relative_to(source_dir).as_posix(),
                 )
                 if part

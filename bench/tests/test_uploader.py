@@ -99,6 +99,30 @@ def test_s3_uploader_uploads_files_with_relative_keys(tmp_path: Path) -> None:
     ]
 
 
+def test_s3_uploader_omits_dot_segment_when_relative_name_is_empty(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "probe.txt").write_text("probe\n", encoding="utf-8")
+    fake_client = FakeS3Client()
+    uploader = S3Uploader(
+        S3UploadConfig(
+            bucket="3dgen-runs",
+            prefix="_codex-s3-probe",
+            endpoint_url="https://example.r2.cloudflarestorage.com",
+            access_key_id="access-key",
+            secret_access_key="secret-key",
+        ),
+        client=fake_client,
+    )
+
+    uploaded = uploader.upload_run(source)
+
+    assert uploaded == ["_codex-s3-probe/probe.txt"]
+    assert fake_client.uploads == [
+        (str(source / "probe.txt"), "3dgen-runs", "_codex-s3-probe/probe.txt")
+    ]
+
+
 def test_create_uploader_builds_s3_uploader_from_env() -> None:
     uploader = create_uploader(
         "s3",
