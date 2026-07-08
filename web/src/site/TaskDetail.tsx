@@ -49,7 +49,13 @@ export function TaskDetail({ taskId, onBack }: { taskId: string; onBack: () => v
                 <ViewerPane
                   key={m.id}
                   title={m.name}
-                  badge={m.badges.includes('geometry-only') ? 'geometry-only' : undefined}
+                  badge={
+                    m.badges.includes('geometry-only')
+                      ? 'geometry-only'
+                      : m.badges.includes('geo-restricted')
+                        ? '地域制限'
+                        : undefined
+                  }
                   loadObject={() => loadModel(result.glbUrl)}
                   extraInfo={formatResultInfo(
                     result.meta.wall_clock_seconds,

@@ -15,8 +15,20 @@ function getLoader(): GLTFLoader {
   return loader;
 }
 
+/** 地域制限モデル(Hunyuan3D 2.1 等)のアセットがエッジで HTTP 451 遮断された場合に投げる */
+export class RegionBlockedError extends Error {
+  constructor() {
+    super('ライセンス条項により、この地域ではこのモデルの出力を表示できません');
+    this.name = 'RegionBlockedError';
+  }
+}
+
 /** ベンチ成果物の GLB を読み込む。ViewerCore.addPane にそのまま渡せる Object3D を返す */
 export async function loadModel(url: string): Promise<THREE.Object3D> {
-  const gltf = await getLoader().loadAsync(url);
+  const res = await fetch(url);
+  if (res.status === 451) throw new RegionBlockedError();
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const buffer = await res.arrayBuffer();
+  const gltf = await getLoader().parseAsync(buffer, '');
   return gltf.scene;
 }
