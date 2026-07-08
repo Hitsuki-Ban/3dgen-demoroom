@@ -97,6 +97,7 @@ Weight-free runtime package:
 - Digest: `sha256:d4bc56e23a07bea440eff269216998d790c1b5af697ec335fd74e8ed17a5d332`
 - The package was split from the historical `3dgen-triposg` package so it does not expose baked-weight tags when made public.
 - Current status: still private; anonymous GHCR manifest probe returned HTTP 401.
+- GitHub documents changing a package to public as irreversible, so this toggle should only happen after explicit Fable/owner approval.
 
 ## Recommended implementation plan
 
@@ -155,3 +156,4 @@ Adjust file checks per model if upstream layouts differ.
 - RunPod worker-vLLM README: https://github.com/runpod-workers/worker-vllm (checked 2026-07-08)
 - RunPod worker-TGI README: https://github.com/runpod-workers/worker-tgi (checked 2026-07-08)
 - Hugging Face Hub environment variables: https://huggingface.co/docs/huggingface_hub/en/package_reference/environment_variables (checked 2026-07-08)
+- GitHub package access control and visibility: https://docs.github.com/en/packages/learn-github-packages/configuring-a-packages-access-control-and-visibility (checked 2026-07-09)

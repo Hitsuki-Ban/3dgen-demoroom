@@ -215,6 +215,7 @@ Documented at 2026-07-08T16:47Z after pushing the package and clearing local Doc
 - The package is still `private` in GitHub Packages immediately after push.
 - Anonymous manifest probe returned HTTP 401 for `https://ghcr.io/v2/hitsuki-ban/3dgen-triposg-runtime/manifests/2026-07-cloud-wave1`, so RunPod still needs registry auth until visibility is changed.
 - REST attempts against `/user/packages/container/3dgen-triposg-runtime/visibility` returned 404, and GraphQL has no visible container package visibility mutation in the current schema. Treat public visibility as a GitHub UI step unless Fable has another package-management path.
+- GitHub documents package public visibility as irreversible; Fable/owner approval is required before toggling this package to public.
 - Docker daemon was cleaned afterward: `docker system df` returned `0` images, `0` containers, `0` build cache.
 
 Conclusion: the package split is ready for a public runtime-only path, but it has not yet removed private GHCR pull from RunPod because GitHub Packages visibility is still private.
@@ -257,4 +258,5 @@ Conclusion: the package split is ready for a public runtime-only path, but it ha
 - RunPod Network Volumes docs: https://docs.runpod.io/storage/network-volumes
 - RunPod Pod logs docs: https://docs.runpod.io/pods/references/pod-logs
 - RunPod CLI release: https://github.com/Run-Pod/runpodctl/releases/tag/v2.6.1
+- GitHub package access control and visibility: https://docs.github.com/en/packages/learn-github-packages/configuring-a-packages-access-control-and-visibility
 - Cloudflare R2 bucket and S3 credential docs: https://developers.cloudflare.com/r2/
