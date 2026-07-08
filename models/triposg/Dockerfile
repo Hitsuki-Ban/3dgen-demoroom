@@ -8,6 +8,7 @@ ARG UV_VERSION=0.11.19
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
     HF_HOME=/opt/hf-cache \
+    PYTHONPATH=/opt/bench/src \
     TORCH_CUDA_ARCH_LIST="8.9;12.0" \
     CUDA_HOME=/usr/local/cuda \
     FORCE_CUDA=1 \
@@ -39,7 +40,7 @@ RUN uv pip install --system \
         torch==2.7.1 \
         torchvision==0.22.1 \
         --index-url https://download.pytorch.org/whl/cu128 \
-    && uv pip install --system scikit-build-core cmake ninja pybind11 \
+    && uv pip install --system boto3 scikit-build-core cmake ninja pybind11 \
     && uv pip install --system --no-build-isolation-package diso -r /opt/TripoSG/requirements.txt
 
 RUN TRIPOSG_WEIGHTS_REVISION="${TRIPOSG_WEIGHTS_REVISION}" \
@@ -61,7 +62,9 @@ snapshot_download(
 )
 PY
 
-COPY runner.py /opt/3dgen-runner/triposg_runner.py
+COPY bench/src /opt/bench/src
+COPY tasks /opt/3dgen-tasks
+COPY models/triposg/runner.py /opt/3dgen-runner/triposg_runner.py
 
 WORKDIR /work
 ENTRYPOINT ["python3", "/opt/3dgen-runner/triposg_runner.py"]

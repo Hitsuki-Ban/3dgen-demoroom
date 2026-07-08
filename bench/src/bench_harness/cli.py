@@ -1,11 +1,41 @@
 from __future__ import annotations
 
 import argparse
+import json
+import os
 from pathlib import Path
 
 from bench_harness.meta import validate_task_output
+from bench_harness.runpod import (
+    DEFAULT_ALLOWED_CUDA_VERSIONS,
+    DEFAULT_GPU_TYPE_IDS,
+    DEFAULT_MAX_RUNTIME_MIN,
+    DEFAULT_MIN_BALANCE_USD,
+    R2Credentials,
+    RunPodClient,
+    RunPodLaunchConfig,
+)
 from bench_harness.tasks import load_tasks
 from bench_harness.uploader import create_uploader
+
+
+def required_env(name: str) -> str:
+    value = os.environ.get(name)
+    if not value:
+        raise ValueError(f"{name} is required")
+    return value
+
+
+def parse_min_balance_usd(raw_value: str | None) -> float:
+    if raw_value is None:
+        return DEFAULT_MIN_BALANCE_USD
+    try:
+        balance = float(raw_value)
+    except ValueError as exc:
+        raise ValueError("RunPod minimum balance must be numeric") from exc
+    if balance <= 0:
+        raise ValueError("RunPod minimum balance must be positive")
+    return balance
 
 
 def main() -> None:
@@ -23,6 +53,25 @@ def main() -> None:
     upload_local.add_argument("target_root")
     upload_local.add_argument("relative_name")
 
+    upload_s3 = subcommands.add_parser("upload-s3")
+    upload_s3.add_argument("source_dir", type=Path)
+    upload_s3.add_argument("target_uri")
+
+    runpod_launch = subcommands.add_parser("runpod-launch")
+    runpod_launch.add_argument("model_id")
+    runpod_launch.add_argument("image_name")
+    runpod_launch.add_argument("s3_target")
+    runpod_launch.add_argument("--name", required=True)
+    runpod_launch.add_argument("--min-balance-usd")
+    runpod_launch.add_argument("--max-runtime-min", type=int, default=DEFAULT_MAX_RUNTIME_MIN)
+    runpod_launch.add_argument("--gpu-type-id", dest="gpu_type_ids", action="append")
+    runpod_launch.add_argument("--allowed-cuda-version", dest="allowed_cuda_versions", action="append")
+
+    subcommands.add_parser("runpod-pods")
+
+    runpod_terminate = subcommands.add_parser("runpod-terminate")
+    runpod_terminate.add_argument("pod_id")
+
     args = parser.parse_args()
     if args.command == "tasks-validate":
         tasks = load_tasks(args.tasks_json)
@@ -34,3 +83,30 @@ def main() -> None:
         uploader = create_uploader("local", args.target_root)
         uploaded = uploader.upload_run(args.source_dir, args.relative_name)
         print(uploaded)
+    elif args.command == "upload-s3":
+        uploader = create_uploader("s3", args.target_uri)
+        uploaded = uploader.upload_run(args.source_dir)
+        print(f"uploaded objects: {len(uploaded)}")
+    elif args.command == "runpod-launch":
+        api_key = required_env("RUNPOD_API_KEY")
+        config = RunPodLaunchConfig(
+            name=args.name,
+            image_name=args.image_name,
+            model_id=args.model_id,
+            s3_target=args.s3_target,
+            max_runtime_min=args.max_runtime_min,
+            gpu_type_ids=tuple(args.gpu_type_ids or DEFAULT_GPU_TYPE_IDS),
+            allowed_cuda_versions=tuple(args.allowed_cuda_versions or DEFAULT_ALLOWED_CUDA_VERSIONS),
+            r2_credentials=R2Credentials.from_env(os.environ),
+        )
+        min_balance_usd = parse_min_balance_usd(
+            args.min_balance_usd if args.min_balance_usd is not None else os.environ.get("RUNPOD_MIN_BALANCE_USD")
+        )
+        pod = RunPodClient(api_key=api_key).launch_pod(config, min_balance_usd=min_balance_usd)
+        print(json.dumps(pod, sort_keys=True))
+    elif args.command == "runpod-pods":
+        pods = RunPodClient(api_key=required_env("RUNPOD_API_KEY")).list_pods()
+        print(json.dumps(pods, sort_keys=True))
+    elif args.command == "runpod-terminate":
+        pod = RunPodClient(api_key=required_env("RUNPOD_API_KEY")).terminate_pod(args.pod_id)
+        print(json.dumps(pod, sort_keys=True))

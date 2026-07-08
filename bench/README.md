@@ -16,6 +16,8 @@ Container output per task:
 - `/work/output/<task-id>/<license_file>` where `license_file` is declared by `meta.json`
 - Any raw model output files required for audit/debugging
 
+If a TripoSG or PartCrafter task fails twice, the runner writes `/work/output/<task-id>/failure.json` and continues the batch so the failed task record is uploaded with the successful outputs.
+
 The canonical `meta.json` schema is enforced by `bench_harness.meta.REQUIRED_META_KEYS`.
 
 ## Local Commands
@@ -26,6 +28,21 @@ uv run pytest
 uv run bench-harness tasks-validate ../tasks/tasks.json
 uv run bench-harness output-validate <path-to-task-output-dir>
 uv run bench-harness upload-local <source-dir> <target-root> runs/<model>/<gpu>/<timestamp>
+uv run bench-harness upload-s3 <source-dir> s3://3dgen-runs/runs/<model>/<gpu>/<timestamp>
+uv run bench-harness runpod-pods
+```
+
+`upload-s3` targets Cloudflare R2 through the S3-compatible API and requires these environment variables:
+
+- `R2_ENDPOINT`
+- `R2_ACCESS_KEY_ID`
+- `R2_SECRET_ACCESS_KEY`
+
+RunPod launch commands additionally require `RUNPOD_API_KEY`:
+
+```powershell
+uv run bench-harness runpod-launch triposg ghcr.io/hitsuki-ban/3dgen-triposg@sha256:<digest> s3://3dgen-runs/runs/triposg/rtx-5090/<timestamp> --name 3dgen-triposg-wave1
+uv run bench-harness runpod-terminate <pod-id>
 ```
 
 ## Docker Build Cache
@@ -37,7 +54,7 @@ On Windows, Docker Desktop stores loaded images inside its C: drive WSL VHDX. To
 .\scripts\docker-build-model.ps1 partcrafter
 ```
 
-By default it writes buildx local cache and the image archive to `.docker-build/` under the F: workspace. Load the image only when a local smoke run is needed:
+By default it writes buildx local cache and the image archive to `.docker-build/` under the F: workspace. The build context is the repository root so cloud images can include `bench/src`, `tasks/`, and the model runner while `.dockerignore` excludes generated outputs, worktrees, and Docker cache. Load the image only when a local smoke run is needed:
 
 ```powershell
 docker load -i .docker-build\images\3dgen-triposg-issue-11.tar
@@ -70,10 +87,12 @@ The local 12GB RTX 4070 Ti validation gate is for lightweight runners first. Tri
 
 ## Cost Guardrails
 
-- `MAX_RUNTIME_MIN` defaults to `60`, as specified in Issue #11. Non-positive values fail fast.
+- Local container watchdog `MAX_RUNTIME_MIN` defaults to `60`, as specified in Issue #11. Cloud launcher `--max-runtime-min` defaults to `90`, as specified in Issue #25. Non-positive values fail fast.
 - When `RUNPOD_POD_ID` is present, RunPod self-termination requires `RUNPOD_API_KEY`; missing credentials fail fast.
-- Remote RunPod launch is not implemented in this runner PR. `bench_harness.runpod` only defines the balance-check request contract (`clientBalance`) for a later orchestration task.
-- S3/R2 upload is intentionally not implemented in this runner PR. Selecting `s3` raises `NotImplementedError`; local upload is implemented.
+- Remote RunPod launch checks `clientBalance` before creating a pod. The default minimum balance is `$5`, or override it with `RUNPOD_MIN_BALANCE_USD` / `--min-balance-usd`.
+- The default cloud GPU priority is RTX 5090 followed by RTX 4090, with `allowedCudaVersions=("12.8",)`.
+- The launcher injects `RUNPOD_API_KEY` plus the three R2 environment variables into the pod so the runner can self-terminate and upload before exit.
+- TripoSG and PartCrafter retry each failed task once; after the retry fails, they write `failure.json` instead of aborting the whole 25-task batch.
 
 ## Source Pins Checked On 2026-07-08
 

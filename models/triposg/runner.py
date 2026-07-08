@@ -20,6 +20,7 @@ TRIPOSG_ROOT = Path("/opt/TripoSG")
 TRIPOSG_WEIGHTS_PATH = "/opt/weights/TripoSG"
 RMBG_WEIGHTS_PATH = "/opt/weights/RMBG-1.4"
 LICENSE_SOURCES = None
+MAX_TASK_ATTEMPTS = 2
 
 DEFAULT_PARAMETERS = {
     "num_inference_steps": 50,
@@ -154,31 +155,83 @@ def run_task(
         raise FileExistsError(f"task output already exists: {task_output_dir}")
 
     work_dir = output_root / "_work" / MODEL_ID / task.id
-    if work_dir.exists():
-        shutil.rmtree(work_dir)
-    work_dir.mkdir(parents=True, exist_ok=False)
-    raw_output_dir = work_dir / "raw"
-    raw_output_dir.mkdir(parents=True, exist_ok=False)
+    first_started_iso = utc_now()
+    for attempt_index in range(MAX_TASK_ATTEMPTS):
+        if work_dir.exists():
+            shutil.rmtree(work_dir)
+        if task_output_dir.exists():
+            shutil.rmtree(task_output_dir)
+        work_dir.mkdir(parents=True, exist_ok=False)
+        raw_output_dir = work_dir / "raw"
+        raw_output_dir.mkdir(parents=True, exist_ok=False)
 
-    started_iso = utc_now()
-    started_monotonic = time.monotonic()
-    command = build_triposg_command(image_path, raw_output_dir, task.seed, DEFAULT_PARAMETERS)
-    peak_vram_bytes = run_with_peak_vram(command, timeout_seconds)
-    wall_clock_seconds = time.monotonic() - started_monotonic
-    finished_iso = utc_now()
-    runtime = collect_runtime_snapshot(peak_vram_bytes)
-    prepare_task_output(
-        task=task,
-        task_output_dir=task_output_dir,
-        raw_output_dir=raw_output_dir,
-        license_sources=license_sources,
-        runtime=runtime,
-        wall_clock_seconds=wall_clock_seconds,
-        retry_count=0,
-        started_at=started_iso,
-        finished_at=finished_iso,
+        started_iso = utc_now()
+        started_monotonic = time.monotonic()
+        command = build_triposg_command(image_path, raw_output_dir, task.seed, DEFAULT_PARAMETERS)
+        try:
+            peak_vram_bytes = run_with_peak_vram(command, timeout_seconds)
+            wall_clock_seconds = time.monotonic() - started_monotonic
+            finished_iso = utc_now()
+            runtime = collect_runtime_snapshot(peak_vram_bytes)
+            prepare_task_output(
+                task=task,
+                task_output_dir=task_output_dir,
+                raw_output_dir=raw_output_dir,
+                license_sources=license_sources,
+                runtime=runtime,
+                wall_clock_seconds=wall_clock_seconds,
+                retry_count=attempt_index,
+                started_at=started_iso,
+                finished_at=finished_iso,
+            )
+            shutil.rmtree(work_dir)
+            return
+        except Exception as exc:
+            if work_dir.exists():
+                shutil.rmtree(work_dir)
+            if task_output_dir.exists():
+                shutil.rmtree(task_output_dir)
+            if attempt_index + 1 < MAX_TASK_ATTEMPTS:
+                continue
+            write_task_failure(
+                task=task,
+                task_output_dir=task_output_dir,
+                error=exc,
+                retry_count=attempt_index,
+                started_at=first_started_iso,
+                finished_at=utc_now(),
+            )
+            return
+
+
+def write_task_failure(
+    *,
+    task: TaskDefinition,
+    task_output_dir: Path,
+    error: Exception,
+    retry_count: int,
+    started_at: str,
+    finished_at: str,
+) -> None:
+    task_output_dir.mkdir(parents=True, exist_ok=False)
+    failure = {
+        "status": "failed",
+        "task_id": task.id,
+        "model_id": MODEL_ID,
+        "model_git_commit": MODEL_GIT_COMMIT,
+        "weights_revision": WEIGHTS_REVISION,
+        "seed": task.seed,
+        "parameters": DEFAULT_PARAMETERS,
+        "retry_count": retry_count,
+        "error_type": type(error).__name__,
+        "error_message": str(error),
+        "started_at": started_at,
+        "finished_at": finished_at,
+    }
+    (task_output_dir / "failure.json").write_text(
+        json.dumps(failure, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
     )
-    shutil.rmtree(work_dir)
 
 
 def build_triposg_command(
