@@ -10,6 +10,7 @@ from bench_harness.runpod import (
     DEFAULT_MAX_RUNTIME_MIN,
     DEFAULT_MIN_BALANCE_USD,
     R2Credentials,
+    RunPodApiError,
     RunPodClient,
     RunPodBalanceCheck,
     RunPodLaunchConfig,
@@ -392,6 +393,67 @@ def test_runpod_client_waits_for_ssh_port_before_startup_ready() -> None:
     assert pod == {"id": "pod-123", "publicIp": "203.0.113.10", "portMappings": {"22": 22001}}
     assert tcp_checks == [("203.0.113.10", 22001, 5.0), ("203.0.113.10", 22001, 5.0)]
     assert [call[0:2] for call in calls].count(("GET", "https://rest.runpod.io/v1/pods/pod-123")) == 2
+
+
+def test_runpod_client_reports_pod_disappearing_before_startup(monkeypatch) -> None:
+    calls = []
+
+    def fake_sleep(seconds: float) -> None:
+        calls.append(("SLEEP", seconds, {}, None))
+
+    def fake_request(method: str, url: str, headers: dict[str, str], body: dict[str, object] | None) -> dict[str, object]:
+        calls.append((method, url, headers, body))
+        if url == "https://api.runpod.io/graphql":
+            return {"data": {"myself": {"clientBalance": 20.0}}}
+        if method == "POST" and url == "https://rest.runpod.io/v1/pods":
+            return {"id": "pod-123", "desiredStatus": "RUNNING"}
+        if method == "GET" and url == "https://rest.runpod.io/v1/pods/pod-123":
+            get_count = [call[0:2] for call in calls].count(("GET", "https://rest.runpod.io/v1/pods/pod-123"))
+            if get_count == 1:
+                return {"id": "pod-123", "publicIp": "203.0.113.10", "portMappings": {"22": 22001}}
+            raise RunPodApiError(
+                method="GET",
+                url=url,
+                status_code=404,
+                reason="Not Found",
+                response_body='{"error":"pod not found","status":404}',
+            )
+        raise AssertionError((method, url))
+
+    monkeypatch.setattr("bench_harness.runpod.time.sleep", fake_sleep)
+
+    client = RunPodClient(
+        api_key="token",
+        request_json=fake_request,
+        tcp_connect=lambda host, port, timeout_seconds: False,
+    )
+
+    with pytest.raises(RuntimeError, match="disappeared before startup"):
+        client.launch_pod(
+            RunPodLaunchConfig(
+                name="3dgen-triposg-wave1",
+                image_name="ghcr.io/hitsuki-ban/3dgen-triposg@sha256:abc",
+                model_id="triposg",
+                s3_target="s3://3dgen-runs/runs/triposg/rtx-5090/20260708T000000Z",
+                max_runtime_min=90,
+                gpu_type_ids=("NVIDIA GeForce RTX 4090",),
+                allowed_cuda_versions=("12.8",),
+                r2_credentials=make_r2_credentials(),
+                network_volume_id="volume-123",
+                data_center_id="EU-RO-1",
+                startup_timeout_min=10,
+                startup_poll_seconds=15,
+            ),
+            min_balance_usd=5.0,
+        )
+
+    assert [call[0:2] for call in calls] == [
+        ("POST", "https://api.runpod.io/graphql"),
+        ("POST", "https://rest.runpod.io/v1/pods"),
+        ("GET", "https://rest.runpod.io/v1/pods/pod-123"),
+        ("SLEEP", 15),
+        ("GET", "https://rest.runpod.io/v1/pods/pod-123"),
+    ]
 
 
 def test_runpod_client_terminates_pod_when_startup_watchdog_expires(monkeypatch) -> None:

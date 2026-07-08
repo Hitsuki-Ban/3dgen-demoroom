@@ -41,6 +41,27 @@ RequestJson = Callable[[str, str, dict[str, str], dict[str, object] | None], Jso
 TcpConnect = Callable[[str, int, float], bool]
 
 
+class RunPodApiError(RuntimeError):
+    def __init__(
+        self,
+        *,
+        method: str,
+        url: str,
+        status_code: int,
+        reason: str,
+        response_body: str,
+    ) -> None:
+        self.method = method
+        self.url = url
+        self.status_code = status_code
+        self.reason = reason
+        self.response_body = response_body
+        message = f"RunPod API request failed: {method} {url} returned HTTP {status_code} {reason}"
+        if response_body:
+            message = f"{message}: {response_body}"
+        super().__init__(message)
+
+
 @dataclass(frozen=True)
 class RunPodBalanceCheck:
     api_key: str
@@ -152,10 +173,20 @@ class RunPodClient:
 
     def wait_for_startup(self, pod_id: str, *, timeout_seconds: float, poll_seconds: float) -> dict[str, object]:
         deadline = time.monotonic() + timeout_seconds
+        last_pod: dict[str, object] | None = None
         while True:
-            pod = self.get_pod(pod_id)
+            try:
+                pod = self.get_pod(pod_id)
+            except RunPodApiError as exc:
+                if exc.status_code == 404:
+                    last_state = format_startup_state(last_pod)
+                    raise RuntimeError(
+                        f"RunPod pod {pod_id} disappeared before startup became ready{last_state}"
+                    ) from exc
+                raise
             if not isinstance(pod, dict):
                 raise ValueError("RunPod get pod response must be a JSON object")
+            last_pod = pod
             tcp_connect = self.tcp_connect or can_connect_tcp
             if pod_is_startup_ready(pod, tcp_connect=tcp_connect):
                 return pod
@@ -235,6 +266,33 @@ def pod_is_startup_ready(response: dict[str, object], *, tcp_connect: TcpConnect
     if ssh_port is None:
         return False
     return tcp_connect(public_ip, ssh_port, 5.0)
+
+
+def format_startup_state(response: dict[str, object] | None) -> str:
+    if response is None:
+        return ""
+    parts = []
+    pod_id = response.get("id")
+    if isinstance(pod_id, str) and pod_id.strip():
+        parts.append(f"id={pod_id}")
+    desired_status = response.get("desiredStatus")
+    if isinstance(desired_status, str) and desired_status.strip():
+        parts.append(f"desiredStatus={desired_status}")
+    public_ip = response.get("publicIp")
+    if isinstance(public_ip, str) and public_ip.strip():
+        parts.append(f"publicIp={public_ip}")
+    ssh_port = pod_ssh_port(response)
+    if ssh_port is not None:
+        parts.append(f"sshPort={ssh_port}")
+    runtime = response.get("runtime")
+    if runtime is not None:
+        parts.append(f"runtime={runtime}")
+    uptime = response.get("uptime")
+    if uptime is not None:
+        parts.append(f"uptime={uptime}")
+    if not parts:
+        return ""
+    return f" (last observed: {', '.join(parts)})"
 
 
 def build_cloud_run_command(model_id: str, output_root: str, s3_target: str) -> str:
@@ -406,10 +464,13 @@ def request_json(
             raw = response.read().decode("utf-8")
     except HTTPError as exc:
         error_body = exc.read().decode("utf-8", errors="replace").strip()
-        message = f"RunPod API request failed: {method} {url} returned HTTP {exc.code} {exc.reason}"
-        if error_body:
-            message = f"{message}: {error_body}"
-        raise RuntimeError(message) from exc
+        raise RunPodApiError(
+            method=method,
+            url=url,
+            status_code=exc.code,
+            reason=exc.reason,
+            response_body=error_body,
+        ) from exc
     if not raw:
         return {}
     parsed = json.loads(raw)
