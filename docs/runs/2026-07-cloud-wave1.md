@@ -8,8 +8,11 @@ Issue: #25
 Implemented the local code needed for the first RunPod/R2 cloud wave, but did not launch GPU jobs yet.
 
 - RunPod API key is present as a GitHub secret: `RUNPOD_API_KEY`.
-- R2 setup is blocked at the account layer. Cloudflare API returned `10042: Please enable R2 through the Cloudflare Dashboard.` when attempting to ensure bucket `3dgen-runs`.
-- GitHub secrets still missing because R2 credentials cannot be created until R2 is enabled: `R2_ENDPOINT`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`.
+- R2 is enabled. Cloudflare API created bucket `3dgen-runs` on 2026-07-08T04:35:35Z with location `APAC`, storage class `Standard`, jurisdiction `default`.
+- Cloudflare R2 object API probe passed: wrote, listed, and deleted `_codex-api-probe.txt`.
+- GitHub secret `R2_ENDPOINT` is set to the account S3-compatible endpoint.
+- GitHub secrets still missing: `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`.
+- Current Cloudflare connector cannot create account-owned API tokens; permission group lookup returned `9109: Unauthorized to access requested resource`.
 - No RunPod pods were launched in this pass, so there are no cloud artifacts or pod cleanup records yet.
 
 ## Implemented
@@ -34,11 +37,10 @@ Implemented the local code needed for the first RunPod/R2 cloud wave, but did no
 
 ## Follow-up Before Full 25-Task Runs
 
-1. Enable R2 in the Cloudflare dashboard for account `f28aec977ce317b9e41897775f69167a`.
-2. Create or confirm bucket `3dgen-runs`.
-3. Create R2 S3 credentials and set GitHub secrets: `R2_ENDPOINT`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`.
-4. Push current TripoSG and PartCrafter images to GHCR and record image digests.
-5. Launch one model at a time, verify `bench-harness runpod-pods` after completion, and sync uploaded artifacts into `outputs/site-data/<model-id>/<task-id>/`.
+1. Create R2 S3 credentials scoped to bucket `3dgen-runs` with Object Read & Write permission.
+2. Set GitHub secrets: `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`.
+3. Push current TripoSG and PartCrafter images to GHCR and record image digests.
+4. Launch one model at a time, verify `bench-harness runpod-pods` after completion, and sync uploaded artifacts into `outputs/site-data/<model-id>/<task-id>/`.
 
 ## Source Checks
 
