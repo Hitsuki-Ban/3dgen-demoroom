@@ -1,0 +1,9 @@
+.git
+.worktrees
+.docker-build
+outputs
+bench/.venv
+bench/.pytest_cache
+**/__pycache__
+web/node_modules
+web/dist

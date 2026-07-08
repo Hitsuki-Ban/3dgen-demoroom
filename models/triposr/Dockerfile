@@ -58,7 +58,7 @@ snapshot_download(
 )
 PY
 
-COPY runner.py /opt/3dgen-runner/triposr_runner.py
+COPY models/triposr/runner.py /opt/3dgen-runner/triposr_runner.py
 
 WORKDIR /work
 ENTRYPOINT ["python3", "/opt/3dgen-runner/triposr_runner.py"]

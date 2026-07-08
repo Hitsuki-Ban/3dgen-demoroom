@@ -74,6 +74,11 @@ def test_triposg_dockerfile_uses_required_cuda_base_and_pins() -> None:
     assert "CPATH=/usr/local/cuda/include" in dockerfile
     assert "uv pip install --system" in dockerfile
     assert "RUN pip install" not in dockerfile
+    assert "boto3" in dockerfile
+    assert "PYTHONPATH=/opt/bench/src" in dockerfile
+    assert "COPY bench/src /opt/bench/src" in dockerfile
+    assert "COPY tasks /opt/3dgen-tasks" in dockerfile
+    assert "COPY models/triposg/runner.py /opt/3dgen-runner/triposg_runner.py" in dockerfile
 
 
 def test_build_triposg_command_uses_local_pinned_weights(tmp_path: Path) -> None:
@@ -169,3 +174,94 @@ def test_prepare_task_output_writes_triposg_contract_files(tmp_path: Path) -> No
     assert "MIT" in licenses
     assert "NOTICE" in licenses
     assert "Tencent" in licenses
+
+
+def test_run_task_retries_once_and_records_retry_count(monkeypatch, tmp_path: Path) -> None:
+    runner = _load_runner()
+    input_root = tmp_path / "input"
+    output_root = tmp_path / "output"
+    input_root.mkdir()
+    output_root.mkdir()
+    (input_root / "input.png").write_bytes(b"png")
+    license_sources = runner.LicenseSources(
+        root_license=tmp_path / "LICENSE",
+        notice=tmp_path / "NOTICE",
+        bundled_license=tmp_path / "triposg_LICENSE",
+    )
+    license_sources.root_license.write_text("MIT\n", encoding="utf-8")
+    license_sources.notice.write_text("NOTICE\n", encoding="utf-8")
+    license_sources.bundled_license.write_text("Tencent\n", encoding="utf-8")
+    calls: list[list[str]] = []
+
+    def fake_run_with_peak_vram(command: list[str], timeout_seconds: float) -> int:
+        calls.append(command)
+        if len(calls) == 1:
+            raise RuntimeError("transient decoder failure")
+        output_path = Path(command[command.index("--infer-output-path") + 1])
+        output_path.write_bytes(b"glTF")
+        return 1234
+
+    monkeypatch.setattr(runner, "run_with_peak_vram", fake_run_with_peak_vram)
+    monkeypatch.setattr(
+        runner,
+        "collect_runtime_snapshot",
+        lambda peak: runner.RuntimeSnapshot(
+            gpu_name="NVIDIA GeForce RTX 5090",
+            peak_vram_bytes=peak,
+            torch_version="2.7.1+cu128",
+            torch_cuda_version="12.8",
+            torch_cuda_arch_list=["sm_120"],
+            attention_backend="sdpa",
+        ),
+    )
+
+    runner.run_task(
+        runner.TaskDefinition(id="cartoon-apple", prompt="apple", image="input.png", seed=20260708),
+        input_root,
+        output_root,
+        license_sources,
+        timeout_seconds=10,
+    )
+
+    meta = json.loads((output_root / "cartoon-apple" / "meta.json").read_text(encoding="utf-8"))
+    assert len(calls) == 2
+    assert meta["retry_count"] == 1
+    assert (output_root / "cartoon-apple" / "output.glb").read_bytes() == b"glTF"
+
+
+def test_run_task_writes_failure_record_after_retry(monkeypatch, tmp_path: Path) -> None:
+    runner = _load_runner()
+    input_root = tmp_path / "input"
+    output_root = tmp_path / "output"
+    input_root.mkdir()
+    output_root.mkdir()
+    (input_root / "input.png").write_bytes(b"png")
+    license_sources = runner.LicenseSources(
+        root_license=tmp_path / "LICENSE",
+        notice=tmp_path / "NOTICE",
+        bundled_license=tmp_path / "triposg_LICENSE",
+    )
+    calls: list[list[str]] = []
+
+    def fake_run_with_peak_vram(command: list[str], timeout_seconds: float) -> int:
+        calls.append(command)
+        raise RuntimeError("persistent decoder failure")
+
+    monkeypatch.setattr(runner, "run_with_peak_vram", fake_run_with_peak_vram)
+
+    runner.run_task(
+        runner.TaskDefinition(id="cartoon-apple", prompt="apple", image="input.png", seed=20260708),
+        input_root,
+        output_root,
+        license_sources,
+        timeout_seconds=10,
+    )
+
+    failure = json.loads((output_root / "cartoon-apple" / "failure.json").read_text(encoding="utf-8"))
+    assert len(calls) == 2
+    assert failure["status"] == "failed"
+    assert failure["model_id"] == "triposg"
+    assert failure["task_id"] == "cartoon-apple"
+    assert failure["retry_count"] == 1
+    assert failure["error_type"] == "RuntimeError"
+    assert "persistent decoder failure" in failure["error_message"]

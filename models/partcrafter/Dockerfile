@@ -8,6 +8,7 @@ ARG UV_VERSION=0.11.19
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
     HF_HOME=/opt/hf-cache \
+    PYTHONPATH=/opt/bench/src \
     TORCH_CUDA_ARCH_LIST="8.9;12.0" \
     CUDA_HOME=/usr/local/cuda \
     CPATH=/usr/local/cuda/include \
@@ -64,7 +65,8 @@ RUN uv pip install --python /opt/venv/bin/python \
         typeguard \
         matplotlib \
         imageio-ffmpeg \
-        colormaps
+        colormaps \
+        boto3
 
 RUN PARTCRAFTER_WEIGHTS_REVISION="${PARTCRAFTER_WEIGHTS_REVISION}" \
     RMBG_WEIGHTS_REVISION="${RMBG_WEIGHTS_REVISION}" \
@@ -85,7 +87,9 @@ snapshot_download(
 )
 PY
 
-COPY runner.py /opt/3dgen-runner/partcrafter_runner.py
+COPY bench/src /opt/bench/src
+COPY tasks /opt/3dgen-tasks
+COPY models/partcrafter/runner.py /opt/3dgen-runner/partcrafter_runner.py
 
 WORKDIR /work
 ENTRYPOINT ["python3", "/opt/3dgen-runner/partcrafter_runner.py"]

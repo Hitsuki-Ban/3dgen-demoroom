@@ -84,7 +84,7 @@ if ($Load) {
     $dockerArgs += @("--output", "type=docker,dest=$imageTar")
 }
 
-$dockerArgs += "models\$Model"
+$dockerArgs += "."
 
 Write-Host "Using Docker build cache under $cacheBase"
 & docker @dockerArgs
