@@ -5,7 +5,7 @@ This runner implements the benchmark container contract for TripoSR.
 ## Build
 
 ```powershell
-docker build -t 3dgen/triposr:local models/triposr
+.\scripts\docker-build-model.ps1 triposr
 ```
 
 The Dockerfile pins:

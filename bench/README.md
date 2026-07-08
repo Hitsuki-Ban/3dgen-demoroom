@@ -28,18 +28,52 @@ uv run bench-harness output-validate <path-to-task-output-dir>
 uv run bench-harness upload-local <source-dir> <target-root> runs/<model>/<gpu>/<timestamp>
 ```
 
+## Docker Build Cache
+
+On Windows, Docker Desktop stores loaded images inside its C: drive WSL VHDX. To keep repeated model builds from filling C:, use the repository build wrapper from the repo root:
+
+```powershell
+.\scripts\docker-build-model.ps1 triposg
+.\scripts\docker-build-model.ps1 partcrafter
+```
+
+By default it writes buildx local cache and the image archive to `.docker-build/` under the F: workspace. Load the image only when a local smoke run is needed:
+
+```powershell
+docker load -i .docker-build\images\3dgen-triposg-issue-11.tar
+```
+
+For direct build-and-run work on a machine with enough C: space, pass `-Load`:
+
+```powershell
+.\scripts\docker-build-model.ps1 triposg -Load
+```
+
+After smoke runs, remove images that are no longer needed and clear build cache:
+
+```powershell
+docker rmi 3dgen/triposg:issue-11
+docker builder prune -af
+```
+
 ## Model Runners
 
 Implemented runner containers:
 
 - `models/triposr/` — TripoSR image-to-3D runner. Builds a pinned CUDA 12.8 + torch 2.7 image and writes the benchmark output contract for each task.
+- `models/triposg/` — TripoSG image-to-geometry runner. Builds a pinned CUDA 12.8 + torch 2.7 image, uses pinned TripoSG/RMBG weights, and writes `LICENSES.txt` with upstream notices.
+- `models/partcrafter/` — PartCrafter part-aware image-to-3D runner. Builds a pinned CUDA 12.8 + torch 2.7 image, uses pinned PartCrafter/RMBG weights, disables VLM/style-transfer API paths, and writes part meshes plus a composite `output.glb`.
+
+## Local Validation Scope
+
+The local 12GB RTX 4070 Ti validation gate is for lightweight runners first. TripoSR has already passed the two-task local E2E path. TripoSG's official decoder configuration (`num_tokens=2048`, `flash_octree_depth=9`) proved too heavy for local validation: diffusion finished, but geometry extraction did not complete after more than 10 minutes. A reduced diagnostic run (`num_inference_steps=5`, `num_tokens=1024`, `flash_octree_depth=8`) completed and exported a GLB, so TripoSG full generation is deferred to the cloud GPU phase. Apply the same rule to PartCrafter if local generation blocks progress: keep pins, buildability, runner contract, and unit tests local; move full generation evidence to the cloud run issue.
 
 ## Cost Guardrails
 
 - `MAX_RUNTIME_MIN` defaults to `60`, as specified in Issue #11. Non-positive values fail fast.
 - When `RUNPOD_POD_ID` is present, RunPod self-termination requires `RUNPOD_API_KEY`; missing credentials fail fast.
-- Remote RunPod launch is not implemented in this split PR. `bench_harness.runpod` only defines the balance-check request contract (`clientBalance`) for the next PR.
-- S3/R2 upload is intentionally not implemented in this split PR. Selecting `s3` raises `NotImplementedError`; local upload is implemented.
+- Remote RunPod launch is not implemented in this runner PR. `bench_harness.runpod` only defines the balance-check request contract (`clientBalance`) for a later orchestration task.
+- S3/R2 upload is intentionally not implemented in this runner PR. Selecting `s3` raises `NotImplementedError`; local upload is implemented.
 
 ## Source Pins Checked On 2026-07-08
 

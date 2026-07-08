@@ -1,0 +1,29 @@
+{
+  "id": "partcrafter",
+  "name": "PartCrafter",
+  "input": "image",
+  "output": "part-aware-mesh",
+  "code_repo": "https://github.com/wgsxm/PartCrafter",
+  "code_commit": "3d773bf02fad51c7ab31a5615573fec93b287b30",
+  "weights_repo": "wgsxm/PartCrafter",
+  "weights_revision": "69a0ffc1dad5e48e7e5ed91c0609f2b1276eb31f",
+  "auxiliary_weights": {
+    "rmbg_repo": "briaai/RMBG-1.4",
+    "rmbg_revision": "2ceba5a5efaec153162aedea169f76caf9b46cf8"
+  },
+  "license": "MIT plus bundled third-party notices",
+  "default_parameters": {
+    "num_parts": 3,
+    "num_tokens": 1024,
+    "num_inference_steps": 50,
+    "guidance_scale": 7.0,
+    "max_num_expanded_coords": 1000000000,
+    "use_flash_decoder": false,
+    "rmbg": true,
+    "part_suggest": false,
+    "style_transfer": false,
+    "dtype": "float16",
+    "partcrafter_weights_path": "/opt/weights/PartCrafter",
+    "rmbg_weights_path": "/opt/weights/RMBG-1.4"
+  }
+}

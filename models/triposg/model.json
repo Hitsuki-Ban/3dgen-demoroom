@@ -1,0 +1,28 @@
+{
+  "id": "triposg",
+  "name": "TripoSG",
+  "input": "image",
+  "output": "geometry-mesh",
+  "code_repo": "https://github.com/VAST-AI-Research/TripoSG",
+  "code_commit": "fc5c40990181e2a756c4e0b1c2f4d6b5202faf8c",
+  "weights_repo": "VAST-AI/TripoSG",
+  "weights_revision": "2c1c516d22d58db486a058d98d31bb6177344e06",
+  "auxiliary_weights": {
+    "rmbg_repo": "briaai/RMBG-1.4",
+    "rmbg_revision": "2ceba5a5efaec153162aedea169f76caf9b46cf8"
+  },
+  "license": "MIT plus bundled third-party notices",
+  "default_parameters": {
+    "num_inference_steps": 50,
+    "num_tokens": 2048,
+    "guidance_scale": 7.0,
+    "dense_octree_depth": 8,
+    "hierarchical_octree_depth": 9,
+    "flash_octree_depth": 9,
+    "use_flash_decoder": true,
+    "faces": -1,
+    "dtype": "float16",
+    "triposg_weights_path": "/opt/weights/TripoSG",
+    "rmbg_weights_path": "/opt/weights/RMBG-1.4"
+  }
+}
