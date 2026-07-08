@@ -15,7 +15,7 @@ Implemented the local code needed for the first RunPod/R2 cloud wave and pushed 
 - Current Cloudflare connector cannot create account-owned API tokens; permission group lookup returned `9109: Unauthorized to access requested resource`.
 - No RunPod pods were launched in this pass, so there are no cloud artifacts or pod cleanup records yet.
 - Local execution environment does not currently expose `RUNPOD_API_KEY`, `R2_ENDPOINT`, `R2_ACCESS_KEY_ID`, or `R2_SECRET_ACCESS_KEY`; the values are present as GitHub secrets but cannot be read back by the local CLI.
-- GHCR packages were created as private by default. RunPod launch without `containerRegistryAuthId` requires changing both packages to public, or adding private registry auth support and providing a GHCR read token to RunPod.
+- GHCR packages were created as private by default. RunPod private registry auth has been provisioned as `cmrc1l2gc00847uotrnjn2des`.
 
 ## GHCR Images
 
@@ -41,15 +41,15 @@ Implemented the local code needed for the first RunPod/R2 cloud wave and pushed 
 - `gpuTypeIds`: `NVIDIA GeForce RTX 5090`, then `NVIDIA GeForce RTX 4090`
 - `gpuTypePriority`: `custom`
 - `allowedCudaVersions`: `12.8`
+- `containerRegistryAuthId`: `cmrc1l2gc00847uotrnjn2des`
 - `cloudType`: `SECURE`
 - `computeType`: `GPU`
 - `interruptible`: `false`
 
 ## Follow-up Before Full 25-Task Runs
 
-1. Make the GHCR images pullable by RunPod: either change both packages to public in GitHub package settings, or add/use a RunPod private registry auth id.
-2. Provide local launch credentials (`RUNPOD_API_KEY` plus R2 S3 env vars) or run the launcher from a GitHub Actions path that can consume the existing repository secrets.
-3. Launch one model at a time, verify `bench-harness runpod-pods` after completion, and sync uploaded artifacts into `outputs/site-data/<model-id>/<task-id>/`.
+1. Provide local launch credentials (`RUNPOD_API_KEY` plus R2 S3 env vars) or run the launcher from a GitHub Actions path that can consume the existing repository secrets.
+2. Launch one model at a time with `--container-registry-auth-id cmrc1l2gc00847uotrnjn2des`, verify `bench-harness runpod-pods` after completion, and sync uploaded artifacts into `outputs/site-data/<model-id>/<task-id>/`.
 
 ## Source Checks
 

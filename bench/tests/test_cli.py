@@ -62,6 +62,8 @@ def test_runpod_launch_command_uses_env_credentials_and_issue_defaults(monkeypat
             "s3://3dgen-runs/runs/triposg/rtx-5090/20260708T000000Z",
             "--name",
             "3dgen-triposg-wave1",
+            "--container-registry-auth-id",
+            "cmrc1l2gc00847uotrnjn2des",
         ],
     )
 
@@ -74,6 +76,7 @@ def test_runpod_launch_command_uses_env_credentials_and_issue_defaults(monkeypat
     assert config.max_runtime_min == 90
     assert config.gpu_type_ids == ("NVIDIA GeForce RTX 5090", "NVIDIA GeForce RTX 4090")
     assert config.allowed_cuda_versions == ("12.8",)
+    assert config.container_registry_auth_id == "cmrc1l2gc00847uotrnjn2des"
     assert config.r2_credentials.endpoint == "https://example.r2.cloudflarestorage.com"
     assert capsys.readouterr().out == '{"desiredStatus": "RUNNING", "id": "pod-123"}\n'
 

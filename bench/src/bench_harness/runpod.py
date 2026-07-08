@@ -71,6 +71,7 @@ class RunPodLaunchConfig:
     gpu_type_ids: tuple[str, ...]
     allowed_cuda_versions: tuple[str, ...]
     r2_credentials: R2Credentials
+    container_registry_auth_id: str | None = None
     container_disk_gb: int = 80
     volume_gb: int = 120
     output_root: str = "/work/output"
@@ -178,8 +179,10 @@ def build_pod_payload(config: RunPodLaunchConfig, *, runpod_api_key: str) -> dic
         raise ValueError("RunPod gpu_type_ids must not be empty")
     if not config.allowed_cuda_versions:
         raise ValueError("RunPod allowed_cuda_versions must not be empty")
+    if config.container_registry_auth_id is not None and not config.container_registry_auth_id.strip():
+        raise ValueError("RunPod container_registry_auth_id must not be empty")
     command = build_cloud_run_command(config.model_id, config.output_root, config.s3_target)
-    return {
+    payload: dict[str, Any] = {
         "name": config.name,
         "imageName": config.image_name,
         "cloudType": "SECURE",
@@ -201,6 +204,9 @@ def build_pod_payload(config: RunPodLaunchConfig, *, runpod_api_key: str) -> dic
             **config.r2_credentials.as_env(),
         },
     }
+    if config.container_registry_auth_id is not None:
+        payload["containerRegistryAuthId"] = config.container_registry_auth_id
+    return payload
 
 
 def request_json(

@@ -91,6 +91,7 @@ def test_build_pod_payload_uses_on_demand_gpu_priority_and_runtime_env() -> None
     assert payload["gpuTypePriority"] == "custom"
     assert payload["allowedCudaVersions"] == ["12.8"]
     assert payload["interruptible"] is False
+    assert "containerRegistryAuthId" not in payload
     assert payload["env"]["MAX_RUNTIME_MIN"] == "90"
     assert payload["env"]["RUNPOD_RUN_MODEL_ID"] == "triposg"
     assert payload["env"]["RUNPOD_API_KEY"] == "token"
@@ -99,6 +100,43 @@ def test_build_pod_payload_uses_on_demand_gpu_priority_and_runtime_env() -> None
     assert payload["env"]["R2_SECRET_ACCESS_KEY"] == "secret-key"
     assert payload["dockerEntrypoint"] == ["bash", "-lc"]
     assert "bench_harness.cli upload-s3" in payload["dockerStartCmd"][0]
+
+
+def test_build_pod_payload_uses_container_registry_auth_id_when_provided() -> None:
+    payload = build_pod_payload(
+        RunPodLaunchConfig(
+            name="3dgen-triposg-wave1",
+            image_name="ghcr.io/hitsuki-ban/3dgen-triposg@sha256:abc",
+            model_id="triposg",
+            s3_target="s3://3dgen-runs/runs/triposg/rtx-5090/20260708T000000Z",
+            max_runtime_min=90,
+            gpu_type_ids=("NVIDIA GeForce RTX 5090",),
+            allowed_cuda_versions=("12.8",),
+            r2_credentials=make_r2_credentials(),
+            container_registry_auth_id="cmrc1l2gc00847uotrnjn2des",
+        ),
+        runpod_api_key="token",
+    )
+
+    assert payload["containerRegistryAuthId"] == "cmrc1l2gc00847uotrnjn2des"
+
+
+def test_build_pod_payload_rejects_empty_container_registry_auth_id() -> None:
+    with pytest.raises(ValueError, match="container_registry_auth_id"):
+        build_pod_payload(
+            RunPodLaunchConfig(
+                name="3dgen-triposg-wave1",
+                image_name="ghcr.io/hitsuki-ban/3dgen-triposg@sha256:abc",
+                model_id="triposg",
+                s3_target="s3://3dgen-runs/runs/triposg/rtx-5090/20260708T000000Z",
+                max_runtime_min=90,
+                gpu_type_ids=("NVIDIA GeForce RTX 5090",),
+                allowed_cuda_versions=("12.8",),
+                r2_credentials=make_r2_credentials(),
+                container_registry_auth_id=" ",
+            ),
+            runpod_api_key="token",
+        )
 
 
 def test_r2_credentials_are_loaded_from_explicit_env() -> None:
