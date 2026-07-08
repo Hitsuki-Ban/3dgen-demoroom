@@ -9,6 +9,11 @@ import { fileURLToPath } from 'node:url';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const runsRoot = path.resolve(here, '../../outputs/site-data');
 const outFile = path.resolve(here, '../public/manifest.json');
+const minResults = Number.parseInt(process.env.SITE_DATA_MIN_RESULTS ?? '', 10);
+
+if (process.env.SITE_DATA_MIN_RESULTS && (!Number.isInteger(minResults) || minResults <= 0)) {
+  throw new Error('SITE_DATA_MIN_RESULTS must be a positive integer');
+}
 
 const results = [];
 if (fs.existsSync(runsRoot)) {
@@ -19,7 +24,12 @@ if (fs.existsSync(runsRoot)) {
       const taskDir = path.join(modelDir, taskId);
       const metaPath = path.join(taskDir, 'meta.json');
       const glbPath = path.join(taskDir, 'output.glb');
-      if (!fs.existsSync(metaPath) || !fs.existsSync(glbPath)) continue;
+      const hasMeta = fs.existsSync(metaPath);
+      const hasGlb = fs.existsSync(glbPath);
+      if (hasMeta !== hasGlb) {
+        throw new Error(`incomplete site-data under ${taskDir}: meta.json=${hasMeta} output.glb=${hasGlb}`);
+      }
+      if (!hasMeta) continue;
       const meta = JSON.parse(fs.readFileSync(metaPath, 'utf-8'));
       if (meta.model_id !== modelId || meta.task_id !== taskId) {
         throw new Error(`meta.json mismatch under ${taskDir}: ${meta.model_id}/${meta.task_id}`);
@@ -27,12 +37,16 @@ if (fs.existsSync(runsRoot)) {
       results.push({
         taskId,
         modelId,
-        glbUrl: `/assets/runs/${modelId}/${taskId}/output.glb`,
+        glbUrl: `/run-assets/${modelId}/${taskId}/output.glb`,
         glbSizeBytes: fs.statSync(glbPath).size,
         meta,
       });
     }
   }
+}
+
+if (process.env.SITE_DATA_MIN_RESULTS && results.length < minResults) {
+  throw new Error(`site-data result count ${results.length} is below required minimum ${minResults}`);
 }
 
 fs.mkdirSync(path.dirname(outFile), { recursive: true });

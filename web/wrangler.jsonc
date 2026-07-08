@@ -1,12 +1,20 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "3dgen-demoroom",
+  "main": "src/worker.ts",
   "compatibility_date": "2026-07-08",
-  // チラ見せ段階: 全アセット(GLB/PNG 含む、いずれも 25MiB 未満)を Workers Static Assets で配信。
-  // 本ベンチのデータ量が増えたら GLB/画像は R2 公開バケット + カスタムドメインへ移行する
-  // (docs/research/viewer-hosting-merged.md 参照)。
+  // GLB は 25MiB を超えるモデルがあるため R2 binding から /run-assets/* で配信する。
+  // React bundle と参照画像だけ Workers Static Assets に載せる。
   "assets": {
     "directory": "./dist",
+    "binding": "ASSETS",
+    "run_worker_first": ["/run-assets/*"],
     "not_found_handling": "single-page-application"
-  }
+  },
+  "r2_buckets": [
+    {
+      "binding": "SITE_DATA",
+      "bucket_name": "3dgen-runs"
+    }
+  ]
 }
