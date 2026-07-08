@@ -103,6 +103,8 @@ Weight-free runtime package:
 - A private-auth retry with this package on `EU-RO-1` reached `publicIp` and an SSH port mapping, but TCP to SSH stayed closed and RunPod later returned `pod not found` before R2 telemetry. The runtime images did not install/start an SSH daemon, so the launcher-side SSH readiness gate could not succeed.
 - The SSH-enabled image fixed container readiness and reached active inference, but pod disappearance after 22 completed task metadata files left R2 empty because upload still happened only at the end.
 - Current TripoSG retry image: `ghcr.io/hitsuki-ban/3dgen-triposg-runtime:2026-07-cloud-wave1-ssh-incremental` at digest `sha256:5a3088fa4038648d0f5b19200c03a5ec45fb206947503ac24dafb6443a6403f8`.
+- The SSH + incremental TripoSG retry completed all 25 tasks on RTX 4090, with 100 task objects preserved in R2 under `runs/triposg/wave1/20260708T182152Z/` and all synced local task outputs passing `output-validate`.
+- Final `runpod-status.json` was still absent after pod cleanup, so final status writing needs its own incremental or earlier persistence path.
 
 ## Recommended implementation plan
 
@@ -110,7 +112,8 @@ Weight-free runtime package:
 2. Keep the old baked-weight images only as historical artifacts; do not spend more GPU time testing them.
 3. Keep the launcher command observable: upload a `runpod-status.json` file even when the model runner exits non-zero, then terminate the pod from local monitoring if self-termination does not complete.
 4. Upload each task result incrementally to R2. Final upload is still useful as a sweep, but it cannot be the only persistence path on preempted or disappearing pods.
-5. Retry the SSH + incremental TripoSG runtime on the same private package path. If the rebuilt private package still stalls before SSH readiness, either make the package public after explicit approval and verify anonymous manifest access, or run a tiny diagnostic image against the same data center/volume to isolate RunPod machine/volume startup from GHCR runtime image pull.
+5. Build the same SSH + incremental package shape for PartCrafter before spending another GPU run.
+6. Persist final status before or independently from self-termination. Incremental task upload solved artifact loss, but final run status can still be missed if the pod disappears after the last task.
 
 ## Candidate staging commands
 

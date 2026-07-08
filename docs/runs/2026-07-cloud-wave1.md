@@ -28,6 +28,7 @@ Implemented the local code needed for the first RunPod/R2 cloud wave and pushed 
 - A paid retry with the split TripoSG weight-free runtime package and private registry auth created pod `il8q7manajir88` on EU-RO-1; `publicIp` and SSH port mapping appeared, but TCP to SSH stayed closed, RunPod later returned `pod not found` during startup polling, and R2 remained empty. This exposed that the runtime images did not install/start an SSH daemon, so the launcher-side SSH readiness gate could not succeed.
 - A paid retry with SSH daemon support created pod `jlnk4q5rjjh3m3` on EU-RO-1. SSH became reachable and the runner reached 22 completed task metadata files before the pod disappeared. R2 stayed empty because the command still uploaded only once at the end, so mid-run pod loss discarded otherwise usable task outputs.
 - The launcher now injects `RUNPOD_INCREMENTAL_S3_TARGET`, and TripoSG/PartCrafter runners upload each completed or failed task directory to R2 under that task id. Incremental upload failures fail the run as infrastructure failures instead of being treated as model inference failures.
+- The TripoSG SSH + incremental retry completed all 25 tasks on RTX 4090. R2 contains all 25 task directories under `runs/triposg/wave1/20260708T182152Z/`, and local `output-validate` passed for every synced task directory.
 
 ## GHCR Images
 
@@ -336,6 +337,87 @@ uv run bench-harness runpod-launch triposg `
   --allowed-cuda-version 12.8
 ```
 
+## TripoSG SSH + Incremental Full Run
+
+Documented at 2026-07-09T03:42Z after active pods returned to `[]`, R2 was rechecked, and local outputs were validated.
+
+Image:
+
+- `ghcr.io/hitsuki-ban/3dgen-triposg-runtime@sha256:5a3088fa4038648d0f5b19200c03a5ec45fb206947503ac24dafb6443a6403f8`
+
+Command shape:
+
+```powershell
+uv run bench-harness runpod-launch triposg `
+  ghcr.io/hitsuki-ban/3dgen-triposg-runtime@sha256:5a3088fa4038648d0f5b19200c03a5ec45fb206947503ac24dafb6443a6403f8 `
+  s3://3dgen-runs/runs/triposg/wave1/20260708T182152Z `
+  --name 3dgen-triposg-wave1-ssh-incremental-20260708T182152Z `
+  --min-balance-usd 12 `
+  --gpu-type-id "NVIDIA GeForce RTX 4090" `
+  --container-registry-auth-id cmrc1l2gc00847uotrnjn2des `
+  --network-volume-id wnqijpazd5 `
+  --data-center-id EU-RO-1 `
+  --startup-timeout-min 25 `
+  --allowed-cuda-version 13.0 `
+  --allowed-cuda-version 12.9 `
+  --allowed-cuda-version 12.8
+```
+
+Observed:
+
+- Pod id: `9fd9wao5wlhwp7`
+- Cost reported by RunPod: `$0.69/hr`
+- GPU: RTX 4090 x1
+- Data center: `EU-RO-1`
+- Network volume: `wnqijpazd5`
+- Public SSH endpoint during run: `213.173.108.136:19146`
+- R2 prefix: `runs/triposg/wave1/20260708T182152Z/`
+- Active pods after completion: `[]`
+- Balance moved from `$18.3885960658` before launch to `$18.1801484704` after completion, an observed delta of about `$0.20845`.
+- R2 contains 100 task objects: 25 task directories with `LICENSES.txt`, `meta.json`, `output.glb`, and `raw/triposg/output.glb` each.
+- R2 does not contain a final `runpod-status.json`; the pod disappeared or self-terminated around the final sweep/status phase. The incremental uploads preserved all task artifacts despite that.
+- Local sync target: `outputs/site-data/triposg/<task-id>/`.
+- `bench-harness output-validate` passed for all 25 synced task directories.
+
+Metrics from synced `meta.json` files:
+
+- Successful task count: 25
+- Failure count: 0
+- Total task wall-clock seconds: `475.16`
+- Average task wall-clock seconds: `19.01`
+- Max peak VRAM: `12,689,866,752` bytes, about `11.82 GiB`
+- GPU name in metadata: `NVIDIA GeForce RTX 4090`
+
+Per-task metrics:
+
+| Task | Seconds | Peak VRAM GiB |
+| --- | ---: | ---: |
+| `anime-heroine-character` | 15.01 | 7.78 |
+| `anime-katana` | 12.94 | 7.48 |
+| `anime-ramen-bowl` | 19.69 | 11.31 |
+| `anime-slime-mascot` | 18.62 | 11.66 |
+| `anime-vending-machine` | 18.64 | 9.79 |
+| `arcade-cabinet` | 17.61 | 9.61 |
+| `cartoon-apple` | 59.90 | 10.74 |
+| `chained-anchor` | 16.62 | 10.13 |
+| `chrome-espresso-machine` | 20.17 | 10.75 |
+| `crusty-bread-loaf` | 20.17 | 11.67 |
+| `fluffy-monster-plush` | 18.10 | 9.76 |
+| `forest-goblin-creature` | 17.09 | 11.82 |
+| `medieval-longsword` | 12.98 | 6.71 |
+| `modular-dungeon-gate` | 18.64 | 9.31 |
+| `old-oak-tree` | 18.11 | 9.93 |
+| `ornate-treasure-chest` | 21.18 | 9.79 |
+| `plasma-rifle` | 15.04 | 7.63 |
+| `potted-monstera` | 16.55 | 10.05 |
+| `rusty-pickup-truck` | 18.13 | 9.66 |
+| `scifi-supply-crate` | 19.13 | 9.53 |
+| `stained-glass-lantern` | 16.55 | 9.34 |
+| `stylized-hover-bike` | 17.08 | 10.19 |
+| `toon-knight-character` | 17.14 | 9.19 |
+| `victorian-street-lamp` | 13.50 | 7.56 |
+| `wooden-rocking-chair` | 16.56 | 11.05 |
+
 ## Log Access Notes
 
 - `runpodctl` v2.6.1 was installed locally under gitignored `.docker-build/tools/runpodctl-2.6.1`; checksum matched the official release checksum.
@@ -363,10 +445,9 @@ uv run bench-harness runpod-launch triposg `
 
 ## Follow-up Before Full 25-Task Runs
 
-1. Retry TripoSG with `ghcr.io/hitsuki-ban/3dgen-triposg-runtime@sha256:5a3088fa4038648d0f5b19200c03a5ec45fb206947503ac24dafb6443a6403f8` on EU-RO-1 / `wnqijpazd5` using private registry auth.
-2. Monitor both SSH and R2. The first completed task should create objects under `runs/triposg/wave1/<timestamp>/<task-id>/` before the full run ends.
-3. If the rebuilt private runtime stalls before SSH readiness, choose the next registry/bootstrap isolation path: make the weight-free package public after explicit approval, or run a tiny diagnostic image against the same data center/volume.
-4. After a successful TripoSG run, validate every task with `output-validate`, sync artifacts into `outputs/site-data/triposg/<task-id>/`, then run PartCrafter with the same volume and a matching weight-free runtime package.
+1. Build and push a PartCrafter weight-free runtime package with SSH daemon support and task-level incremental upload, then run it against the same EU-RO-1 / `wnqijpazd5` volume.
+2. Add a follow-up hardening change so final `runpod-status.json` is also uploaded incrementally or written before self-termination; task outputs are complete, but the final status file is still vulnerable to pod disappearance.
+3. After PartCrafter succeeds, validate every task with `output-validate`, sync artifacts into `outputs/site-data/partcrafter/<task-id>/`, and hand the synced site data to the frontend comparison page flow.
 
 ## Source Checks
 
