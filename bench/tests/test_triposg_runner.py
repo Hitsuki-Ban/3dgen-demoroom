@@ -1,5 +1,6 @@
 import importlib.util
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -78,6 +79,7 @@ def test_triposg_dockerfile_uses_required_cuda_base_and_pins() -> None:
     assert "uv pip install --system" in dockerfile
     assert "RUN pip install" not in dockerfile
     assert "boto3" in dockerfile
+    assert "openssh-server" in dockerfile
     assert "PYTHONPATH=/opt/bench/src" in dockerfile
     assert "COPY bench/src /opt/bench/src" in dockerfile
     assert "COPY tasks /opt/3dgen-tasks" in dockerfile
@@ -124,6 +126,29 @@ def test_build_triposg_command_uses_volume_pinned_weights(monkeypatch, tmp_path:
         "--infer-rmbg-weights-path",
         "/workspace/weights/RMBG-1.4",
     ]
+
+
+def test_triposg_incremental_upload_uses_task_id_prefix(monkeypatch, tmp_path: Path) -> None:
+    runner = _load_runner(monkeypatch)
+    task_dir = tmp_path / "task-a"
+    task_dir.mkdir()
+    (task_dir / "meta.json").write_text("{}", encoding="utf-8")
+    uploaded = []
+
+    class FakeS3Client:
+        def upload_file(self, source: str, bucket: str, key: str) -> None:
+            uploaded.append((Path(source).name, bucket, key))
+
+    monkeypatch.setenv("RUNPOD_INCREMENTAL_S3_TARGET", "s3://3dgen-runs/runs/triposg/wave1/test")
+    monkeypatch.setenv("R2_ENDPOINT", "https://example.r2.cloudflarestorage.com")
+    monkeypatch.setenv("R2_ACCESS_KEY_ID", "access-key")
+    monkeypatch.setenv("R2_SECRET_ACCESS_KEY", "secret-key")
+    monkeypatch.setattr("bench_harness.uploader.create_s3_client", lambda config: FakeS3Client())
+
+    assert runner.upload_task_increment_if_configured(task_dir, "task-a", dict(os.environ)) == [
+        "runs/triposg/wave1/test/task-a/meta.json",
+    ]
+    assert uploaded == [("meta.json", "3dgen-runs", "runs/triposg/wave1/test/task-a/meta.json")]
 
 
 def test_triposg_runner_requires_explicit_weight_env(monkeypatch) -> None:
@@ -250,6 +275,65 @@ def test_run_task_retries_once_and_records_retry_count(monkeypatch, tmp_path: Pa
     assert len(calls) == 2
     assert meta["retry_count"] == 1
     assert (output_root / "cartoon-apple" / "output.glb").read_bytes() == b"glTF"
+
+
+def test_run_task_upload_failure_does_not_retry_successful_triposg_task(monkeypatch, tmp_path: Path) -> None:
+    runner = _load_runner(monkeypatch)
+    input_root = tmp_path / "input"
+    output_root = tmp_path / "output"
+    input_root.mkdir()
+    output_root.mkdir()
+    (input_root / "input.png").write_bytes(b"png")
+    license_sources = runner.LicenseSources(
+        root_license=tmp_path / "LICENSE",
+        notice=tmp_path / "NOTICE",
+        bundled_license=tmp_path / "triposg_LICENSE",
+    )
+    license_sources.root_license.write_text("MIT\n", encoding="utf-8")
+    license_sources.notice.write_text("NOTICE\n", encoding="utf-8")
+    license_sources.bundled_license.write_text("Tencent\n", encoding="utf-8")
+    calls: list[list[str]] = []
+
+    def fake_run_with_peak_vram(command: list[str], timeout_seconds: float) -> int:
+        calls.append(command)
+        output_path = Path(command[command.index("--infer-output-path") + 1])
+        output_path.write_bytes(b"glTF")
+        return 1234
+
+    monkeypatch.setattr(runner, "run_with_peak_vram", fake_run_with_peak_vram)
+    monkeypatch.setattr(
+        runner,
+        "collect_runtime_snapshot",
+        lambda peak: runner.RuntimeSnapshot(
+            gpu_name="NVIDIA GeForce RTX 5090",
+            peak_vram_bytes=peak,
+            torch_version="2.7.1+cu128",
+            torch_cuda_version="12.8",
+            torch_cuda_arch_list=["sm_120"],
+            attention_backend="sdpa",
+        ),
+    )
+    monkeypatch.setattr(
+        runner,
+        "upload_task_increment_if_configured",
+        lambda task_output_dir, task_id, env: (_ for _ in ()).throw(RuntimeError("r2 upload failed")),
+    )
+
+    try:
+        runner.run_task(
+            runner.TaskDefinition(id="cartoon-apple", prompt="apple", image="input.png", seed=20260708),
+            input_root,
+            output_root,
+            license_sources,
+            timeout_seconds=10,
+        )
+    except RuntimeError as exc:
+        assert "r2 upload failed" in str(exc)
+    else:
+        raise AssertionError("incremental upload failure should fail the task run")
+
+    assert len(calls) == 1
+    assert (output_root / "cartoon-apple" / "meta.json").is_file()
 
 
 def test_run_task_writes_failure_record_after_retry(monkeypatch, tmp_path: Path) -> None:

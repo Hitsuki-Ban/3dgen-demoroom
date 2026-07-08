@@ -38,6 +38,14 @@ def parse_min_balance_usd(raw_value: str | None) -> float:
     return balance
 
 
+def strip_runpod_env(response):
+    if isinstance(response, list):
+        return [strip_runpod_env(item) for item in response]
+    if isinstance(response, dict):
+        return {key: strip_runpod_env(value) for key, value in response.items() if key != "env"}
+    return response
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(prog="bench-harness")
     subcommands = parser.add_subparsers(dest="command", required=True)
@@ -111,10 +119,10 @@ def main() -> None:
             args.min_balance_usd if args.min_balance_usd is not None else os.environ.get("RUNPOD_MIN_BALANCE_USD")
         )
         pod = RunPodClient(api_key=api_key).launch_pod(config, min_balance_usd=min_balance_usd)
-        print(json.dumps(pod, sort_keys=True))
+        print(json.dumps(strip_runpod_env(pod), sort_keys=True))
     elif args.command == "runpod-pods":
         pods = RunPodClient(api_key=required_env("RUNPOD_API_KEY")).list_pods()
-        print(json.dumps(pods, sort_keys=True))
+        print(json.dumps(strip_runpod_env(pods), sort_keys=True))
     elif args.command == "runpod-terminate":
         pod = RunPodClient(api_key=required_env("RUNPOD_API_KEY")).terminate_pod(args.pod_id)
         print(json.dumps(pod, sort_keys=True))

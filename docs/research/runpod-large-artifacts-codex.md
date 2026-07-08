@@ -73,29 +73,49 @@ Implemented:
 - `bench-harness runpod-launch` requires `--network-volume-id`.
 - Pod payloads include `networkVolumeId` and mount the volume at `/workspace`.
 - Pod payloads require one explicit `--data-center-id` and set `dataCenterPriority=custom` so placement stays with the volume.
-- `bench-harness runpod-launch` requires `--startup-timeout-min`; if `publicIp` does not appear before the timeout, it terminates the pod.
+- `bench-harness runpod-launch` requires `--startup-timeout-min`; if a reachable mapped SSH TCP port does not appear before the timeout, it terminates the pod.
 - Pod env includes Hugging Face offline mode and explicit model weight paths under `/workspace/weights`.
 - TripoSG and PartCrafter Dockerfiles no longer download model snapshots into image layers.
 - TripoSG and PartCrafter runners fail fast when explicit weight path environment variables are missing.
+- Runtime images install and start `openssh-server` before benchmark execution, so launcher readiness waits for a real reachable container SSH port.
+- Pod env includes `RUNPOD_INCREMENTAL_S3_TARGET`, and model runners upload each completed or final-failed task directory to R2 immediately under that task id.
 
-Still needed before the next paid benchmark pod:
+Created/staged volume:
 
-- Pre-populate the exact pinned model revisions under `/workspace/weights`.
-- Rebuild and push the updated runtime-only images.
-
-Created volume:
-
-- ID: `b01dms1lva`
-- Name: `3dgen-wave1-weights-us-il-1`
-- Data center: `US-IL-1`
+- ID: `wnqijpazd5`
+- Name: `3dgen-wave1-weights-eu-ro-1-20260708T155503Z`
+- Data center: `EU-RO-1`
 - Size: 30GB
 - Created: 2026-07-08
+- Staged weights report: `runs/staging/20260708T155503Z/network-volume-wnqijpazd5.json`
+
+Retired volume:
+
+- `cwcjs6bz6j` in `US-NC-1` was deleted after EU-RO-1 staging succeeded, because actual create capacity in US-NC-1 was unavailable.
+
+Weight-free runtime package:
+
+- `ghcr.io/hitsuki-ban/3dgen-triposg-runtime:2026-07-cloud-wave1`
+- Digest: `sha256:d4bc56e23a07bea440eff269216998d790c1b5af697ec335fd74e8ed17a5d332`
+- The package was split from the historical `3dgen-triposg` package so it does not expose baked-weight tags when made public.
+- Current status: still private; anonymous GHCR manifest probe returned HTTP 401.
+- GitHub documents changing a package to public as irreversible, so this toggle should only happen after explicit Fable/owner approval.
+- A private-auth retry with this package on `EU-RO-1` reached `publicIp` and an SSH port mapping, but TCP to SSH stayed closed and RunPod later returned `pod not found` before R2 telemetry. The runtime images did not install/start an SSH daemon, so the launcher-side SSH readiness gate could not succeed.
+- The SSH-enabled image fixed container readiness and reached active inference, but pod disappearance after 22 completed task metadata files left R2 empty because upload still happened only at the end.
+- Current TripoSG retry image: `ghcr.io/hitsuki-ban/3dgen-triposg-runtime:2026-07-cloud-wave1-ssh-incremental` at digest `sha256:5a3088fa4038648d0f5b19200c03a5ec45fb206947503ac24dafb6443a6403f8`.
+- The SSH + incremental TripoSG retry completed all 25 tasks on RTX 4090, with 100 task objects preserved in R2 under `runs/triposg/wave1/20260708T182152Z/` and all synced local task outputs passing `output-validate`.
+- Final `runpod-status.json` was still absent after pod cleanup, so final status writing needs its own incremental or earlier persistence path.
+- Current PartCrafter retry image: `ghcr.io/hitsuki-ban/3dgen-partcrafter-runtime:2026-07-cloud-wave1-ssh-incremental` at digest `sha256:8d890742d62c1b69db59c9bc7545a28aa340fd6538b5c3605c1bcd6091fab277`.
+- The PartCrafter SSH + incremental run preserved all 25 task directories in R2 under `runs/partcrafter/wave1/20260708T190306Z/`: 24 passed `output-validate`, and `chrome-espresso-machine` produced a model failure record after retry.
 
 ## Recommended implementation plan
 
-1. Add a small staging script that downloads pinned Hugging Face revisions into the mounted network volume and writes manifest files containing repo id, revision, expected local path, and checked timestamp.
-2. Make benchmark runners validate those manifest files before starting the first task.
-3. Keep the old baked-weight images only as historical artifacts; do not spend more GPU time testing them.
+1. Make benchmark runners validate the staging report or expected weight files before starting the first task.
+2. Keep the old baked-weight images only as historical artifacts; do not spend more GPU time testing them.
+3. Keep the launcher command observable: upload a `runpod-status.json` file even when the model runner exits non-zero, then terminate the pod from local monitoring if self-termination does not complete.
+4. Upload each task result incrementally to R2. Final upload is still useful as a sweep, but it cannot be the only persistence path on preempted or disappearing pods.
+5. Build the same SSH + incremental package shape for PartCrafter before spending another GPU run.
+6. Persist final status before or independently from self-termination. Incremental task upload solved artifact loss, but final run status can still be missed if the pod disappears after the last task.
 
 ## Candidate staging commands
 
@@ -133,7 +153,7 @@ Adjust file checks per model if upstream layouts differ.
 ## Operational notes
 
 - Use `runpodctl pod list` or `bench-harness runpod-pods` for status. Avoid raw `runpodctl pod get` in logs because it prints pod environment values.
-- Add a launcher-side pre-container watchdog before another expensive run. Container self-termination cannot help while Docker is still pulling layers.
+- Keep the launcher-side pre-container watchdog tied to a reachable mapped SSH port. `publicIp` alone can appear before the container is actually usable.
 - Prefer one model per cloud launch until cache behavior is proven.
 - Store outputs and run manifests in R2. Do not put frequently-read model weights on R2 for inference unless a later benchmark proves R2 throughput is competitive from the chosen RunPod data center.
 
@@ -147,3 +167,4 @@ Adjust file checks per model if upstream layouts differ.
 - RunPod worker-vLLM README: https://github.com/runpod-workers/worker-vllm (checked 2026-07-08)
 - RunPod worker-TGI README: https://github.com/runpod-workers/worker-tgi (checked 2026-07-08)
 - Hugging Face Hub environment variables: https://huggingface.co/docs/huggingface_hub/en/package_reference/environment_variables (checked 2026-07-08)
+- GitHub package access control and visibility: https://docs.github.com/en/packages/learn-github-packages/configuring-a-packages-access-control-and-visibility (checked 2026-07-09)

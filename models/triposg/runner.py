@@ -195,7 +195,6 @@ def run_task(
                 finished_at=finished_iso,
             )
             shutil.rmtree(work_dir)
-            return
         except Exception as exc:
             if work_dir.exists():
                 shutil.rmtree(work_dir)
@@ -211,7 +210,21 @@ def run_task(
                 started_at=first_started_iso,
                 finished_at=utc_now(),
             )
+            upload_task_increment_if_configured(task_output_dir, task.id, os.environ)
             return
+        else:
+            upload_task_increment_if_configured(task_output_dir, task.id, os.environ)
+            return
+
+
+def upload_task_increment_if_configured(task_output_dir: Path, task_id: str, env: dict[str, str]) -> list[str]:
+    target = env.get("RUNPOD_INCREMENTAL_S3_TARGET")
+    if not target:
+        return []
+    from bench_harness.uploader import create_uploader
+
+    uploader = create_uploader("s3", target, env=env)
+    return uploader.upload_run(task_output_dir, task_id)
 
 
 def write_task_failure(

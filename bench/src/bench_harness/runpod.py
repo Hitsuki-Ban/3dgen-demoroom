@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import json
+import socket
 import time
 from dataclasses import dataclass
 from shlex import quote
 from typing import Any, Callable, Mapping
+from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 
@@ -36,6 +38,28 @@ MODEL_WEIGHT_ENVS = {
 
 JsonResponse = dict[str, object] | list[object]
 RequestJson = Callable[[str, str, dict[str, str], dict[str, object] | None], JsonResponse]
+TcpConnect = Callable[[str, int, float], bool]
+
+
+class RunPodApiError(RuntimeError):
+    def __init__(
+        self,
+        *,
+        method: str,
+        url: str,
+        status_code: int,
+        reason: str,
+        response_body: str,
+    ) -> None:
+        self.method = method
+        self.url = url
+        self.status_code = status_code
+        self.reason = reason
+        self.response_body = response_body
+        message = f"RunPod API request failed: {method} {url} returned HTTP {status_code} {reason}"
+        if response_body:
+            message = f"{message}: {response_body}"
+        super().__init__(message)
 
 
 @dataclass(frozen=True)
@@ -100,6 +124,7 @@ class RunPodLaunchConfig:
 class RunPodClient:
     api_key: str
     request_json: RequestJson | None = None
+    tcp_connect: TcpConnect | None = None
 
     @property
     def headers(self) -> dict[str, str]:
@@ -148,16 +173,27 @@ class RunPodClient:
 
     def wait_for_startup(self, pod_id: str, *, timeout_seconds: float, poll_seconds: float) -> dict[str, object]:
         deadline = time.monotonic() + timeout_seconds
+        last_pod: dict[str, object] | None = None
         while True:
-            pod = self.get_pod(pod_id)
+            try:
+                pod = self.get_pod(pod_id)
+            except RunPodApiError as exc:
+                if exc.status_code == 404:
+                    last_state = format_startup_state(last_pod)
+                    raise RuntimeError(
+                        f"RunPod pod {pod_id} disappeared before startup became ready{last_state}"
+                    ) from exc
+                raise
             if not isinstance(pod, dict):
                 raise ValueError("RunPod get pod response must be a JSON object")
-            if pod_has_public_ip(pod):
+            last_pod = pod
+            tcp_connect = self.tcp_connect or can_connect_tcp
+            if pod_is_startup_ready(pod, tcp_connect=tcp_connect):
                 return pod
             if time.monotonic() >= deadline:
                 self.terminate_pod(pod_id)
                 raise TimeoutError(
-                    f"RunPod pod {pod_id} did not expose publicIp within {timeout_seconds / 60:.1f} minutes"
+                    f"RunPod pod {pod_id} did not expose a reachable SSH port within {timeout_seconds / 60:.1f} minutes"
                 )
             time.sleep(poll_seconds)
 
@@ -204,6 +240,61 @@ def pod_has_public_ip(response: dict[str, object]) -> bool:
     return isinstance(public_ip, str) and bool(public_ip.strip())
 
 
+def pod_ssh_port(response: dict[str, object]) -> int | None:
+    port_mappings = response.get("portMappings")
+    if not isinstance(port_mappings, dict):
+        return None
+    raw_port = port_mappings.get("22")
+    if isinstance(raw_port, bool) or not isinstance(raw_port, int):
+        return None
+    return raw_port
+
+
+def can_connect_tcp(host: str, port: int, timeout_seconds: float) -> bool:
+    try:
+        with socket.create_connection((host, port), timeout=timeout_seconds):
+            return True
+    except OSError:
+        return False
+
+
+def pod_is_startup_ready(response: dict[str, object], *, tcp_connect: TcpConnect) -> bool:
+    public_ip = response.get("publicIp")
+    if not isinstance(public_ip, str) or not public_ip.strip():
+        return False
+    ssh_port = pod_ssh_port(response)
+    if ssh_port is None:
+        return False
+    return tcp_connect(public_ip, ssh_port, 5.0)
+
+
+def format_startup_state(response: dict[str, object] | None) -> str:
+    if response is None:
+        return ""
+    parts = []
+    pod_id = response.get("id")
+    if isinstance(pod_id, str) and pod_id.strip():
+        parts.append(f"id={pod_id}")
+    desired_status = response.get("desiredStatus")
+    if isinstance(desired_status, str) and desired_status.strip():
+        parts.append(f"desiredStatus={desired_status}")
+    public_ip = response.get("publicIp")
+    if isinstance(public_ip, str) and public_ip.strip():
+        parts.append(f"publicIp={public_ip}")
+    ssh_port = pod_ssh_port(response)
+    if ssh_port is not None:
+        parts.append(f"sshPort={ssh_port}")
+    runtime = response.get("runtime")
+    if runtime is not None:
+        parts.append(f"runtime={runtime}")
+    uptime = response.get("uptime")
+    if uptime is not None:
+        parts.append(f"uptime={uptime}")
+    if not parts:
+        return ""
+    return f" (last observed: {', '.join(parts)})"
+
+
 def build_cloud_run_command(model_id: str, output_root: str, s3_target: str) -> str:
     try:
         runner_path = MODEL_RUNNER_PATHS[model_id]
@@ -211,16 +302,100 @@ def build_cloud_run_command(model_id: str, output_root: str, s3_target: str) -> 
         raise ValueError(f"unknown model for RunPod cloud run: {model_id}") from exc
     if not s3_target.startswith("s3://"):
         raise ValueError("RunPod cloud run S3 target must use s3://")
+    quoted_output_root = quote(output_root)
+    quoted_s3_target = quote(s3_target)
+    quoted_model_id = quote(model_id)
     run_command = (
         f"python3 {quote(runner_path)} "
         f"--input-root {quote('/opt/3dgen-tasks')} "
-        f"--output-root {quote(output_root)}"
+        f"--output-root {quoted_output_root}"
+    )
+    ssh_command = (
+        "mkdir -p /run/sshd\n"
+        "if [ -n \"${PUBLIC_KEY:-}\" ]; then\n"
+        "  mkdir -p /root/.ssh\n"
+        "  printf '%s\\n' \"$PUBLIC_KEY\" >> /root/.ssh/authorized_keys\n"
+        "  chmod 700 /root/.ssh\n"
+        "  chmod 600 /root/.ssh/authorized_keys\n"
+        "fi\n"
+        "service ssh start\n"
+        "ssh_exit_code=$?\n"
+        "if [ \"$ssh_exit_code\" -ne 0 ]; then\n"
+        "  runner_exit_code=\"$ssh_exit_code\"\n"
+        "else\n"
+        f"  {run_command}\n"
+        "  runner_exit_code=$?\n"
+        "fi"
+    )
+    status_command = (
+        "python3 - "
+        f"{quoted_output_root} {quoted_model_id} {quoted_s3_target} "
+        '"$runner_exit_code" <<\'PY_RUNPOD_STATUS\'\n'
+        "from __future__ import annotations\n"
+        "import json\n"
+        "import os\n"
+        "import sys\n"
+        "from datetime import datetime, timezone\n"
+        "from pathlib import Path\n"
+        "\n"
+        "output_root = Path(sys.argv[1])\n"
+        "model_id = sys.argv[2]\n"
+        "s3_target = sys.argv[3]\n"
+        "runner_exit_code = int(sys.argv[4])\n"
+        "output_root.mkdir(parents=True, exist_ok=True)\n"
+        "status = {\n"
+        "    'finished_at': datetime.now(timezone.utc).isoformat(),\n"
+        "    'model_id': model_id,\n"
+        "    'pod_id': os.environ.get('RUNPOD_POD_ID'),\n"
+        "    'runner_exit_code': runner_exit_code,\n"
+        "    'self_termination_configured': bool(os.environ.get('RUNPOD_POD_ID') and os.environ.get('RUNPOD_API_KEY')),\n"
+        "    's3_target': s3_target,\n"
+        "    'status': 'ok' if runner_exit_code == 0 else 'failed',\n"
+        "}\n"
+        "(output_root / 'runpod-status.json').write_text(json.dumps(status, indent=2, sort_keys=True) + '\\n', encoding='utf-8')\n"
+        "PY_RUNPOD_STATUS"
     )
     upload_command = (
         "PYTHONPATH=/opt/bench/src "
-        f"python3 -m bench_harness.cli upload-s3 {quote(output_root)} {quote(s3_target)}"
+        f"python3 -m bench_harness.cli upload-s3 {quoted_output_root} {quoted_s3_target}"
     )
-    return f"{run_command} && {upload_command}"
+    terminate_command = (
+        "python3 - <<'PY_RUNPOD_TERMINATE'\n"
+        "from __future__ import annotations\n"
+        "import os\n"
+        "import urllib.request\n"
+        "\n"
+        "pod_id = os.environ.get('RUNPOD_POD_ID')\n"
+        "api_key = os.environ.get('RUNPOD_API_KEY')\n"
+        "if not pod_id or not api_key:\n"
+        "    print('RunPod self-termination warning: RUNPOD_POD_ID or RUNPOD_API_KEY is missing', flush=True)\n"
+        "else:\n"
+        "    request = urllib.request.Request(\n"
+        "        f'https://rest.runpod.io/v1/pods/{pod_id}',\n"
+        "        method='DELETE',\n"
+        "        headers={\n"
+        "            'Authorization': f'Bearer {api_key}',\n"
+        "            'User-Agent': '3dgen-demoroom-bench-harness/0.1',\n"
+        "        },\n"
+        "    )\n"
+        "    try:\n"
+        "        urllib.request.urlopen(request, timeout=30).read()\n"
+        "    except Exception as exc:\n"
+        "        print(f'RunPod self-termination warning: {exc}', flush=True)\n"
+        "PY_RUNPOD_TERMINATE"
+    )
+    return (
+        "set +e\n"
+        f"{ssh_command}\n"
+        f"{status_command}\n"
+        "status_exit_code=$?\n"
+        f"{upload_command}\n"
+        "upload_exit_code=$?\n"
+        f"{terminate_command}\n"
+        'if [ "$upload_exit_code" -ne 0 ]; then exit "$upload_exit_code"; fi\n'
+        'if [ "$status_exit_code" -ne 0 ]; then exit "$status_exit_code"; fi\n'
+        'exit "$runner_exit_code"'
+    )
 
 
 def build_model_weight_env(model_id: str) -> dict[str, str]:
@@ -277,6 +452,7 @@ def build_pod_payload(config: RunPodLaunchConfig, *, runpod_api_key: str) -> dic
             "MAX_RUNTIME_MIN": str(config.max_runtime_min),
             "RUNPOD_RUN_MODEL_ID": config.model_id,
             "RUNPOD_S3_TARGET": config.s3_target,
+            "RUNPOD_INCREMENTAL_S3_TARGET": config.s3_target,
             "RUNPOD_API_KEY": runpod_api_key,
             **build_model_weight_env(config.model_id),
             **config.r2_credentials.as_env(),
@@ -300,8 +476,18 @@ def request_json(
         data = json.dumps(body).encode("utf-8")
         request_headers["Content-Type"] = "application/json"
     request = Request(url, data=data, headers=request_headers, method=method)
-    with urlopen(request, timeout=60) as response:
-        raw = response.read().decode("utf-8")
+    try:
+        with urlopen(request, timeout=60) as response:
+            raw = response.read().decode("utf-8")
+    except HTTPError as exc:
+        error_body = exc.read().decode("utf-8", errors="replace").strip()
+        raise RunPodApiError(
+            method=method,
+            url=url,
+            status_code=exc.code,
+            reason=exc.reason,
+            response_body=error_body,
+        ) from exc
     if not raw:
         return {}
     parsed = json.loads(raw)

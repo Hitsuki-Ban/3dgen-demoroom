@@ -29,6 +29,7 @@ RUN apt-get update \
         libglib2.0-0 \
         libgl1 \
         libgl1-mesa-dev \
+        openssh-server \
         python3 \
         python3-dev \
         python3-venv \
