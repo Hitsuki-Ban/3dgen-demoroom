@@ -16,6 +16,7 @@ from typing import Any
 MODEL_ID = "partcrafter"
 MODEL_GIT_COMMIT = "3d773bf02fad51c7ab31a5615573fec93b287b30"
 WEIGHTS_REVISION = "69a0ffc1dad5e48e7e5ed91c0609f2b1276eb31f"
+RUNPOD_USER_AGENT = "3dgen-demoroom-bench-harness/0.1"
 PARTCRAFTER_ROOT = Path("/opt/PartCrafter")
 PARTCRAFTER_WEIGHTS_PATH = "/opt/weights/PartCrafter"
 RMBG_WEIGHTS_PATH = "/opt/weights/RMBG-1.4"
@@ -505,7 +506,10 @@ def terminate_runpod_if_needed(env: dict[str, str]) -> None:
     request = urllib.request.Request(
         f"https://rest.runpod.io/v1/pods/{pod_id}",
         method="DELETE",
-        headers={"Authorization": f"Bearer {api_key}"},
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "User-Agent": RUNPOD_USER_AGENT,
+        },
     )
     with urllib.request.urlopen(request, timeout=30) as response:
         if response.status >= 300:

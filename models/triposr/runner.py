@@ -16,6 +16,7 @@ from typing import Any
 MODEL_ID = "triposr"
 MODEL_GIT_COMMIT = "107cefdc244c39106fa830359024f6a2f1c78871"
 WEIGHTS_REVISION = "5b521936b01fbe1890f6f9baed0254ab6351c04a"
+RUNPOD_USER_AGENT = "3dgen-demoroom-bench-harness/0.1"
 TRIPOSR_ROOT = Path("/opt/TripoSR")
 TRIPOSR_WEIGHTS_PATH = "/opt/weights/TripoSR"
 TRIPOSR_WEIGHTS = Path(TRIPOSR_WEIGHTS_PATH)
@@ -284,7 +285,10 @@ def terminate_runpod_if_needed(env: dict[str, str]) -> None:
     request = urllib.request.Request(
         f"https://rest.runpod.io/v1/pods/{pod_id}",
         method="DELETE",
-        headers={"Authorization": f"Bearer {api_key}"},
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "User-Agent": RUNPOD_USER_AGENT,
+        },
     )
     with urllib.request.urlopen(request, timeout=30) as response:
         if response.status >= 300:
