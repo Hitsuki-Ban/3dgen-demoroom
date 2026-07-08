@@ -18,9 +18,18 @@ MODEL_GIT_COMMIT = "3d773bf02fad51c7ab31a5615573fec93b287b30"
 WEIGHTS_REVISION = "69a0ffc1dad5e48e7e5ed91c0609f2b1276eb31f"
 RUNPOD_USER_AGENT = "3dgen-demoroom-bench-harness/0.1"
 PARTCRAFTER_ROOT = Path("/opt/PartCrafter")
-PARTCRAFTER_WEIGHTS_PATH = "/opt/weights/PartCrafter"
-RMBG_WEIGHTS_PATH = "/opt/weights/RMBG-1.4"
 MAX_TASK_ATTEMPTS = 2
+
+
+def required_env(name: str) -> str:
+    value = os.environ.get(name)
+    if not value:
+        raise ValueError(f"{name} is required")
+    return value
+
+
+PARTCRAFTER_WEIGHTS_PATH = required_env("PARTCRAFTER_WEIGHTS_PATH")
+RMBG_WEIGHTS_PATH = required_env("RMBG_WEIGHTS_PATH")
 
 DEFAULT_PARAMETERS = {
     "num_parts": 3,

@@ -18,10 +18,19 @@ MODEL_GIT_COMMIT = "fc5c40990181e2a756c4e0b1c2f4d6b5202faf8c"
 WEIGHTS_REVISION = "2c1c516d22d58db486a058d98d31bb6177344e06"
 RUNPOD_USER_AGENT = "3dgen-demoroom-bench-harness/0.1"
 TRIPOSG_ROOT = Path("/opt/TripoSG")
-TRIPOSG_WEIGHTS_PATH = "/opt/weights/TripoSG"
-RMBG_WEIGHTS_PATH = "/opt/weights/RMBG-1.4"
 LICENSE_SOURCES = None
 MAX_TASK_ATTEMPTS = 2
+
+
+def required_env(name: str) -> str:
+    value = os.environ.get(name)
+    if not value:
+        raise ValueError(f"{name} is required")
+    return value
+
+
+TRIPOSG_WEIGHTS_PATH = required_env("TRIPOSG_WEIGHTS_PATH")
+RMBG_WEIGHTS_PATH = required_env("RMBG_WEIGHTS_PATH")
 
 DEFAULT_PARAMETERS = {
     "num_inference_steps": 50,

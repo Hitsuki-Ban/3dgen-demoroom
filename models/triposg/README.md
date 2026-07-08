@@ -16,7 +16,10 @@ The Dockerfile pins:
 - Base: `nvidia/cuda:12.8.1-cudnn-devel-ubuntu22.04`
 - Torch: `2.7.1` cu128
 
-The runner uses TripoSG's official image preprocessing and pipeline, but it does not call the official CLI because that path downloads Hugging Face snapshots at runtime without an explicit revision. The container downloads pinned code and weights during build, then the runner loads `/opt/weights/TripoSG` and `/opt/weights/RMBG-1.4`.
+The runner uses TripoSG's official image preprocessing and pipeline, but it does not call the official CLI because that path downloads Hugging Face snapshots at runtime without an explicit revision. The container downloads pinned code during build. Pinned weights are staged separately on the RunPod network volume, and the runner fails fast unless these environment variables are set:
+
+- `TRIPOSG_WEIGHTS_PATH`
+- `RMBG_WEIGHTS_PATH`
 
 The default parameters are the official TripoSG generation path: `num_inference_steps=50`, `num_tokens=2048`, `use_flash_decoder=true`, and `flash_octree_depth=9`. These values are passed explicitly so `meta.json` records the full generation configuration.
 
@@ -33,7 +36,10 @@ Prepare an input directory that contains `tasks.json` and `references/`.
 New-Item -ItemType Directory -Force outputs\triposg-smoke | Out-Null
 docker run --rm --gpus all `
   -e MAX_RUNTIME_MIN=60 `
+  -e TRIPOSG_WEIGHTS_PATH=/workspace/weights/TripoSG `
+  -e RMBG_WEIGHTS_PATH=/workspace/weights/RMBG-1.4 `
   -v ${PWD}\tasks:/work/input:ro `
+  -v <local-or-network-weight-root>:/workspace/weights:ro `
   -v ${PWD}\outputs\triposg-smoke:/work/output `
   3dgen/triposg:local --task-limit 2
 ```

@@ -60,30 +60,42 @@ export HF_HUB_OFFLINE=1
 export TRANSFORMERS_OFFLINE=1
 ```
 
-For our runners, the more important piece is not the generic Hugging Face cache path but the explicit model snapshot path. TripoSG and PartCrafter currently default to:
-
-- `/opt/weights/TripoSG`
-- `/opt/weights/PartCrafter`
-- `/opt/weights/RMBG-1.4`
-
-Those defaults should move behind environment variables so the cloud path can point them to volume-backed directories, for example:
+For our runners, the more important piece is not the generic Hugging Face cache path but the explicit model snapshot path. TripoSG and PartCrafter now require environment variables pointing at volume-backed directories:
 
 - `/workspace/weights/TripoSG`
 - `/workspace/weights/PartCrafter`
 - `/workspace/weights/RMBG-1.4`
 
+## Implementation status in current follow-up branch
+
+Implemented:
+
+- `bench-harness runpod-launch` requires `--network-volume-id`.
+- Pod payloads include `networkVolumeId` and mount the volume at `/workspace`.
+- Pod payloads require one explicit `--data-center-id` and set `dataCenterPriority=custom` so placement stays with the volume.
+- `bench-harness runpod-launch` requires `--startup-timeout-min`; if `publicIp` does not appear before the timeout, it terminates the pod.
+- Pod env includes Hugging Face offline mode and explicit model weight paths under `/workspace/weights`.
+- TripoSG and PartCrafter Dockerfiles no longer download model snapshots into image layers.
+- TripoSG and PartCrafter runners fail fast when explicit weight path environment variables are missing.
+
+Still needed before the next paid benchmark pod:
+
+- Pre-populate the exact pinned model revisions under `/workspace/weights`.
+- Rebuild and push the updated runtime-only images.
+
+Created volume:
+
+- ID: `b01dms1lva`
+- Name: `3dgen-wave1-weights-us-il-1`
+- Data center: `US-IL-1`
+- Size: 30GB
+- Created: 2026-07-08
+
 ## Recommended implementation plan
 
-1. Add RunPod launcher fields for `networkVolumeId` and optional `volumeMountPath`.
-2. Add runner environment variables for model weight roots:
-   - `TRIPOSG_WEIGHTS_PATH`
-   - `PARTCRAFTER_WEIGHTS_PATH`
-   - `RMBG_WEIGHTS_PATH`
-   - later `TRIPOSR_WEIGHTS_PATH`
-3. Build "runtime-only" cloud images that skip Dockerfile `snapshot_download` layers.
-4. Add a small staging script that downloads pinned Hugging Face revisions into the mounted network volume and writes manifest files containing repo id, revision, expected local path, and checked timestamp.
-5. Make benchmark runners validate those manifest files before starting the first task.
-6. Keep the old baked-weight images only as historical artifacts; do not spend more GPU time testing them.
+1. Add a small staging script that downloads pinned Hugging Face revisions into the mounted network volume and writes manifest files containing repo id, revision, expected local path, and checked timestamp.
+2. Make benchmark runners validate those manifest files before starting the first task.
+3. Keep the old baked-weight images only as historical artifacts; do not spend more GPU time testing them.
 
 ## Candidate staging commands
 

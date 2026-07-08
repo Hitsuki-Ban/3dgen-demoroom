@@ -22,7 +22,7 @@
     "use_flash_decoder": true,
     "faces": -1,
     "dtype": "float16",
-    "triposg_weights_path": "/opt/weights/TripoSG",
-    "rmbg_weights_path": "/opt/weights/RMBG-1.4"
+    "triposg_weights_path": "/workspace/weights/TripoSG",
+    "rmbg_weights_path": "/workspace/weights/RMBG-1.4"
   }
 }

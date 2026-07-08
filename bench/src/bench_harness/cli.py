@@ -67,6 +67,9 @@ def main() -> None:
     runpod_launch.add_argument("--gpu-type-id", dest="gpu_type_ids", action="append")
     runpod_launch.add_argument("--allowed-cuda-version", dest="allowed_cuda_versions", action="append")
     runpod_launch.add_argument("--container-registry-auth-id")
+    runpod_launch.add_argument("--network-volume-id", required=True)
+    runpod_launch.add_argument("--data-center-id", required=True)
+    runpod_launch.add_argument("--startup-timeout-min", type=int, required=True)
 
     subcommands.add_parser("runpod-pods")
 
@@ -100,6 +103,9 @@ def main() -> None:
             allowed_cuda_versions=tuple(args.allowed_cuda_versions or DEFAULT_ALLOWED_CUDA_VERSIONS),
             r2_credentials=R2Credentials.from_env(os.environ),
             container_registry_auth_id=args.container_registry_auth_id,
+            network_volume_id=args.network_volume_id,
+            data_center_id=args.data_center_id,
+            startup_timeout_min=args.startup_timeout_min,
         )
         min_balance_usd = parse_min_balance_usd(
             args.min_balance_usd if args.min_balance_usd is not None else os.environ.get("RUNPOD_MIN_BALANCE_USD")

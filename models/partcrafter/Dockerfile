@@ -7,8 +7,12 @@ ARG UV_VERSION=0.11.19
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
-    HF_HOME=/opt/hf-cache \
+    HF_HOME=/workspace/hf \
+    HF_HUB_OFFLINE=1 \
+    TRANSFORMERS_OFFLINE=1 \
     PYTHONPATH=/opt/bench/src \
+    PARTCRAFTER_WEIGHTS_PATH=/workspace/weights/PartCrafter \
+    RMBG_WEIGHTS_PATH=/workspace/weights/RMBG-1.4 \
     TORCH_CUDA_ARCH_LIST="8.9;12.0" \
     CUDA_HOME=/usr/local/cuda \
     CPATH=/usr/local/cuda/include \
@@ -67,25 +71,6 @@ RUN uv pip install --python /opt/venv/bin/python \
         imageio-ffmpeg \
         colormaps \
         boto3
-
-RUN PARTCRAFTER_WEIGHTS_REVISION="${PARTCRAFTER_WEIGHTS_REVISION}" \
-    RMBG_WEIGHTS_REVISION="${RMBG_WEIGHTS_REVISION}" \
-    python3 - <<'PY'
-import os
-
-from huggingface_hub import snapshot_download
-
-snapshot_download(
-    repo_id="wgsxm/PartCrafter",
-    revision=os.environ["PARTCRAFTER_WEIGHTS_REVISION"],
-    local_dir="/opt/weights/PartCrafter",
-)
-snapshot_download(
-    repo_id="briaai/RMBG-1.4",
-    revision=os.environ["RMBG_WEIGHTS_REVISION"],
-    local_dir="/opt/weights/RMBG-1.4",
-)
-PY
 
 COPY bench/src /opt/bench/src
 COPY tasks /opt/3dgen-tasks

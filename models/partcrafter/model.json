@@ -23,7 +23,7 @@
     "part_suggest": false,
     "style_transfer": false,
     "dtype": "float16",
-    "partcrafter_weights_path": "/opt/weights/PartCrafter",
-    "rmbg_weights_path": "/opt/weights/RMBG-1.4"
+    "partcrafter_weights_path": "/workspace/weights/PartCrafter",
+    "rmbg_weights_path": "/workspace/weights/RMBG-1.4"
   }
 }

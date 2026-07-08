@@ -20,6 +20,11 @@ The Dockerfile pins:
 
 The runner uses PartCrafter's official pipeline, image preprocessing, and mesh-composition helper. It does not call the official CLI because that path downloads Hugging Face snapshots at runtime without an explicit revision and imports optional render/VLM code before argument handling. The runner keeps `part_suggest=false` and `style_transfer=false` so no external Gemini/API path is used.
 
+The container downloads pinned code during build. Pinned weights are staged separately on the RunPod network volume, and the runner fails fast unless these environment variables are set:
+
+- `PARTCRAFTER_WEIGHTS_PATH`
+- `RMBG_WEIGHTS_PATH`
+
 PartCrafter's official CLI substitutes a dummy triangle mesh when decoding returns `None`. This runner fails the task instead, because benchmark output should not silently contain placeholders.
 
 Timing and VRAM notes:
@@ -35,7 +40,10 @@ Prepare an input directory that contains `tasks.json` and `references/`.
 New-Item -ItemType Directory -Force outputs\partcrafter-smoke | Out-Null
 docker run --rm --gpus all `
   -e MAX_RUNTIME_MIN=60 `
+  -e PARTCRAFTER_WEIGHTS_PATH=/workspace/weights/PartCrafter `
+  -e RMBG_WEIGHTS_PATH=/workspace/weights/RMBG-1.4 `
   -v ${PWD}\tasks:/work/input:ro `
+  -v <local-or-network-weight-root>:/workspace/weights:ro `
   -v ${PWD}\outputs\partcrafter-smoke:/work/output `
   3dgen/partcrafter:local --task-limit 2
 ```

@@ -64,6 +64,12 @@ def test_runpod_launch_command_uses_env_credentials_and_issue_defaults(monkeypat
             "3dgen-triposg-wave1",
             "--container-registry-auth-id",
             "cmrc1l2gc00847uotrnjn2des",
+            "--network-volume-id",
+            "volume-123",
+            "--startup-timeout-min",
+            "20",
+            "--data-center-id",
+            "US-IL-1",
         ],
     )
 
@@ -77,6 +83,9 @@ def test_runpod_launch_command_uses_env_credentials_and_issue_defaults(monkeypat
     assert config.gpu_type_ids == ("NVIDIA GeForce RTX 5090", "NVIDIA GeForce RTX 4090")
     assert config.allowed_cuda_versions == ("12.8",)
     assert config.container_registry_auth_id == "cmrc1l2gc00847uotrnjn2des"
+    assert config.network_volume_id == "volume-123"
+    assert config.data_center_id == "US-IL-1"
+    assert config.startup_timeout_min == 20
     assert config.r2_credentials.endpoint == "https://example.r2.cloudflarestorage.com"
     assert capsys.readouterr().out == '{"desiredStatus": "RUNNING", "id": "pod-123"}\n'
 

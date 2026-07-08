@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 from dataclasses import dataclass
 from shlex import quote
 from typing import Any, Callable, Mapping
@@ -14,10 +15,23 @@ DEFAULT_MIN_BALANCE_USD = 5.0
 DEFAULT_MAX_RUNTIME_MIN = 90
 DEFAULT_GPU_TYPE_IDS = ("NVIDIA GeForce RTX 5090", "NVIDIA GeForce RTX 4090")
 DEFAULT_ALLOWED_CUDA_VERSIONS = ("12.8",)
+RUNPOD_VOLUME_MOUNT_PATH = "/workspace"
+RUNPOD_WEIGHT_ROOT = f"{RUNPOD_VOLUME_MOUNT_PATH}/weights"
+RUNPOD_HF_HOME = f"{RUNPOD_VOLUME_MOUNT_PATH}/hf"
 REQUIRED_R2_ENV_VARS = ("R2_ENDPOINT", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY")
 MODEL_RUNNER_PATHS = {
     "triposg": "/opt/3dgen-runner/triposg_runner.py",
     "partcrafter": "/opt/3dgen-runner/partcrafter_runner.py",
+}
+MODEL_WEIGHT_ENVS = {
+    "triposg": {
+        "TRIPOSG_WEIGHTS_PATH": f"{RUNPOD_WEIGHT_ROOT}/TripoSG",
+        "RMBG_WEIGHTS_PATH": f"{RUNPOD_WEIGHT_ROOT}/RMBG-1.4",
+    },
+    "partcrafter": {
+        "PARTCRAFTER_WEIGHTS_PATH": f"{RUNPOD_WEIGHT_ROOT}/PartCrafter",
+        "RMBG_WEIGHTS_PATH": f"{RUNPOD_WEIGHT_ROOT}/RMBG-1.4",
+    },
 }
 
 JsonResponse = dict[str, object] | list[object]
@@ -73,9 +87,12 @@ class RunPodLaunchConfig:
     gpu_type_ids: tuple[str, ...]
     allowed_cuda_versions: tuple[str, ...]
     r2_credentials: R2Credentials
+    network_volume_id: str
+    data_center_id: str
+    startup_timeout_min: int
+    startup_poll_seconds: float = 15.0
     container_registry_auth_id: str | None = None
     container_disk_gb: int = 80
-    volume_gb: int = 120
     output_root: str = "/work/output"
 
 
@@ -93,6 +110,10 @@ class RunPodClient:
     def launch_pod(self, config: RunPodLaunchConfig, min_balance_usd: float) -> JsonResponse:
         if min_balance_usd <= 0:
             raise ValueError("RunPod minimum balance must be positive")
+        if config.startup_timeout_min <= 0:
+            raise ValueError("RunPod startup_timeout_min must be positive")
+        if config.startup_poll_seconds < 0:
+            raise ValueError("RunPod startup_poll_seconds must not be negative")
         balance_response = self._request_json(
             "POST",
             RUNPOD_GRAPHQL_ENDPOINT,
@@ -100,11 +121,16 @@ class RunPodClient:
             {"query": build_balance_query()},
         )
         parse_client_balance(balance_response, min_balance_usd=min_balance_usd)
-        return self._request_json(
+        created_pod = self._request_json(
             "POST",
             f"{RUNPOD_REST_ENDPOINT}/pods",
             self.headers,
             build_pod_payload(config, runpod_api_key=self.api_key),
+        )
+        return self.wait_for_startup(
+            parse_pod_id(created_pod),
+            timeout_seconds=config.startup_timeout_min * 60,
+            poll_seconds=config.startup_poll_seconds,
         )
 
     def terminate_pod(self, pod_id: str) -> JsonResponse:
@@ -119,6 +145,21 @@ class RunPodClient:
 
     def list_pods(self) -> JsonResponse:
         return self._request_json("GET", f"{RUNPOD_REST_ENDPOINT}/pods", self.headers, None)
+
+    def wait_for_startup(self, pod_id: str, *, timeout_seconds: float, poll_seconds: float) -> dict[str, object]:
+        deadline = time.monotonic() + timeout_seconds
+        while True:
+            pod = self.get_pod(pod_id)
+            if not isinstance(pod, dict):
+                raise ValueError("RunPod get pod response must be a JSON object")
+            if pod_has_public_ip(pod):
+                return pod
+            if time.monotonic() >= deadline:
+                self.terminate_pod(pod_id)
+                raise TimeoutError(
+                    f"RunPod pod {pod_id} did not expose publicIp within {timeout_seconds / 60:.1f} minutes"
+                )
+            time.sleep(poll_seconds)
 
     def _request_json(
         self,
@@ -149,6 +190,20 @@ def parse_client_balance(response: dict[str, Any], min_balance_usd: float) -> fl
     return balance
 
 
+def parse_pod_id(response: JsonResponse) -> str:
+    if not isinstance(response, dict):
+        raise ValueError("RunPod create pod response must be a JSON object")
+    pod_id = response.get("id")
+    if not isinstance(pod_id, str) or not pod_id.strip():
+        raise ValueError("RunPod create pod response missing id")
+    return pod_id
+
+
+def pod_has_public_ip(response: dict[str, object]) -> bool:
+    public_ip = response.get("publicIp")
+    return isinstance(public_ip, str) and bool(public_ip.strip())
+
+
 def build_cloud_run_command(model_id: str, output_root: str, s3_target: str) -> str:
     try:
         runner_path = MODEL_RUNNER_PATHS[model_id]
@@ -168,6 +223,19 @@ def build_cloud_run_command(model_id: str, output_root: str, s3_target: str) -> 
     return f"{run_command} && {upload_command}"
 
 
+def build_model_weight_env(model_id: str) -> dict[str, str]:
+    try:
+        weight_env = MODEL_WEIGHT_ENVS[model_id]
+    except KeyError as exc:
+        raise ValueError(f"unknown model for RunPod cloud run: {model_id}") from exc
+    return {
+        "HF_HOME": RUNPOD_HF_HOME,
+        "HF_HUB_OFFLINE": "1",
+        "TRANSFORMERS_OFFLINE": "1",
+        **weight_env,
+    }
+
+
 def build_pod_payload(config: RunPodLaunchConfig, *, runpod_api_key: str) -> dict[str, Any]:
     if not config.name.strip():
         raise ValueError("RunPod pod name is required")
@@ -181,6 +249,10 @@ def build_pod_payload(config: RunPodLaunchConfig, *, runpod_api_key: str) -> dic
         raise ValueError("RunPod gpu_type_ids must not be empty")
     if not config.allowed_cuda_versions:
         raise ValueError("RunPod allowed_cuda_versions must not be empty")
+    if not config.network_volume_id.strip():
+        raise ValueError("RunPod network_volume_id is required")
+    if not config.data_center_id.strip():
+        raise ValueError("RunPod data_center_id is required")
     if config.container_registry_auth_id is not None and not config.container_registry_auth_id.strip():
         raise ValueError("RunPod container_registry_auth_id must not be empty")
     command = build_cloud_run_command(config.model_id, config.output_root, config.s3_target)
@@ -191,11 +263,14 @@ def build_pod_payload(config: RunPodLaunchConfig, *, runpod_api_key: str) -> dic
         "computeType": "GPU",
         "gpuTypeIds": list(config.gpu_type_ids),
         "gpuTypePriority": "custom",
+        "dataCenterIds": [config.data_center_id],
+        "dataCenterPriority": "custom",
         "gpuCount": 1,
         "allowedCudaVersions": list(config.allowed_cuda_versions),
         "interruptible": False,
         "containerDiskInGb": config.container_disk_gb,
-        "volumeInGb": config.volume_gb,
+        "networkVolumeId": config.network_volume_id,
+        "volumeMountPath": RUNPOD_VOLUME_MOUNT_PATH,
         "dockerEntrypoint": ["bash", "-lc"],
         "dockerStartCmd": [command],
         "env": {
@@ -203,6 +278,7 @@ def build_pod_payload(config: RunPodLaunchConfig, *, runpod_api_key: str) -> dic
             "RUNPOD_RUN_MODEL_ID": config.model_id,
             "RUNPOD_S3_TARGET": config.s3_target,
             "RUNPOD_API_KEY": runpod_api_key,
+            **build_model_weight_env(config.model_id),
             **config.r2_credentials.as_env(),
         },
     }
