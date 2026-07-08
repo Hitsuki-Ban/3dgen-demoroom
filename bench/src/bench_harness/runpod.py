@@ -452,6 +452,7 @@ def build_pod_payload(config: RunPodLaunchConfig, *, runpod_api_key: str) -> dic
             "MAX_RUNTIME_MIN": str(config.max_runtime_min),
             "RUNPOD_RUN_MODEL_ID": config.model_id,
             "RUNPOD_S3_TARGET": config.s3_target,
+            "RUNPOD_INCREMENTAL_S3_TARGET": config.s3_target,
             "RUNPOD_API_KEY": runpod_api_key,
             **build_model_weight_env(config.model_id),
             **config.r2_credentials.as_env(),

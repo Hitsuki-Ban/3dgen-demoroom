@@ -77,6 +77,8 @@ Implemented:
 - Pod env includes Hugging Face offline mode and explicit model weight paths under `/workspace/weights`.
 - TripoSG and PartCrafter Dockerfiles no longer download model snapshots into image layers.
 - TripoSG and PartCrafter runners fail fast when explicit weight path environment variables are missing.
+- Runtime images install and start `openssh-server` before benchmark execution, so launcher readiness waits for a real reachable container SSH port.
+- Pod env includes `RUNPOD_INCREMENTAL_S3_TARGET`, and model runners upload each completed or final-failed task directory to R2 immediately under that task id.
 
 Created/staged volume:
 
@@ -99,13 +101,16 @@ Weight-free runtime package:
 - Current status: still private; anonymous GHCR manifest probe returned HTTP 401.
 - GitHub documents changing a package to public as irreversible, so this toggle should only happen after explicit Fable/owner approval.
 - A private-auth retry with this package on `EU-RO-1` reached `publicIp` and an SSH port mapping, but TCP to SSH stayed closed and RunPod later returned `pod not found` before R2 telemetry. The runtime images did not install/start an SSH daemon, so the launcher-side SSH readiness gate could not succeed.
+- The SSH-enabled image fixed container readiness and reached active inference, but pod disappearance after 22 completed task metadata files left R2 empty because upload still happened only at the end.
+- Current TripoSG retry image: `ghcr.io/hitsuki-ban/3dgen-triposg-runtime:2026-07-cloud-wave1-ssh-incremental` at digest `sha256:5a3088fa4038648d0f5b19200c03a5ec45fb206947503ac24dafb6443a6403f8`.
 
 ## Recommended implementation plan
 
 1. Make benchmark runners validate the staging report or expected weight files before starting the first task.
 2. Keep the old baked-weight images only as historical artifacts; do not spend more GPU time testing them.
 3. Keep the launcher command observable: upload a `runpod-status.json` file even when the model runner exits non-zero, then terminate the pod from local monitoring if self-termination does not complete.
-4. Rebuild the weight-free runtime images with SSH daemon support before retrying the same private package path. If the rebuilt private package still stalls before SSH readiness, either make the package public after explicit approval and verify anonymous manifest access, or run a tiny diagnostic image against the same data center/volume to isolate RunPod machine/volume startup from GHCR runtime image pull.
+4. Upload each task result incrementally to R2. Final upload is still useful as a sweep, but it cannot be the only persistence path on preempted or disappearing pods.
+5. Retry the SSH + incremental TripoSG runtime on the same private package path. If the rebuilt private package still stalls before SSH readiness, either make the package public after explicit approval and verify anonymous manifest access, or run a tiny diagnostic image against the same data center/volume to isolate RunPod machine/volume startup from GHCR runtime image pull.
 
 ## Candidate staging commands
 

@@ -26,6 +26,8 @@ Implemented the local code needed for the first RunPod/R2 cloud wave and pushed 
 - The old US-NC-1 volume `cwcjs6bz6j` was deleted after EU-RO-1 staging succeeded, avoiding double network-volume storage cost while US-NC-1 had no actual create capacity.
 - A paid TripoSG runtime-only launch on EU-RO-1 created pod `sgoerg5ya0v8hw` on RTX 4090 and reached `publicIp`, but mapped SSH port 22 never became reachable and R2 remained empty. It was terminated at 2026-07-08T16:24Z, and active pods returned to `[]`.
 - A paid retry with the split TripoSG weight-free runtime package and private registry auth created pod `il8q7manajir88` on EU-RO-1; `publicIp` and SSH port mapping appeared, but TCP to SSH stayed closed, RunPod later returned `pod not found` during startup polling, and R2 remained empty. This exposed that the runtime images did not install/start an SSH daemon, so the launcher-side SSH readiness gate could not succeed.
+- A paid retry with SSH daemon support created pod `jlnk4q5rjjh3m3` on EU-RO-1. SSH became reachable and the runner reached 22 completed task metadata files before the pod disappeared. R2 stayed empty because the command still uploaded only once at the end, so mid-run pod loss discarded otherwise usable task outputs.
+- The launcher now injects `RUNPOD_INCREMENTAL_S3_TARGET`, and TripoSG/PartCrafter runners upload each completed or failed task directory to R2 under that task id. Incremental upload failures fail the run as infrastructure failures instead of being treated as model inference failures.
 
 ## GHCR Images
 
@@ -36,6 +38,7 @@ Implemented the local code needed for the first RunPod/R2 cloud wave and pushed 
 | TripoSG runtime-only | `ghcr.io/hitsuki-ban/3dgen-triposg:2026-07-cloud-wave1-runtime-volume` | `sha256:d210db2e5c0aa22cc788129de6e4a8484e0380346ce1f9d2169ce25dcd5d640e` | private |
 | PartCrafter runtime-only | `ghcr.io/hitsuki-ban/3dgen-partcrafter:2026-07-cloud-wave1-runtime-volume` | `sha256:bb9e7bff54ca1688c1584f1de0e12c11153caa3d4a32f2073068e9ef27ce0eb0` | private |
 | TripoSG weight-free runtime package | `ghcr.io/hitsuki-ban/3dgen-triposg-runtime:2026-07-cloud-wave1` | `sha256:d4bc56e23a07bea440eff269216998d790c1b5af697ec335fd74e8ed17a5d332` | private; package was created separately from historical baked-weight tags, but GitHub package visibility still needs UI change to become anonymous-pullable |
+| TripoSG weight-free runtime, SSH + incremental upload | `ghcr.io/hitsuki-ban/3dgen-triposg-runtime:2026-07-cloud-wave1-ssh-incremental` | `sha256:5a3088fa4038648d0f5b19200c03a5ec45fb206947503ac24dafb6443a6403f8` | private; use `containerRegistryAuthId` |
 
 ## Implemented
 
@@ -58,6 +61,8 @@ Implemented the local code needed for the first RunPod/R2 cloud wave and pushed 
 - RunPod HTTP errors now include the response body in the raised exception, which exposed the 2026-07-08T15:46Z retry failure as a capacity miss instead of an opaque HTTP 500.
 - Startup polling now reports a pod that disappears before SSH readiness as an explicit startup failure instead of surfacing a raw `GET /pods/<id>` HTTP 404 stack trace.
 - TripoSG and PartCrafter runtime images now install `openssh-server`, and the RunPod start command starts SSH before running the benchmark so the launcher-side SSH readiness gate reflects actual container readiness.
+- The RunPod payload injects `RUNPOD_INCREMENTAL_S3_TARGET`, and the model runners upload each task directory immediately after success or final failure. The final full-run upload remains as a completion sweep.
+- Successful task output upload failures are no longer caught by model retry handling; they now stop the run as upload infrastructure failures without re-running a successful generation.
 
 ## TripoSG Launch Attempt
 
@@ -260,6 +265,77 @@ Observed:
 
 Conclusion: the split weight-free runtime package plus private registry auth reached `publicIp` and port mapping, but the runtime image did not provide an SSH daemon for the launcher readiness gate. The image and start command now install/start SSH before benchmark execution, while the launcher also turns a disappearing pod into an explicit startup failure with last-observed pod state.
 
+## SSH-Enabled Runtime Retry
+
+Documented at 2026-07-09T03:18Z after the pod disappeared and R2 was rechecked.
+
+Image:
+
+- `ghcr.io/hitsuki-ban/3dgen-triposg-runtime:2026-07-cloud-wave1-ssh`
+- Digest: `sha256:7d4fe3ab9198ce36beb8d8b891a9676bdcedbae428105c71bc60a37dc9b2be50`
+
+Command shape:
+
+```powershell
+uv run bench-harness runpod-launch triposg `
+  ghcr.io/hitsuki-ban/3dgen-triposg-runtime@sha256:7d4fe3ab9198ce36beb8d8b891a9676bdcedbae428105c71bc60a37dc9b2be50 `
+  s3://3dgen-runs/runs/triposg/wave1/20260708T174136Z `
+  --name 3dgen-triposg-wave1-ssh-20260708T174136Z `
+  --min-balance-usd 12 `
+  --gpu-type-id "NVIDIA GeForce RTX 4090" `
+  --container-registry-auth-id cmrc1l2gc00847uotrnjn2des `
+  --network-volume-id wnqijpazd5 `
+  --data-center-id EU-RO-1 `
+  --startup-timeout-min 25 `
+  --allowed-cuda-version 13.0 `
+  --allowed-cuda-version 12.9 `
+  --allowed-cuda-version 12.8
+```
+
+Observed:
+
+- Pod id: `jlnk4q5rjjh3m3`
+- Cost reported by RunPod: `$0.69/hr`
+- GPU: RTX 4090 x1
+- Data center: `EU-RO-1`
+- Network volume: `wnqijpazd5`
+- R2 prefix: `runs/triposg/wave1/20260708T174136Z/`
+- SSH became reachable at `213.173.109.42:13674`, confirming the image and start command fixed the prior SSH daemon gap.
+- SSH inspection showed the runner active with GPU utilization at 100%.
+- Before the pod disappeared, `/work/output` contained 23 task directories and 22 `meta.json` files; the active task was `anime-ramen-bowl`.
+- The pod then disappeared from `GET /pods` and `runpod-pods`; active pods returned to `[]`.
+- R2 object count under the run prefix stayed `0` because the final upload sweep never ran.
+
+Conclusion: the runtime image and SSH readiness path are now viable, and the model runner can make real progress on the staged EU-RO-1 volume. Final-only upload is not robust enough for RunPod pod disappearance or host interruption. The next retry uses task-level incremental R2 upload so completed tasks are preserved as soon as they finish.
+
+## SSH + Incremental Runtime Image
+
+Documented at 2026-07-09T03:18Z after rebuilding and pushing the corrected runner.
+
+- Image tag: `ghcr.io/hitsuki-ban/3dgen-triposg-runtime:2026-07-cloud-wave1-ssh-incremental`
+- Digest: `sha256:5a3088fa4038648d0f5b19200c03a5ec45fb206947503ac24dafb6443a6403f8`
+- Registry inspect confirmed the tag points at that digest.
+- The image includes SSH daemon support plus the TripoSG runner change that uploads each task directory to R2 under `<run-prefix>/<task-id>/`.
+- Docker daemon was cleaned afterward: `docker system df` returned `0` images, `0` containers, `0` build cache. The temporary F: buildx cache directory was deleted after the push.
+
+Next retry command shape:
+
+```powershell
+uv run bench-harness runpod-launch triposg `
+  ghcr.io/hitsuki-ban/3dgen-triposg-runtime@sha256:5a3088fa4038648d0f5b19200c03a5ec45fb206947503ac24dafb6443a6403f8 `
+  s3://3dgen-runs/runs/triposg/wave1/<timestamp> `
+  --name 3dgen-triposg-wave1-ssh-incremental-<timestamp> `
+  --min-balance-usd 12 `
+  --gpu-type-id "NVIDIA GeForce RTX 4090" `
+  --container-registry-auth-id cmrc1l2gc00847uotrnjn2des `
+  --network-volume-id wnqijpazd5 `
+  --data-center-id EU-RO-1 `
+  --startup-timeout-min 25 `
+  --allowed-cuda-version 13.0 `
+  --allowed-cuda-version 12.9 `
+  --allowed-cuda-version 12.8
+```
+
 ## Log Access Notes
 
 - `runpodctl` v2.6.1 was installed locally under gitignored `.docker-build/tools/runpodctl-2.6.1`; checksum matched the official release checksum.
@@ -287,9 +363,9 @@ Conclusion: the split weight-free runtime package plus private registry auth rea
 
 ## Follow-up Before Full 25-Task Runs
 
-1. Rebuild and push the TripoSG weight-free runtime package with `openssh-server` installed and the SSH-starting RunPod command, then retry the same EU-RO-1 / `wnqijpazd5` path with private registry auth.
-2. If the rebuilt private runtime still stalls before SSH readiness, choose the next registry/bootstrap isolation path: make the weight-free package public after explicit approval, or run a tiny diagnostic image against the same data center/volume.
-3. Confirm that every started benchmark pod reaches a reachable mapped SSH port, then uploads either task outputs or `runpod-status.json` under the run prefix before considering the pod attempt diagnosable.
+1. Retry TripoSG with `ghcr.io/hitsuki-ban/3dgen-triposg-runtime@sha256:5a3088fa4038648d0f5b19200c03a5ec45fb206947503ac24dafb6443a6403f8` on EU-RO-1 / `wnqijpazd5` using private registry auth.
+2. Monitor both SSH and R2. The first completed task should create objects under `runs/triposg/wave1/<timestamp>/<task-id>/` before the full run ends.
+3. If the rebuilt private runtime stalls before SSH readiness, choose the next registry/bootstrap isolation path: make the weight-free package public after explicit approval, or run a tiny diagnostic image against the same data center/volume.
 4. After a successful TripoSG run, validate every task with `output-validate`, sync artifacts into `outputs/site-data/triposg/<task-id>/`, then run PartCrafter with the same volume and a matching weight-free runtime package.
 
 ## Source Checks

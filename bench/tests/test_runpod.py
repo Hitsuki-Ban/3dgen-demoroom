@@ -161,6 +161,7 @@ def test_build_pod_payload_uses_on_demand_gpu_priority_and_runtime_env() -> None
     assert payload["env"]["HF_HOME"] == "/workspace/hf"
     assert payload["env"]["HF_HUB_OFFLINE"] == "1"
     assert payload["env"]["TRANSFORMERS_OFFLINE"] == "1"
+    assert payload["env"]["RUNPOD_INCREMENTAL_S3_TARGET"] == "s3://3dgen-runs/runs/triposg/rtx-5090/20260708T000000Z"
     assert payload["env"]["TRIPOSG_WEIGHTS_PATH"] == "/workspace/weights/TripoSG"
     assert payload["env"]["RMBG_WEIGHTS_PATH"] == "/workspace/weights/RMBG-1.4"
     assert payload["env"]["R2_ENDPOINT"] == "https://example.r2.cloudflarestorage.com"
