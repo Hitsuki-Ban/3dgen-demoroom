@@ -9,6 +9,7 @@ from urllib.request import Request, urlopen
 
 RUNPOD_GRAPHQL_ENDPOINT = "https://api.runpod.io/graphql"
 RUNPOD_REST_ENDPOINT = "https://rest.runpod.io/v1"
+RUNPOD_USER_AGENT = "3dgen-demoroom-bench-harness/0.1"
 DEFAULT_MIN_BALANCE_USD = 5.0
 DEFAULT_MAX_RUNTIME_MIN = 90
 DEFAULT_GPU_TYPE_IDS = ("NVIDIA GeForce RTX 5090", "NVIDIA GeForce RTX 4090")
@@ -19,7 +20,8 @@ MODEL_RUNNER_PATHS = {
     "partcrafter": "/opt/3dgen-runner/partcrafter_runner.py",
 }
 
-RequestJson = Callable[[str, str, dict[str, str], dict[str, object] | None], dict[str, object]]
+JsonResponse = dict[str, object] | list[object]
+RequestJson = Callable[[str, str, dict[str, str], dict[str, object] | None], JsonResponse]
 
 
 @dataclass(frozen=True)
@@ -88,7 +90,7 @@ class RunPodClient:
             raise ValueError("RunPod API key is required")
         return {"Authorization": f"Bearer {self.api_key}"}
 
-    def launch_pod(self, config: RunPodLaunchConfig, min_balance_usd: float) -> dict[str, object]:
+    def launch_pod(self, config: RunPodLaunchConfig, min_balance_usd: float) -> JsonResponse:
         if min_balance_usd <= 0:
             raise ValueError("RunPod minimum balance must be positive")
         balance_response = self._request_json(
@@ -105,17 +107,17 @@ class RunPodClient:
             build_pod_payload(config, runpod_api_key=self.api_key),
         )
 
-    def terminate_pod(self, pod_id: str) -> dict[str, object]:
+    def terminate_pod(self, pod_id: str) -> JsonResponse:
         if not pod_id.strip():
             raise ValueError("RunPod pod_id is required")
         return self._request_json("DELETE", f"{RUNPOD_REST_ENDPOINT}/pods/{pod_id}", self.headers, None)
 
-    def get_pod(self, pod_id: str) -> dict[str, object]:
+    def get_pod(self, pod_id: str) -> JsonResponse:
         if not pod_id.strip():
             raise ValueError("RunPod pod_id is required")
         return self._request_json("GET", f"{RUNPOD_REST_ENDPOINT}/pods/{pod_id}", self.headers, None)
 
-    def list_pods(self) -> dict[str, object]:
+    def list_pods(self) -> JsonResponse:
         return self._request_json("GET", f"{RUNPOD_REST_ENDPOINT}/pods", self.headers, None)
 
     def _request_json(
@@ -124,7 +126,7 @@ class RunPodClient:
         url: str,
         headers: dict[str, str],
         body: dict[str, object] | None,
-    ) -> dict[str, object]:
+    ) -> JsonResponse:
         if self.request_json is not None:
             return self.request_json(method, url, headers, body)
         return request_json(method, url, headers, body)
@@ -214,8 +216,9 @@ def request_json(
     url: str,
     headers: dict[str, str],
     body: dict[str, object] | None,
-) -> dict[str, object]:
+) -> JsonResponse:
     request_headers = dict(headers)
+    request_headers["User-Agent"] = RUNPOD_USER_AGENT
     data = None
     if body is not None:
         data = json.dumps(body).encode("utf-8")
@@ -226,6 +229,6 @@ def request_json(
     if not raw:
         return {}
     parsed = json.loads(raw)
-    if not isinstance(parsed, dict):
-        raise ValueError("RunPod API response must be a JSON object")
+    if not isinstance(parsed, dict | list):
+        raise ValueError("RunPod API response must be a JSON object or array")
     return parsed

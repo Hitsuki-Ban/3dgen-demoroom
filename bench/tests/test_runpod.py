@@ -13,6 +13,7 @@ from bench_harness.runpod import (
     build_cloud_run_command,
     build_pod_payload,
     parse_client_balance,
+    request_json,
 )
 
 
@@ -216,3 +217,46 @@ def test_runpod_client_terminates_pod_idempotently() -> None:
     assert calls == [
         ("DELETE", "https://rest.runpod.io/v1/pods/pod-123", {"Authorization": "Bearer token"}, None)
     ]
+
+
+def test_request_json_accepts_runpod_list_response(monkeypatch) -> None:
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc_value, traceback) -> None:
+            pass
+
+        def read(self) -> bytes:
+            return b"[]"
+
+    def fake_urlopen(request, timeout: int):
+        return FakeResponse()
+
+    monkeypatch.setattr("bench_harness.runpod.urlopen", fake_urlopen)
+
+    assert request_json("GET", "https://rest.runpod.io/v1/pods", {"Authorization": "Bearer token"}, None) == []
+
+
+def test_request_json_sends_harness_user_agent(monkeypatch) -> None:
+    captured = {}
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc_value, traceback) -> None:
+            pass
+
+        def read(self) -> bytes:
+            return b"{}"
+
+    def fake_urlopen(request, timeout: int):
+        captured["user_agent"] = request.get_header("User-agent")
+        return FakeResponse()
+
+    monkeypatch.setattr("bench_harness.runpod.urlopen", fake_urlopen)
+
+    request_json("POST", "https://api.runpod.io/graphql", {"Authorization": "Bearer token"}, {"query": "{}"})
+
+    assert captured["user_agent"] == "3dgen-demoroom-bench-harness/0.1"
