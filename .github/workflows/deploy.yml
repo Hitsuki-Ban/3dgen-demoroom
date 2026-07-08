@@ -1,0 +1,49 @@
+# サイトを Cloudflare Workers Static Assets へデプロイする。
+# ベンチ成果物(GLB/meta)は git に無いので、R2 の site-data/ プレフィックスから同期する
+# (ローカル→R2 へのアップロードは bench-harness upload-s3 で行う)。
+name: deploy
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+
+      - name: Install dependencies
+        working-directory: web
+        run: pnpm install --frozen-lockfile
+
+      - name: Sync benchmark results from R2
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+        run: |
+          mkdir -p outputs/site-data
+          aws s3 sync "s3://3dgen-runs/site-data/" outputs/site-data/ --endpoint-url "${{ secrets.R2_ENDPOINT }}" --only-show-errors
+          echo "synced task dirs:"
+          find outputs/site-data -name meta.json | wc -l
+
+      - name: Build
+        working-directory: web
+        run: pnpm build
+
+      - name: Deploy to Cloudflare Workers
+        working-directory: web
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: pnpm exec wrangler deploy
