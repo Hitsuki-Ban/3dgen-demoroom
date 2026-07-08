@@ -73,31 +73,30 @@ Implemented:
 - `bench-harness runpod-launch` requires `--network-volume-id`.
 - Pod payloads include `networkVolumeId` and mount the volume at `/workspace`.
 - Pod payloads require one explicit `--data-center-id` and set `dataCenterPriority=custom` so placement stays with the volume.
-- `bench-harness runpod-launch` requires `--startup-timeout-min`; if `publicIp` does not appear before the timeout, it terminates the pod.
+- `bench-harness runpod-launch` requires `--startup-timeout-min`; if a reachable mapped SSH TCP port does not appear before the timeout, it terminates the pod.
 - Pod env includes Hugging Face offline mode and explicit model weight paths under `/workspace/weights`.
 - TripoSG and PartCrafter Dockerfiles no longer download model snapshots into image layers.
 - TripoSG and PartCrafter runners fail fast when explicit weight path environment variables are missing.
 
-Still needed before the next paid benchmark pod:
+Created/staged volume:
 
-- Pre-populate the exact pinned model revisions under `/workspace/weights`.
-- Rebuild and push the updated runtime-only images.
-
-Created volume:
-
-- ID: `cwcjs6bz6j`
-- Name: `3dgen-wave1-weights-us-nc-1`
-- Data center: `US-NC-1`
+- ID: `wnqijpazd5`
+- Name: `3dgen-wave1-weights-eu-ro-1-20260708T155503Z`
+- Data center: `EU-RO-1`
 - Size: 30GB
 - Created: 2026-07-08
-- Staged weights report: `runs/staging/20260708T144842Z/network-volume-cwcjs6bz6j.json`
+- Staged weights report: `runs/staging/20260708T155503Z/network-volume-wnqijpazd5.json`
+
+Retired volume:
+
+- `cwcjs6bz6j` in `US-NC-1` was deleted after EU-RO-1 staging succeeded, because actual create capacity in US-NC-1 was unavailable.
 
 ## Recommended implementation plan
 
-1. Add a small staging script that downloads pinned Hugging Face revisions into the mounted network volume and writes manifest files containing repo id, revision, expected local path, and checked timestamp.
-2. Make benchmark runners validate those manifest files before starting the first task.
-3. Keep the old baked-weight images only as historical artifacts; do not spend more GPU time testing them.
-4. Keep the launcher command observable: upload a `runpod-status.json` file even when the model runner exits non-zero, then terminate the pod from local monitoring if self-termination does not complete.
+1. Make benchmark runners validate the staging report or expected weight files before starting the first task.
+2. Keep the old baked-weight images only as historical artifacts; do not spend more GPU time testing them.
+3. Keep the launcher command observable: upload a `runpod-status.json` file even when the model runner exits non-zero, then terminate the pod from local monitoring if self-termination does not complete.
+4. If private GHCR runtime image pulls keep exceeding the startup window, move runtime-only images to a weight-free public package name or another registry path that does not expose the historical baked-weight tags.
 
 ## Candidate staging commands
 
@@ -135,7 +134,7 @@ Adjust file checks per model if upstream layouts differ.
 ## Operational notes
 
 - Use `runpodctl pod list` or `bench-harness runpod-pods` for status. Avoid raw `runpodctl pod get` in logs because it prints pod environment values.
-- Add a launcher-side pre-container watchdog before another expensive run. Container self-termination cannot help while Docker is still pulling layers.
+- Keep the launcher-side pre-container watchdog tied to a reachable mapped SSH port. `publicIp` alone can appear before the container is actually usable.
 - Prefer one model per cloud launch until cache behavior is proven.
 - Store outputs and run manifests in R2. Do not put frequently-read model weights on R2 for inference unless a later benchmark proves R2 throughput is competitive from the chosen RunPod data center.
 

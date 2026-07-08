@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import socket
 import time
 from dataclasses import dataclass
 from shlex import quote
@@ -37,6 +38,7 @@ MODEL_WEIGHT_ENVS = {
 
 JsonResponse = dict[str, object] | list[object]
 RequestJson = Callable[[str, str, dict[str, str], dict[str, object] | None], JsonResponse]
+TcpConnect = Callable[[str, int, float], bool]
 
 
 @dataclass(frozen=True)
@@ -101,6 +103,7 @@ class RunPodLaunchConfig:
 class RunPodClient:
     api_key: str
     request_json: RequestJson | None = None
+    tcp_connect: TcpConnect | None = None
 
     @property
     def headers(self) -> dict[str, str]:
@@ -153,12 +156,13 @@ class RunPodClient:
             pod = self.get_pod(pod_id)
             if not isinstance(pod, dict):
                 raise ValueError("RunPod get pod response must be a JSON object")
-            if pod_has_public_ip(pod):
+            tcp_connect = self.tcp_connect or can_connect_tcp
+            if pod_is_startup_ready(pod, tcp_connect=tcp_connect):
                 return pod
             if time.monotonic() >= deadline:
                 self.terminate_pod(pod_id)
                 raise TimeoutError(
-                    f"RunPod pod {pod_id} did not expose publicIp within {timeout_seconds / 60:.1f} minutes"
+                    f"RunPod pod {pod_id} did not expose a reachable SSH port within {timeout_seconds / 60:.1f} minutes"
                 )
             time.sleep(poll_seconds)
 
@@ -203,6 +207,34 @@ def parse_pod_id(response: JsonResponse) -> str:
 def pod_has_public_ip(response: dict[str, object]) -> bool:
     public_ip = response.get("publicIp")
     return isinstance(public_ip, str) and bool(public_ip.strip())
+
+
+def pod_ssh_port(response: dict[str, object]) -> int | None:
+    port_mappings = response.get("portMappings")
+    if not isinstance(port_mappings, dict):
+        return None
+    raw_port = port_mappings.get("22")
+    if isinstance(raw_port, bool) or not isinstance(raw_port, int):
+        return None
+    return raw_port
+
+
+def can_connect_tcp(host: str, port: int, timeout_seconds: float) -> bool:
+    try:
+        with socket.create_connection((host, port), timeout=timeout_seconds):
+            return True
+    except OSError:
+        return False
+
+
+def pod_is_startup_ready(response: dict[str, object], *, tcp_connect: TcpConnect) -> bool:
+    public_ip = response.get("publicIp")
+    if not isinstance(public_ip, str) or not public_ip.strip():
+        return False
+    ssh_port = pod_ssh_port(response)
+    if ssh_port is None:
+        return False
+    return tcp_connect(public_ip, ssh_port, 5.0)
 
 
 def build_cloud_run_command(model_id: str, output_root: str, s3_target: str) -> str:

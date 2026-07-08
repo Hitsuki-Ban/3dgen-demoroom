@@ -19,9 +19,12 @@ Implemented the local code needed for the first RunPod/R2 cloud wave and pushed 
 - RunPod pod `6o5yduivsud4yt` was launched for TripoSG at 2026-07-08T12:50:25Z and terminated manually after log inspection; `bench-harness runpod-pods` then returned `[]`.
 - There are no cloud artifacts from that pod because the container never reached runner execution.
 - The old empty RunPod network volume `b01dms1lva` in `US-IL-1` was deleted after Fable's review noted that volume placement must follow actual 5090 data center availability.
-- Current retained RunPod network volume: `cwcjs6bz6j` (`3dgen-wave1-weights-us-nc-1`) in data center `US-NC-1`, size 30GB. It was CPU-staged successfully with TripoSG, PartCrafter, and RMBG pinned weights. R2 staging report: `runs/staging/20260708T144842Z/network-volume-cwcjs6bz6j.json`.
+- Former RunPod network volume: `cwcjs6bz6j` (`3dgen-wave1-weights-us-nc-1`) in data center `US-NC-1`, size 30GB. It was CPU-staged successfully with TripoSG, PartCrafter, and RMBG pinned weights. R2 staging report: `runs/staging/20260708T144842Z/network-volume-cwcjs6bz6j.json`.
 - A paid TripoSG runtime-only launch on `US-NC-1` reached public IP, then lost public IP/port mappings while `/pods` still reported `RUNNING`; it was manually terminated with no R2 benchmark artifacts. This exposed a launcher observability gap: runner failures did not upload a status report because the command used `runner && upload-s3`.
 - A follow-up TripoSG retry after the status-upload fix did not create a pod. RunPod returned HTTP 500 from `POST /pods` with body `create pod: There are no instances currently available`. `bench-harness runpod-pods` returned `[]` afterward.
+- EU-RO-1 was validated with a 10GB temporary network volume and short RTX 4090 smoke pod; both temporary resources were deleted. A new 30GB EU-RO-1 volume `wnqijpazd5` was staged successfully with TripoSG, PartCrafter, and RMBG pinned weights. R2 staging report: `runs/staging/20260708T155503Z/network-volume-wnqijpazd5.json`.
+- The old US-NC-1 volume `cwcjs6bz6j` was deleted after EU-RO-1 staging succeeded, avoiding double network-volume storage cost while US-NC-1 had no actual create capacity.
+- A paid TripoSG runtime-only launch on EU-RO-1 created pod `sgoerg5ya0v8hw` on RTX 4090 and reached `publicIp`, but mapped SSH port 22 never became reachable and R2 remained empty. It was terminated at 2026-07-08T16:24Z, and active pods returned to `[]`.
 
 ## GHCR Images
 
@@ -45,7 +48,7 @@ Implemented the local code needed for the first RunPod/R2 cloud wave and pushed 
 - `bench-harness runpod-pods` now accepts the RunPod REST API's JSON array response. The previous object-only parser failed on the empty-pod `[]` response.
 - The cloud launcher now requires `--network-volume-id`, injects `networkVolumeId`, mounts the volume at `/workspace`, and sets model weight paths under `/workspace/weights`.
 - The cloud launcher also requires `--data-center-id` and writes `dataCenterIds` / `dataCenterPriority=custom`, so pod placement stays in the same data center as the network volume.
-- The cloud launcher now has a pre-container startup watchdog: it polls `GET /pods/<id>` until `publicIp` appears, and terminates the pod if `--startup-timeout-min` expires first.
+- The cloud launcher now has a pre-container startup watchdog: it polls `GET /pods/<id>` until `publicIp` appears and the mapped SSH TCP port is reachable, and terminates the pod if `--startup-timeout-min` expires first.
 - TripoSG and PartCrafter cloud images are now runtime-only with respect to model weights; their Dockerfiles no longer download Hugging Face snapshots into image layers.
 - TripoSG and PartCrafter runners now fail fast unless explicit weight path environment variables are present.
 - RunPod cloud commands now write `runpod-status.json`, upload the output directory even when the runner exits non-zero, and then attempt best-effort self-termination. Upload/status failures take precedence over runner failures because a missing R2 report is an infrastructure failure.
@@ -143,7 +146,64 @@ Observed:
 - `bench-harness runpod-pods` returned `[]` after the failure, so no paid pod was left running.
 - No R2 benchmark prefix was created because the container never started.
 
-Conclusion: the current blocker is RunPod capacity in the only warmed network-volume data center (`US-NC-1`), not the launcher payload or credentials. Retry should wait for capacity change or use another network-volume-supported data center after staging weights there.
+Conclusion at that point: the blocker was RunPod capacity in the only warmed network-volume data center (`US-NC-1`), not the launcher payload or credentials. The next step was to wait for capacity change or use another network-volume-supported data center after staging weights there.
+
+## EU-RO-1 Staging and Runtime-Only Retry
+
+Documented at 2026-07-08T16:24Z after terminating the stalled GPU pod and rechecking active pods.
+
+EU-RO-1 readiness checks:
+
+- `runpodctl datacenter list` showed EU-RO-1 RTX 4090 stock as `Medium`.
+- A 10GB temporary network volume in EU-RO-1 was created and deleted successfully.
+- A short RTX 4090 smoke pod using that temporary volume was created and deleted successfully.
+
+Staging:
+
+- Current retained volume: `wnqijpazd5`
+- Name: `3dgen-wave1-weights-eu-ro-1-20260708T155503Z`
+- Data center: `EU-RO-1`
+- Size: 30GB
+- Staging pod: CPU, `$0.06/hr`, self-terminated.
+- R2 report: `runs/staging/20260708T155503Z/network-volume-wnqijpazd5.json`
+- Report status: `ok`
+- Downloaded payloads:
+  - `VAST-AI/TripoSG`: 36 files, 7,946,497,514 bytes
+  - `wgsxm/PartCrafter`: 36 files, 3,973,454,051 bytes
+  - `briaai/RMBG-1.4`: 63 files, 842,221,152 bytes
+
+Runtime-only TripoSG retry:
+
+```powershell
+uv run bench-harness runpod-launch triposg `
+  ghcr.io/hitsuki-ban/3dgen-triposg:2026-07-cloud-wave1-runtime-volume `
+  s3://3dgen-runs/runs/triposg/wave1/20260708T155725Z `
+  --name 3dgen-triposg-wave1-eu-ro-1-20260708T155725Z `
+  --min-balance-usd 12 `
+  --gpu-type-id "NVIDIA GeForce RTX 4090" `
+  --container-registry-auth-id cmrc1l2gc00847uotrnjn2des `
+  --network-volume-id wnqijpazd5 `
+  --data-center-id EU-RO-1 `
+  --startup-timeout-min 25 `
+  --allowed-cuda-version 13.0 `
+  --allowed-cuda-version 12.9 `
+  --allowed-cuda-version 12.8
+```
+
+Observed:
+
+- Pod id: `sgoerg5ya0v8hw`
+- Created at: 2026-07-08T15:57:26Z
+- Cost reported by RunPod: `$0.69/hr`
+- GPU: RTX 4090 x1
+- Data center: `EU-RO-1`
+- Network volume: `wnqijpazd5`
+- R2 prefix: `runs/triposg/wave1/20260708T155725Z/`
+- `publicIp` and port mapping appeared, but TCP to the mapped SSH port stayed closed through the 25-minute startup window.
+- R2 object count stayed `0`.
+- The pod was terminated manually at 2026-07-08T16:24Z; `bench-harness runpod-pods` then returned `[]`.
+
+Conclusion: EU-RO-1 has usable 4090 capacity and the network volume is staged, but `publicIp` alone is not a valid startup readiness signal. The launcher now waits for a reachable mapped SSH TCP port before considering startup complete. If the next attempt still times out before SSH is reachable, the remaining bottleneck is likely private GHCR runtime image pull or container bootstrap, not model weights.
 
 ## Log Access Notes
 
@@ -160,11 +220,11 @@ Conclusion: the current blocker is RunPod capacity in the only warmed network-vo
 - `MAX_RUNTIME_MIN`: `90`
 - `gpuTypeIds`: `NVIDIA GeForce RTX 5090`, then `NVIDIA GeForce RTX 4090`
 - `gpuTypePriority`: `custom`
-- `dataCenterIds`: current retry volume is in `US-NC-1`
+- `dataCenterIds`: current retry volume is in `EU-RO-1`
 - `dataCenterPriority`: `custom`
 - `allowedCudaVersions`: code default is `12.8`; the successful pod allocation used `13.0`, `12.9`, `12.8` to avoid over-filtering available 5090 machines
 - `containerRegistryAuthId`: `cmrc1l2gc00847uotrnjn2des`
-- `networkVolumeId`: `cwcjs6bz6j`
+- `networkVolumeId`: `wnqijpazd5`
 - `startupTimeoutMin`: required per launch, launcher-side pre-container watchdog
 - `cloudType`: `SECURE`
 - `computeType`: `GPU`
@@ -172,9 +232,9 @@ Conclusion: the current blocker is RunPod capacity in the only warmed network-vo
 
 ## Follow-up Before Full 25-Task Runs
 
-1. Retry TripoSG when `US-NC-1` has actual create capacity, or stage the same pinned weights into another network-volume-supported data center and launch there.
-2. Keep using `--container-registry-auth-id cmrc1l2gc00847uotrnjn2des`, `--network-volume-id cwcjs6bz6j` or the newly staged volume id, `--startup-timeout-min 25`, and `--min-balance-usd 12`.
-3. Confirm that every started pod uploads either task outputs or `runpod-status.json` under the run prefix before considering the pod attempt diagnosable.
+1. Retry TripoSG from EU-RO-1 only after the SSH-port startup watchdog change is reviewed, or prepare a smaller/public runtime-only image path if Fable wants to reduce private GHCR pull risk first.
+2. Keep using `--container-registry-auth-id cmrc1l2gc00847uotrnjn2des`, `--network-volume-id wnqijpazd5`, `--data-center-id EU-RO-1`, `--startup-timeout-min 25`, and `--min-balance-usd 12`.
+3. Confirm that every started pod reaches a reachable mapped SSH port, then uploads either task outputs or `runpod-status.json` under the run prefix before considering the pod attempt diagnosable.
 4. After a successful TripoSG run, validate every task with `output-validate`, sync artifacts into `outputs/site-data/triposg/<task-id>/`, then run PartCrafter with the same volume.
 
 ## Source Checks
