@@ -2,6 +2,7 @@ import pytest
 import os
 import shutil
 import subprocess
+from urllib.error import HTTPError
 
 from bench_harness.runpod import (
     DEFAULT_ALLOWED_CUDA_VERSIONS,
@@ -422,6 +423,29 @@ def test_request_json_accepts_runpod_list_response(monkeypatch) -> None:
     monkeypatch.setattr("bench_harness.runpod.urlopen", fake_urlopen)
 
     assert request_json("GET", "https://rest.runpod.io/v1/pods", {"Authorization": "Bearer token"}, None) == []
+
+
+def test_request_json_includes_runpod_error_body(monkeypatch) -> None:
+    class FakeErrorBody:
+        def read(self) -> bytes:
+            return b'{"error":"create pod: There are no instances currently available","status":500}\n'
+
+        def close(self) -> None:
+            pass
+
+    def fake_urlopen(request, timeout: int):
+        raise HTTPError(
+            url=request.full_url,
+            code=500,
+            msg="Internal Server Error",
+            hdrs={},
+            fp=FakeErrorBody(),
+        )
+
+    monkeypatch.setattr("bench_harness.runpod.urlopen", fake_urlopen)
+
+    with pytest.raises(RuntimeError, match="There are no instances currently available"):
+        request_json("POST", "https://rest.runpod.io/v1/pods", {"Authorization": "Bearer token"}, {})
 
 
 def test_request_json_sends_harness_user_agent(monkeypatch) -> None:

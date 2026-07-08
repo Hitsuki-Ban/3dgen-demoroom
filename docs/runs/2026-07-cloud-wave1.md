@@ -21,6 +21,7 @@ Implemented the local code needed for the first RunPod/R2 cloud wave and pushed 
 - The old empty RunPod network volume `b01dms1lva` in `US-IL-1` was deleted after Fable's review noted that volume placement must follow actual 5090 data center availability.
 - Current retained RunPod network volume: `cwcjs6bz6j` (`3dgen-wave1-weights-us-nc-1`) in data center `US-NC-1`, size 30GB. It was CPU-staged successfully with TripoSG, PartCrafter, and RMBG pinned weights. R2 staging report: `runs/staging/20260708T144842Z/network-volume-cwcjs6bz6j.json`.
 - A paid TripoSG runtime-only launch on `US-NC-1` reached public IP, then lost public IP/port mappings while `/pods` still reported `RUNNING`; it was manually terminated with no R2 benchmark artifacts. This exposed a launcher observability gap: runner failures did not upload a status report because the command used `runner && upload-s3`.
+- A follow-up TripoSG retry after the status-upload fix did not create a pod. RunPod returned HTTP 500 from `POST /pods` with body `create pod: There are no instances currently available`. `bench-harness runpod-pods` returned `[]` afterward.
 
 ## GHCR Images
 
@@ -49,6 +50,7 @@ Implemented the local code needed for the first RunPod/R2 cloud wave and pushed 
 - TripoSG and PartCrafter runners now fail fast unless explicit weight path environment variables are present.
 - RunPod cloud commands now write `runpod-status.json`, upload the output directory even when the runner exits non-zero, and then attempt best-effort self-termination. Upload/status failures take precedence over runner failures because a missing R2 report is an infrastructure failure.
 - `bench-harness runpod-launch` and `runpod-pods` now strip RunPod `env` fields before printing pod responses, so local logs do not contain injected R2 or RunPod secrets.
+- RunPod HTTP errors now include the response body in the raised exception, which exposed the 2026-07-08T15:46Z retry failure as a capacity miss instead of an opaque HTTP 500.
 
 ## TripoSG Launch Attempt
 
@@ -112,6 +114,37 @@ Observed:
 
 Conclusion: the runtime-only image fixed the pre-container pull delay, but the command did not produce enough failure telemetry. The launcher command now uploads a `runpod-status.json` file even when the runner fails, and treats upload/status failures as infrastructure failures, so the next paid retry should produce an R2 status artifact instead of a blank prefix.
 
+## TripoSG Status-Fix Retry
+
+Documented at 2026-07-08T15:46Z after rechecking active pods.
+
+Command shape:
+
+```powershell
+uv run bench-harness runpod-launch triposg `
+  ghcr.io/hitsuki-ban/3dgen-triposg:2026-07-cloud-wave1-runtime-volume `
+  s3://3dgen-runs/runs/triposg/wave1/<timestamp> `
+  --name 3dgen-triposg-wave1-statusfix-<timestamp> `
+  --min-balance-usd 12 `
+  --container-registry-auth-id cmrc1l2gc00847uotrnjn2des `
+  --network-volume-id cwcjs6bz6j `
+  --data-center-id US-NC-1 `
+  --startup-timeout-min 25 `
+  --allowed-cuda-version 13.0 `
+  --allowed-cuda-version 12.9 `
+  --allowed-cuda-version 12.8
+```
+
+Observed:
+
+- RunPod rejected creation at `POST /pods` before any pod id was returned.
+- The initial CLI attempt surfaced only `HTTP Error 500: Internal Server Error`.
+- A diagnostic retry using the same payload captured the response body: `create pod: There are no instances currently available`.
+- `bench-harness runpod-pods` returned `[]` after the failure, so no paid pod was left running.
+- No R2 benchmark prefix was created because the container never started.
+
+Conclusion: the current blocker is RunPod capacity in the only warmed network-volume data center (`US-NC-1`), not the launcher payload or credentials. Retry should wait for capacity change or use another network-volume-supported data center after staging weights there.
+
 ## Log Access Notes
 
 - `runpodctl` v2.6.1 was installed locally under gitignored `.docker-build/tools/runpodctl-2.6.1`; checksum matched the official release checksum.
@@ -139,9 +172,10 @@ Conclusion: the runtime-only image fixed the pre-container pull delay, but the c
 
 ## Follow-up Before Full 25-Task Runs
 
-1. Retry TripoSG with `--container-registry-auth-id cmrc1l2gc00847uotrnjn2des`, `--network-volume-id cwcjs6bz6j`, `--data-center-id US-NC-1`, and `--startup-timeout-min 25`.
-2. Confirm that every retry uploads either task outputs or `runpod-status.json` under the run prefix before considering the pod attempt diagnosable.
-3. After a successful TripoSG run, validate every task with `output-validate`, sync artifacts into `outputs/site-data/triposg/<task-id>/`, then run PartCrafter with the same volume.
+1. Retry TripoSG when `US-NC-1` has actual create capacity, or stage the same pinned weights into another network-volume-supported data center and launch there.
+2. Keep using `--container-registry-auth-id cmrc1l2gc00847uotrnjn2des`, `--network-volume-id cwcjs6bz6j` or the newly staged volume id, `--startup-timeout-min 25`, and `--min-balance-usd 12`.
+3. Confirm that every started pod uploads either task outputs or `runpod-status.json` under the run prefix before considering the pod attempt diagnosable.
+4. After a successful TripoSG run, validate every task with `output-validate`, sync artifacts into `outputs/site-data/triposg/<task-id>/`, then run PartCrafter with the same volume.
 
 ## Source Checks
 

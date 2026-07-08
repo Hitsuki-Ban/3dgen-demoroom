@@ -5,6 +5,7 @@ import time
 from dataclasses import dataclass
 from shlex import quote
 from typing import Any, Callable, Mapping
+from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 
@@ -368,8 +369,15 @@ def request_json(
         data = json.dumps(body).encode("utf-8")
         request_headers["Content-Type"] = "application/json"
     request = Request(url, data=data, headers=request_headers, method=method)
-    with urlopen(request, timeout=60) as response:
-        raw = response.read().decode("utf-8")
+    try:
+        with urlopen(request, timeout=60) as response:
+            raw = response.read().decode("utf-8")
+    except HTTPError as exc:
+        error_body = exc.read().decode("utf-8", errors="replace").strip()
+        message = f"RunPod API request failed: {method} {url} returned HTTP {exc.code} {exc.reason}"
+        if error_body:
+            message = f"{message}: {error_body}"
+        raise RuntimeError(message) from exc
     if not raw:
         return {}
     parsed = json.loads(raw)
