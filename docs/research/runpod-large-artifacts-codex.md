@@ -1,0 +1,137 @@
+# RunPod large artifact handling: Codex notes
+
+- Checked: 2026-07-08 JST
+- Scope: RunPod Pods startup speed, Docker image pulls, large Hugging Face weight loading, and cache layout for the cloud benchmark path in Issue #25.
+
+## Conclusion
+
+Do not keep iterating on the current "weights baked into GHCR image layers" path for TripoSG and PartCrafter. The first TripoSG cloud attempt already proved that private registry auth works, but the pod stayed in the pre-container image pull phase while fetching a multi-GB layer. That phase is outside the runner's `MAX_RUNTIME_MIN` watchdog, so it can burn GPU time before any benchmark code starts.
+
+Recommended next path:
+
+1. Build smaller runtime images that contain CUDA/Python dependencies, model source code, runners, and task files, but not model snapshots.
+2. Create a RunPod network volume in the target data center and pre-populate exact pinned model revisions there.
+3. Mount that volume into benchmark pods and make runners read weights from explicit volume paths.
+4. Keep R2 only for benchmark outputs and small manifests, not for hot model reads.
+
+This trades one controlled staging job for much lower repeated launch risk. It also keeps private/licensed model redistribution risk lower than making GHCR packages public.
+
+## What RunPod documents imply
+
+RunPod exposes three relevant Pod storage types:
+
+- **Container disk** is temporary and cleared when a pod stops. It is appropriate for OS files, temp files, and ephemeral caches, not benchmark-critical model snapshots.
+- **Volume disk** is mounted at `/workspace` and survives pod stop/restart, but is deleted when the pod is terminated. It can help during debugging, but not for reusable benchmark cache across one-off pods.
+- **Network volume** persists independently of compute, can be shared across pods, and is the intended reusable storage primitive for shared data, datasets, and checkpoints.
+
+Official network volume docs also describe a create-by-data-center flow and a REST create endpoint. That matters because the cache must live in a data center where the target GPU type is available; otherwise the launcher can allocate a pod that cannot attach the desired volume.
+
+RunPod's Serverless model caching tutorial is not the same product path as Pods, but it demonstrates the same operational pattern we want: a handler locates a cached model locally and uses offline mode to avoid re-downloading during cold starts. For Pods, the analogous implementation is a mounted network volume plus fail-fast checks for expected revision marker files.
+
+## Community and template practice
+
+RunPod-maintained worker templates use two patterns that map well to this project:
+
+- `runpod-workers/worker-vllm` has a `BASE_PATH` build argument for where the Hugging Face cache and model live. Its default is `/runpod-volume`, so attaching network storage naturally redirects the model/cache path there.
+- `runpod-workers/worker-tgi` documents a `DOWNLOAD_MODEL=false` mode. In that mode, the Docker image does not include model weights and the user must pre-download weights to network storage, with Hugging Face cache env vars pointed at `/runpod-volume/huggingface-cache`.
+
+The pattern is not "download weights on every pod boot." It is "preload exact weights once, then start inference pods against an already-populated local path."
+
+Community issue traffic around RunPod workers also treats model download/cache behavior as an operational concern separate from inference code. The actionable lesson for us is to make cache miss obvious and cheap: a pod should fail immediately with a clear message if the mounted volume lacks the pinned revision, rather than silently starting a multi-GB download on a paid GPU.
+
+## Hugging Face transfer practice
+
+Hugging Face Hub now documents `HF_HUB_ENABLE_HF_TRANSFER` as deprecated because transfers go through `hf-xet` when available. For a staging pod, use current `huggingface_hub` plus `hf-xet`, set cache locations under the mounted volume, and set `HF_XET_HIGH_PERFORMANCE=1` only during the staging download job if the node has enough CPU/disk headroom.
+
+Recommended staging environment:
+
+```bash
+export HF_HOME=/workspace/hf
+export HF_HUB_CACHE=/workspace/hf/hub
+export HF_XET_CACHE=/workspace/hf/xet
+export HF_XET_HIGH_PERFORMANCE=1
+```
+
+Recommended runtime environment after the volume is warm:
+
+```bash
+export HF_HOME=/workspace/hf
+export HF_HUB_OFFLINE=1
+export TRANSFORMERS_OFFLINE=1
+```
+
+For our runners, the more important piece is not the generic Hugging Face cache path but the explicit model snapshot path. TripoSG and PartCrafter currently default to:
+
+- `/opt/weights/TripoSG`
+- `/opt/weights/PartCrafter`
+- `/opt/weights/RMBG-1.4`
+
+Those defaults should move behind environment variables so the cloud path can point them to volume-backed directories, for example:
+
+- `/workspace/weights/TripoSG`
+- `/workspace/weights/PartCrafter`
+- `/workspace/weights/RMBG-1.4`
+
+## Recommended implementation plan
+
+1. Add RunPod launcher fields for `networkVolumeId` and optional `volumeMountPath`.
+2. Add runner environment variables for model weight roots:
+   - `TRIPOSG_WEIGHTS_PATH`
+   - `PARTCRAFTER_WEIGHTS_PATH`
+   - `RMBG_WEIGHTS_PATH`
+   - later `TRIPOSR_WEIGHTS_PATH`
+3. Build "runtime-only" cloud images that skip Dockerfile `snapshot_download` layers.
+4. Add a small staging script that downloads pinned Hugging Face revisions into the mounted network volume and writes manifest files containing repo id, revision, expected local path, and checked timestamp.
+5. Make benchmark runners validate those manifest files before starting the first task.
+6. Keep the old baked-weight images only as historical artifacts; do not spend more GPU time testing them.
+
+## Candidate staging commands
+
+This should run on a cheap RunPod pod in the same data center as the network volume, not on the final benchmark pod:
+
+```bash
+uv pip install --system "huggingface_hub[hf_xet]"
+
+python3 - <<'PY'
+from pathlib import Path
+from huggingface_hub import snapshot_download
+
+downloads = [
+    ("VAST-AI/TripoSG", "2c1c516d22d58db486a058d98d31bb6177344e06", "/workspace/weights/TripoSG"),
+    ("wgsxm/PartCrafter", "69a0ffc1dad5e48e7e5ed91c0609f2b1276eb31f", "/workspace/weights/PartCrafter"),
+    ("briaai/RMBG-1.4", "2ceba5a5efaec153162aedea169f76caf9b46cf8", "/workspace/weights/RMBG-1.4"),
+]
+
+for repo_id, revision, local_dir in downloads:
+    Path(local_dir).parent.mkdir(parents=True, exist_ok=True)
+    snapshot_download(repo_id=repo_id, revision=revision, local_dir=local_dir)
+PY
+```
+
+After staging, run a no-GPU or short-GPU smoke pod that mounts the same volume and checks:
+
+```bash
+test -f /workspace/weights/TripoSG/model_index.json
+test -f /workspace/weights/RMBG-1.4/config.json
+du -sh /workspace/weights /workspace/hf
+```
+
+Adjust file checks per model if upstream layouts differ.
+
+## Operational notes
+
+- Use `runpodctl pod list` or `bench-harness runpod-pods` for status. Avoid raw `runpodctl pod get` in logs because it prints pod environment values.
+- Add a launcher-side pre-container watchdog before another expensive run. Container self-termination cannot help while Docker is still pulling layers.
+- Prefer one model per cloud launch until cache behavior is proven.
+- Store outputs and run manifests in R2. Do not put frequently-read model weights on R2 for inference unless a later benchmark proves R2 throughput is competitive from the chosen RunPod data center.
+
+## Sources
+
+- RunPod Network Volumes docs: https://docs.runpod.io/storage/network-volumes (checked 2026-07-08)
+- RunPod Pod storage options: https://docs.runpod.io/pods/storage/types (checked 2026-07-08)
+- RunPod Create Pod API: https://docs.runpod.io/api-reference/pods/POST/pods (checked 2026-07-08)
+- RunPod Serverless model caching tutorial: https://docs.runpod.io/tutorials/serverless/model-caching-text (checked 2026-07-08)
+- RunPod Dockerfile tutorial: https://docs.runpod.io/tutorials/introduction/containers/create-dockerfiles (checked 2026-07-08)
+- RunPod worker-vLLM README: https://github.com/runpod-workers/worker-vllm (checked 2026-07-08)
+- RunPod worker-TGI README: https://github.com/runpod-workers/worker-tgi (checked 2026-07-08)
+- Hugging Face Hub environment variables: https://huggingface.co/docs/huggingface_hub/en/package_reference/environment_variables (checked 2026-07-08)
