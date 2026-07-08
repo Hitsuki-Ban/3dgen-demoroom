@@ -31,12 +31,12 @@ function serveTaskReferences(): Plugin {
   };
 }
 
-/** dev 時に outputs/site-data/ のベンチ成果物 GLB を /assets/runs/ で配信する */
+/** dev 時に outputs/site-data/ のベンチ成果物 GLB を /run-assets/ で配信する */
 function serveRunOutputs(): Plugin {
   return {
     name: 'serve-run-outputs',
     configureServer(server) {
-      server.middlewares.use('/assets/runs', (req, res, next) => {
+      server.middlewares.use('/run-assets', (req, res, next) => {
         const rel = decodeURIComponent((req.url ?? '').split('?')[0].replace(/^\//, ''));
         if (!/^[a-z0-9-]+\/[a-z0-9-]+\/output\.glb$/.test(rel)) return next();
         fs.readFile(path.join(runsDir, rel), (err, data) => {
