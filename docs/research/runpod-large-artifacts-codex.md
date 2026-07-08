@@ -105,6 +105,7 @@ Weight-free runtime package:
 - Current TripoSG retry image: `ghcr.io/hitsuki-ban/3dgen-triposg-runtime:2026-07-cloud-wave1-ssh-incremental` at digest `sha256:5a3088fa4038648d0f5b19200c03a5ec45fb206947503ac24dafb6443a6403f8`.
 - The SSH + incremental TripoSG retry completed all 25 tasks on RTX 4090, with 100 task objects preserved in R2 under `runs/triposg/wave1/20260708T182152Z/` and all synced local task outputs passing `output-validate`.
 - Final `runpod-status.json` was still absent after pod cleanup, so final status writing needs its own incremental or earlier persistence path.
+- Current PartCrafter retry image: `ghcr.io/hitsuki-ban/3dgen-partcrafter-runtime:2026-07-cloud-wave1-ssh-incremental` at digest `sha256:8d890742d62c1b69db59c9bc7545a28aa340fd6538b5c3605c1bcd6091fab277`.
 
 ## Recommended implementation plan
 

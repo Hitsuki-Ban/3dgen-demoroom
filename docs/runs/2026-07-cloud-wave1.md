@@ -40,6 +40,7 @@ Implemented the local code needed for the first RunPod/R2 cloud wave and pushed 
 | PartCrafter runtime-only | `ghcr.io/hitsuki-ban/3dgen-partcrafter:2026-07-cloud-wave1-runtime-volume` | `sha256:bb9e7bff54ca1688c1584f1de0e12c11153caa3d4a32f2073068e9ef27ce0eb0` | private |
 | TripoSG weight-free runtime package | `ghcr.io/hitsuki-ban/3dgen-triposg-runtime:2026-07-cloud-wave1` | `sha256:d4bc56e23a07bea440eff269216998d790c1b5af697ec335fd74e8ed17a5d332` | private; package was created separately from historical baked-weight tags, but GitHub package visibility still needs UI change to become anonymous-pullable |
 | TripoSG weight-free runtime, SSH + incremental upload | `ghcr.io/hitsuki-ban/3dgen-triposg-runtime:2026-07-cloud-wave1-ssh-incremental` | `sha256:5a3088fa4038648d0f5b19200c03a5ec45fb206947503ac24dafb6443a6403f8` | private; use `containerRegistryAuthId` |
+| PartCrafter weight-free runtime, SSH + incremental upload | `ghcr.io/hitsuki-ban/3dgen-partcrafter-runtime:2026-07-cloud-wave1-ssh-incremental` | `sha256:8d890742d62c1b69db59c9bc7545a28aa340fd6538b5c3605c1bcd6091fab277` | private; use `containerRegistryAuthId` |
 
 ## Implemented
 
@@ -418,6 +419,34 @@ Per-task metrics:
 | `victorian-street-lamp` | 13.50 | 7.56 |
 | `wooden-rocking-chair` | 16.56 | 11.05 |
 
+## PartCrafter SSH + Incremental Runtime Image
+
+Documented at 2026-07-09T04:02Z after registry inspect and local cleanup.
+
+- Image tag: `ghcr.io/hitsuki-ban/3dgen-partcrafter-runtime:2026-07-cloud-wave1-ssh-incremental`
+- Digest: `sha256:8d890742d62c1b69db59c9bc7545a28aa340fd6538b5c3605c1bcd6091fab277`
+- Registry inspect confirmed the tag points at that digest.
+- The image includes SSH daemon support plus the PartCrafter runner change that uploads each task directory to R2 under `<run-prefix>/<task-id>/`.
+- Docker daemon was cleaned afterward: `docker system df` returned `0` images, `0` containers, `0` build cache. The temporary F: buildx cache directory was deleted after the push.
+
+Next run command shape:
+
+```powershell
+uv run bench-harness runpod-launch partcrafter `
+  ghcr.io/hitsuki-ban/3dgen-partcrafter-runtime@sha256:8d890742d62c1b69db59c9bc7545a28aa340fd6538b5c3605c1bcd6091fab277 `
+  s3://3dgen-runs/runs/partcrafter/wave1/<timestamp> `
+  --name 3dgen-partcrafter-wave1-ssh-incremental-<timestamp> `
+  --min-balance-usd 12 `
+  --gpu-type-id "NVIDIA GeForce RTX 4090" `
+  --container-registry-auth-id cmrc1l2gc00847uotrnjn2des `
+  --network-volume-id wnqijpazd5 `
+  --data-center-id EU-RO-1 `
+  --startup-timeout-min 25 `
+  --allowed-cuda-version 13.0 `
+  --allowed-cuda-version 12.9 `
+  --allowed-cuda-version 12.8
+```
+
 ## Log Access Notes
 
 - `runpodctl` v2.6.1 was installed locally under gitignored `.docker-build/tools/runpodctl-2.6.1`; checksum matched the official release checksum.
@@ -445,7 +474,7 @@ Per-task metrics:
 
 ## Follow-up Before Full 25-Task Runs
 
-1. Build and push a PartCrafter weight-free runtime package with SSH daemon support and task-level incremental upload, then run it against the same EU-RO-1 / `wnqijpazd5` volume.
+1. Run PartCrafter with `ghcr.io/hitsuki-ban/3dgen-partcrafter-runtime@sha256:8d890742d62c1b69db59c9bc7545a28aa340fd6538b5c3605c1bcd6091fab277` against the same EU-RO-1 / `wnqijpazd5` volume.
 2. Add a follow-up hardening change so final `runpod-status.json` is also uploaded incrementally or written before self-termination; task outputs are complete, but the final status file is still vulnerable to pod disappearance.
 3. After PartCrafter succeeds, validate every task with `output-validate`, sync artifacts into `outputs/site-data/partcrafter/<task-id>/`, and hand the synced site data to the frontend comparison page flow.
 
