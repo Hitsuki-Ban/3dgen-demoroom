@@ -25,7 +25,7 @@ Implemented the local code needed for the first RunPod/R2 cloud wave and pushed 
 - EU-RO-1 was validated with a 10GB temporary network volume and short RTX 4090 smoke pod; both temporary resources were deleted. A new 30GB EU-RO-1 volume `wnqijpazd5` was staged successfully with TripoSG, PartCrafter, and RMBG pinned weights. R2 staging report: `runs/staging/20260708T155503Z/network-volume-wnqijpazd5.json`.
 - The old US-NC-1 volume `cwcjs6bz6j` was deleted after EU-RO-1 staging succeeded, avoiding double network-volume storage cost while US-NC-1 had no actual create capacity.
 - A paid TripoSG runtime-only launch on EU-RO-1 created pod `sgoerg5ya0v8hw` on RTX 4090 and reached `publicIp`, but mapped SSH port 22 never became reachable and R2 remained empty. It was terminated at 2026-07-08T16:24Z, and active pods returned to `[]`.
-- A paid retry with the split TripoSG weight-free runtime package and private registry auth created pod `il8q7manajir88` on EU-RO-1; `publicIp` and SSH port mapping appeared, but TCP to SSH stayed closed, RunPod later returned `pod not found` during startup polling, and R2 remained empty. Active pods returned to `[]`.
+- A paid retry with the split TripoSG weight-free runtime package and private registry auth created pod `il8q7manajir88` on EU-RO-1; `publicIp` and SSH port mapping appeared, but TCP to SSH stayed closed, RunPod later returned `pod not found` during startup polling, and R2 remained empty. This exposed that the runtime images did not install/start an SSH daemon, so the launcher-side SSH readiness gate could not succeed.
 
 ## GHCR Images
 
@@ -56,7 +56,8 @@ Implemented the local code needed for the first RunPod/R2 cloud wave and pushed 
 - RunPod cloud commands now write `runpod-status.json`, upload the output directory even when the runner exits non-zero, and then attempt best-effort self-termination. Upload/status failures take precedence over runner failures because a missing R2 report is an infrastructure failure.
 - `bench-harness runpod-launch` and `runpod-pods` now strip RunPod `env` fields before printing pod responses, so local logs do not contain injected R2 or RunPod secrets.
 - RunPod HTTP errors now include the response body in the raised exception, which exposed the 2026-07-08T15:46Z retry failure as a capacity miss instead of an opaque HTTP 500.
-- Startup polling now reports a pod that disappears before SSH readiness as an explicit pre-container startup failure instead of surfacing a raw `GET /pods/<id>` HTTP 404 stack trace.
+- Startup polling now reports a pod that disappears before SSH readiness as an explicit startup failure instead of surfacing a raw `GET /pods/<id>` HTTP 404 stack trace.
+- TripoSG and PartCrafter runtime images now install `openssh-server`, and the RunPod start command starts SSH before running the benchmark so the launcher-side SSH readiness gate reflects actual container readiness.
 
 ## TripoSG Launch Attempt
 
@@ -257,7 +258,7 @@ Observed:
 - Active pods after the failure: `[]`.
 - Balance after the failure: `$18.5332833593`.
 
-Conclusion: the split weight-free runtime package plus private registry auth still did not reach container runtime. This narrows the current blocker to registry/container bootstrap on RunPod before our runner can write `runpod-status.json`. The launcher now turns this disappearance into an explicit startup failure with last-observed pod state.
+Conclusion: the split weight-free runtime package plus private registry auth reached `publicIp` and port mapping, but the runtime image did not provide an SSH daemon for the launcher readiness gate. The image and start command now install/start SSH before benchmark execution, while the launcher also turns a disappearing pod into an explicit startup failure with last-observed pod state.
 
 ## Log Access Notes
 
@@ -286,10 +287,8 @@ Conclusion: the split weight-free runtime package plus private registry auth sti
 
 ## Follow-up Before Full 25-Task Runs
 
-1. Do not retry the same private TripoSG runtime package path unchanged; it reproduced a pre-container disappearance before SSH readiness and before R2 telemetry.
-2. Choose the next registry/bootstrap isolation path:
-   - make `ghcr.io/hitsuki-ban/3dgen-triposg-runtime` public in GitHub Packages UI, accepting that GitHub documents public package visibility as irreversible, then verify anonymous manifest access returns 200 before another paid retry; or
-   - run a tiny diagnostic image against `EU-RO-1` / `wnqijpazd5` to separate RunPod machine/volume startup from GHCR runtime image pull.
+1. Rebuild and push the TripoSG weight-free runtime package with `openssh-server` installed and the SSH-starting RunPod command, then retry the same EU-RO-1 / `wnqijpazd5` path with private registry auth.
+2. If the rebuilt private runtime still stalls before SSH readiness, choose the next registry/bootstrap isolation path: make the weight-free package public after explicit approval, or run a tiny diagnostic image against the same data center/volume.
 3. Confirm that every started benchmark pod reaches a reachable mapped SSH port, then uploads either task outputs or `runpod-status.json` under the run prefix before considering the pod attempt diagnosable.
 4. After a successful TripoSG run, validate every task with `output-validate`, sync artifacts into `outputs/site-data/triposg/<task-id>/`, then run PartCrafter with the same volume and a matching weight-free runtime package.
 

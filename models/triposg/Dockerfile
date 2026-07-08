@@ -28,6 +28,7 @@ RUN apt-get update \
         libegl1 \
         libglib2.0-0 \
         libgl1 \
+        openssh-server \
         python3 \
         python3-dev \
         python3-venv \

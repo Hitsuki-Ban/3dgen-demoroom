@@ -78,6 +78,7 @@ def test_triposg_dockerfile_uses_required_cuda_base_and_pins() -> None:
     assert "uv pip install --system" in dockerfile
     assert "RUN pip install" not in dockerfile
     assert "boto3" in dockerfile
+    assert "openssh-server" in dockerfile
     assert "PYTHONPATH=/opt/bench/src" in dockerfile
     assert "COPY bench/src /opt/bench/src" in dockerfile
     assert "COPY tasks /opt/3dgen-tasks" in dockerfile

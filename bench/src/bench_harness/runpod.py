@@ -310,6 +310,23 @@ def build_cloud_run_command(model_id: str, output_root: str, s3_target: str) -> 
         f"--input-root {quote('/opt/3dgen-tasks')} "
         f"--output-root {quoted_output_root}"
     )
+    ssh_command = (
+        "mkdir -p /run/sshd\n"
+        "if [ -n \"${PUBLIC_KEY:-}\" ]; then\n"
+        "  mkdir -p /root/.ssh\n"
+        "  printf '%s\\n' \"$PUBLIC_KEY\" >> /root/.ssh/authorized_keys\n"
+        "  chmod 700 /root/.ssh\n"
+        "  chmod 600 /root/.ssh/authorized_keys\n"
+        "fi\n"
+        "service ssh start\n"
+        "ssh_exit_code=$?\n"
+        "if [ \"$ssh_exit_code\" -ne 0 ]; then\n"
+        "  runner_exit_code=\"$ssh_exit_code\"\n"
+        "else\n"
+        f"  {run_command}\n"
+        "  runner_exit_code=$?\n"
+        "fi"
+    )
     status_command = (
         "python3 - "
         f"{quoted_output_root} {quoted_model_id} {quoted_s3_target} "
@@ -369,8 +386,7 @@ def build_cloud_run_command(model_id: str, output_root: str, s3_target: str) -> 
     )
     return (
         "set +e\n"
-        f"{run_command}\n"
-        "runner_exit_code=$?\n"
+        f"{ssh_command}\n"
         f"{status_command}\n"
         "status_exit_code=$?\n"
         f"{upload_command}\n"

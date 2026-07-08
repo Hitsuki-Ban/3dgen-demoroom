@@ -72,6 +72,10 @@ def test_build_cloud_run_command_uploads_status_even_when_runner_fails() -> None
         s3_target="s3://3dgen-runs/runs/triposg/wave1/20260708T000000Z",
     )
 
+    assert "mkdir -p /run/sshd" in command
+    assert "service ssh start" in command
+    assert "ssh_exit_code=$?" in command
+    assert command.index("service ssh start") < command.index("python3 /opt/3dgen-runner/triposg_runner.py")
     assert "runner_exit_code=$?" in command
     assert "runpod-status.json" in command
     assert "upload_exit_code=$?" in command

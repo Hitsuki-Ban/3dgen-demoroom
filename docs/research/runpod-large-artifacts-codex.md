@@ -98,14 +98,14 @@ Weight-free runtime package:
 - The package was split from the historical `3dgen-triposg` package so it does not expose baked-weight tags when made public.
 - Current status: still private; anonymous GHCR manifest probe returned HTTP 401.
 - GitHub documents changing a package to public as irreversible, so this toggle should only happen after explicit Fable/owner approval.
-- A private-auth retry with this package on `EU-RO-1` reached `publicIp` and an SSH port mapping, but TCP to SSH stayed closed and RunPod later returned `pod not found` before container runtime/R2 telemetry.
+- A private-auth retry with this package on `EU-RO-1` reached `publicIp` and an SSH port mapping, but TCP to SSH stayed closed and RunPod later returned `pod not found` before R2 telemetry. The runtime images did not install/start an SSH daemon, so the launcher-side SSH readiness gate could not succeed.
 
 ## Recommended implementation plan
 
 1. Make benchmark runners validate the staging report or expected weight files before starting the first task.
 2. Keep the old baked-weight images only as historical artifacts; do not spend more GPU time testing them.
 3. Keep the launcher command observable: upload a `runpod-status.json` file even when the model runner exits non-zero, then terminate the pod from local monitoring if self-termination does not complete.
-4. Do not retry the same private package path unchanged. Either make the weight-free runtime package public through GitHub Packages UI after explicit approval and verify anonymous manifest access, or run a tiny diagnostic image against the same data center/volume to isolate RunPod machine/volume startup from GHCR runtime image pull.
+4. Rebuild the weight-free runtime images with SSH daemon support before retrying the same private package path. If the rebuilt private package still stalls before SSH readiness, either make the package public after explicit approval and verify anonymous manifest access, or run a tiny diagnostic image against the same data center/volume to isolate RunPod machine/volume startup from GHCR runtime image pull.
 
 ## Candidate staging commands
 
