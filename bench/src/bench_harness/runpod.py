@@ -148,6 +148,7 @@ class RunPodLaunchConfig:
     network_volume_id: str
     data_center_id: str
     startup_timeout_min: int
+    task_limit: int | None = None
     startup_poll_seconds: float = 15.0
     container_registry_auth_id: str | None = None
     container_disk_gb: int = 80
@@ -329,13 +330,21 @@ def format_startup_state(response: dict[str, object] | None) -> str:
     return f" (last observed: {', '.join(parts)})"
 
 
-def build_cloud_run_command(model_id: str, output_root: str, s3_target: str) -> str:
+def build_cloud_run_command(
+    model_id: str,
+    output_root: str,
+    s3_target: str,
+    *,
+    task_limit: int | None = None,
+) -> str:
     try:
         runner_path = MODEL_RUNNER_PATHS[model_id]
     except KeyError as exc:
         raise ValueError(f"unknown model for RunPod cloud run: {model_id}") from exc
     if not s3_target.startswith("s3://"):
         raise ValueError("RunPod cloud run S3 target must use s3://")
+    if task_limit is not None and task_limit <= 0:
+        raise ValueError("RunPod cloud run task_limit must be positive")
     quoted_output_root = quote(output_root)
     quoted_s3_target = quote(s3_target)
     quoted_model_id = quote(model_id)
@@ -344,6 +353,8 @@ def build_cloud_run_command(model_id: str, output_root: str, s3_target: str) -> 
         f"--input-root {quote('/opt/3dgen-tasks')} "
         f"--output-root {quoted_output_root}"
     )
+    if task_limit is not None:
+        run_command = f"{run_command} --task-limit {task_limit}"
     ssh_command = (
         "mkdir -p /run/sshd\n"
         "if [ -n \"${PUBLIC_KEY:-}\" ]; then\n"
@@ -466,7 +477,12 @@ def build_pod_payload(config: RunPodLaunchConfig, *, runpod_api_key: str) -> dic
         raise ValueError("RunPod data_center_id is required")
     if config.container_registry_auth_id is not None and not config.container_registry_auth_id.strip():
         raise ValueError("RunPod container_registry_auth_id must not be empty")
-    command = build_cloud_run_command(config.model_id, config.output_root, config.s3_target)
+    command = build_cloud_run_command(
+        config.model_id,
+        config.output_root,
+        config.s3_target,
+        task_limit=config.task_limit,
+    )
     payload: dict[str, Any] = {
         "name": config.name,
         "imageName": config.image_name,

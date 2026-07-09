@@ -5,14 +5,17 @@ Issue: #37
 
 ## Status
 
-Batch A has completed and has been published to the public site-data prefixes in R2.
+Batch A and `direct3d-s2` have completed and have been published to the public site-data prefixes in R2.
 The remaining Batch B/C models stay in scope for the same issue/PR.
 
-- Active RunPod pods after Batch A: `[]`
+- Active RunPod pods after the `direct3d-s2` publish: `[]`
 - RunPod balance after the 3DTopia-XL publish check: `$16.2145592614`
+- Current RunPod token can use REST Pods and Billing endpoints, but GraphQL `myself.clientBalance` returns HTTP 403 `error code: 1010`; `direct3d-s2` launch used REST create with active-pod and billing checks instead of `bench-harness runpod-launch`'s GraphQL balance gate.
 - RunPod reported the EU-RO-1 RTX 4090 runtime price as `$0.69/hr` during the paid runs, higher than the `$0.34/hr` value captured in the issue text.
+- RunPod reported the EU-RO-1 RTX 5090 runtime price as `$0.99/hr` during `direct3d-s2` staging, smoke, and full runs.
 - EU-RO-1 network volume `wnqijpazd5` was expanded from 30GB to 80GB for wave 2 staging.
 - Wave 2 staging validation report: `runs/staging/20260709T005450Z/network-volume-wnqijpazd5-wave2-batch-a-validate.json`
+- Direct3D-S2 staging validation report: `runs/staging/20260709T090135Z/network-volume-wnqijpazd5-direct3d-s2-v2-fast.json`
 - Staged Batch A payloads included:
   - `/workspace/weights/TRELLIS-image-large/`
   - `/workspace/weights/3DTopia-XL/`
@@ -26,6 +29,7 @@ The remaining Batch B/C models stay in scope for the same issue/PR.
 | --- | --- | --- | --- |
 | TRELLIS v1 | `ghcr.io/hitsuki-ban/3dgen-trellis1-runtime:2026-07-cloud-wave2-batch-a` | `sha256:0326602fb7daf9e04dc3e168e919b8e7672db4299f96d16a7c7b42c700c3a385` | Uses `SPCONV_ALGO=native`; the earlier `auto` path failed with `SIGFPE` on RTX 4090. |
 | 3DTopia-XL | `ghcr.io/hitsuki-ban/3dgen-3dtopia-xl-runtime:2026-07-cloud-wave2-batch-a` | `sha256:f9a80c8d826bd1400e02676e066b28d65f45a29eec518788ab00fac1a9e140dd` | Uses `rembg[cpu]`, `numpy==1.26.4`, and source-built PyTorch3D v0.7.9. |
+| Direct3D-S2 | `ghcr.io/hitsuki-ban/3dgen-direct3d-s2-runtime:2026-07-cloud-wave2-batch-b-v4` | index `sha256:b039ea24105baaef1ab09b551452164bd34acf7bb5b658c32c1ae488dd91cff9`; linux/amd64 `sha256:5c9aadd6d180208cdc437a65b430810e886364d4244e591e67b8b47a457c70e2` | CUDA 12.8 / torch 2.7.1, source-built `torchsparse`, `flash-attn==2.8.3`, and Direct3D-S2 voxelize `udf_ext`; runner records upstream `LICENSE.txt`. |
 
 ## Published Site Data
 
@@ -33,15 +37,19 @@ The remaining Batch B/C models stay in scope for the same issue/PR.
 | --- | --- | --- | ---: | ---: | ---: | ---: | ---: |
 | `trellis1` | `runs/trellis1/wave2/20260709T013634Z/` | `site-data/trellis1/` | 25 | 0 | 75 | `47.011` | `19.588 GiB` |
 | `3dtopia-xl` | `runs/3dtopia-xl/wave2/20260709T050629Z/` | `site-data/3dtopia-xl/` | 25 | 0 | 75 | `76.362` | `10.016 GiB` |
+| `direct3d-s2` | `runs/direct3d-s2/wave2/20260709T103859Z/` | `site-data/direct3d-s2/` | 25 | 0 | 75 | `140.106` | `30.590 GiB` |
 
 Trellis v1 task metadata spans `2026-07-09T01:39:44Z` through `2026-07-09T02:03:48Z`.
 3DTopia-XL task metadata spans `2026-07-09T05:12:14Z` through `2026-07-09T05:54:51Z`.
+Direct3D-S2 task metadata spans `2026-07-09T10:43:05Z` through `2026-07-09T11:56:53Z`.
 The final successful 3DTopia-XL run moved the balance by about `$0.5625982428`.
+Latest REST billing visible after the Direct3D-S2 publish included `$1.0415233377` across the Direct3D-S2 staging/smoke/full pods, but the full-run pod's final billing appeared partially delayed at check time. Runtime estimate for the full pod is about `$1.4` at `$0.99/hr`.
 
 Both published prefixes were rechecked after upload:
 
 - `site-data/trellis1/`: 75 objects, 25 task directories, sample `meta.json` has `model_id="trellis1"`.
 - `site-data/3dtopia-xl/`: 75 objects, 25 task directories, sample `meta.json` has `model_id="3dtopia-xl"`.
+- `site-data/direct3d-s2/`: 75 objects, 25 task directories, sample `meta.json` has `model_id="direct3d-s2"` and `gpu_name="NVIDIA GeForce RTX 5090"`.
 
 ## Debug Notes
 
@@ -52,12 +60,16 @@ Both published prefixes were rechecked after upload:
   - PyTorch3D v0.7.9 built from source because no matching official wheel was available for Python 3.9 / CUDA 11.8 / torch 2.1.2.
 - Docker Desktop BuildKit returned an EOF once during the PyTorch3D build. Restarting Docker Desktop and rebuilding with `MAX_JOBS=1` for PyTorch3D completed the image.
 - As with wave 1, the final `runpod-status.json` was not present after self-termination, but per-task incremental uploads preserved the full task result set.
+- Direct3D-S2 image v2 reached staging but its first cloud smoke failed because upstream imports require the compiled voxelize extension `udf_ext`.
+- Direct3D-S2 image v3 added `flash-attn`, `udf_ext`, `accelerate`, `kornia`, and `prettytable`. The RTX 4090 smoke then failed with CUDA OOM near 23 GiB in the refiner path, matching the issue's 5090 Batch B placement. The RTX 5090 smoke got through inference but failed packaging because the runner required `/opt/Direct3D-S2/LICENSE`; the pinned upstream repo actually ships `LICENSE.txt`.
+- Direct3D-S2 image v4 fixed the license source path. The 2-task RTX 5090 smoke succeeded with mean `166.176s` and max VRAM `27.559 GiB`.
+- The full Direct3D-S2 pod uploaded all 25 task outputs but did not self-terminate after the object count stabilized at 175. It was manually deleted via REST `DELETE /pods/mce6en0xdr1g08`; `bench-harness runpod-pods` then returned `[]`.
 
 ## Remaining
 
 - Batch B:
   - `trellis2`: runner/spec/Dockerfile added. Actual staging requires `HF_TOKEN` plus accepted access for `facebook/dinov3-vitl16-pretrain-lvd1689m` and `briaai/RMBG-2.0`; current local env does not provide `HF_TOKEN`.
-  - `direct3d-s2`: runner/spec/Dockerfile added. Next step is image build + weight staging + 1-2 task smoke before the 25-task run.
+  - `direct3d-s2`: complete and published.
   - `step1x-3d`: runner/spec/Dockerfile added after checking upstream `stepfun-ai/Step1X-3D` at commit `cb5ac944709c6c913109070c7b90c3447f57f3d4` and HF weights revision `bf7084495b3a72222f36549b7942948aa4d9daa7`. The benchmark path is official base geometry `Step1X-3D-Geometry-1300m` plus `Step1X-3D-Texture`; label geometry is not used.
   - `pixal3d`: runner/spec/Dockerfile added after checking upstream `TencentARC/Pixal3D` at commit `cdbb2bbffbf4e6f298b5f2af3d1d76a8d823d2af` and HF weights revision `0b31f9160aa400719af409098bff7936a932f726`. The benchmark path forces the official standard `1536_cascade`; it does not switch to low-VRAM `1024` on OOM.
 - Batch C:
@@ -68,13 +80,14 @@ Both published prefixes were rechecked after upload:
 Current local secret state checked before this draft:
 
 - `F:\WorkSpace\3DGSDemoRoom\.env` has `RUNPOD_API_KEY`.
-- R2 S3 variables are not present in the file or current process environment.
+- R2 S3 variables are present and were used for Direct3D-S2 publish.
 - `HF_TOKEN` is not present in the file or current process environment.
 
 ## Source Checks
 
 - TRELLIS: https://github.com/microsoft/TRELLIS
 - 3DTopia-XL: https://github.com/3DTopia/3DTopia-XL
+- Direct3D-S2: https://github.com/DreamTechAI/Direct3D-S2
 - PyTorch3D v0.7.9 source tag: https://github.com/facebookresearch/pytorch3d/releases/tag/v0.7.9
 - Step1X-3D: https://github.com/stepfun-ai/Step1X-3D
 - Pixal3D: https://github.com/TencentARC/Pixal3D

@@ -103,6 +103,28 @@ def test_build_cloud_run_command_runs_model_then_uploads_to_s3() -> None:
     assert "s3://3dgen-runs/runs/triposg/rtx-5090/20260708T000000Z" in command
 
 
+def test_build_cloud_run_command_passes_task_limit_to_runner() -> None:
+    command = build_cloud_run_command(
+        model_id="direct3d-s2",
+        output_root="/work/output",
+        s3_target="s3://3dgen-runs/runs/direct3d-s2/wave2/20260709T000000Z",
+        task_limit=3,
+    )
+
+    assert "python3 /opt/3dgen-runner/direct3d_s2_runner.py" in command
+    assert "--task-limit 3" in command
+
+
+def test_build_cloud_run_command_rejects_nonpositive_task_limit() -> None:
+    with pytest.raises(ValueError, match="task_limit"):
+        build_cloud_run_command(
+            model_id="direct3d-s2",
+            output_root="/work/output",
+            s3_target="s3://3dgen-runs/runs/direct3d-s2/wave2/20260709T000000Z",
+            task_limit=0,
+        )
+
+
 def test_build_cloud_run_command_uploads_status_even_when_runner_fails() -> None:
     command = build_cloud_run_command(
         model_id="triposg",
@@ -217,6 +239,7 @@ def test_build_pod_payload_uses_on_demand_gpu_priority_and_runtime_env() -> None
             network_volume_id="volume-123",
             data_center_id="US-IL-1",
             startup_timeout_min=10,
+            task_limit=2,
         ),
         runpod_api_key="token",
     )
@@ -251,6 +274,7 @@ def test_build_pod_payload_uses_on_demand_gpu_priority_and_runtime_env() -> None
     assert payload["env"]["R2_SECRET_ACCESS_KEY"] == "secret-key"
     assert payload["dockerEntrypoint"] == ["bash", "-lc"]
     assert "bench_harness.cli upload-s3" in payload["dockerStartCmd"][0]
+    assert "--task-limit 2" in payload["dockerStartCmd"][0]
 
 
 def test_build_pod_payload_uses_container_registry_auth_id_when_provided() -> None:

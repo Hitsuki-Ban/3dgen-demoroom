@@ -78,7 +78,7 @@ def main() -> None:
         tasks = tasks[: args.task_limit]
 
     license_sources = [
-        LicenseSource("Direct3D-S2 LICENSE", DIRECT3D_S2_ROOT / "LICENSE"),
+        LicenseSource("Direct3D-S2 LICENSE.txt", DIRECT3D_S2_ROOT / "LICENSE.txt"),
         LicenseSource(
             "Direct3D-S2 model card and license metadata",
             Path(DIRECT3D_S2_WEIGHTS_PATH) / "README.md",

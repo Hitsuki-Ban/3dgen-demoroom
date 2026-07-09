@@ -57,7 +57,7 @@ def test_prepare_direct3d_s2_task_output_writes_geometry_only_meta(tmp_path, mon
     raw.mkdir()
     (raw / "output.glb").write_bytes(b"glb")
     (raw / "output.obj").write_text("obj\n", encoding="utf-8")
-    license_path = tmp_path / "LICENSE"
+    license_path = tmp_path / "LICENSE.txt"
     license_path.write_text("license\n", encoding="utf-8")
     model_card_path = tmp_path / "README.md"
     model_card_path.write_text("model card\n", encoding="utf-8")
@@ -81,7 +81,7 @@ def test_prepare_direct3d_s2_task_output_writes_geometry_only_meta(tmp_path, mon
         task_output_dir=tmp_path / "task-output",
         raw_output_dir=raw,
         license_sources=[
-            runner.LicenseSource("Direct3D-S2 LICENSE", license_path),
+            runner.LicenseSource("Direct3D-S2 LICENSE.txt", license_path),
             runner.LicenseSource("Direct3D-S2 model card and license metadata", model_card_path),
         ],
         runtime=runtime,
@@ -120,6 +120,13 @@ def test_direct3d_s2_dockerfile_uses_runtime_only_volume_paths() -> None:
     assert "nvidia/cuda:12.8.1-cudnn-devel-ubuntu22.04" in dockerfile
     assert "ARG DIRECT3D_S2_COMMIT=a1cf235b2881cff04a91900060a9546b40e7ee5d" in dockerfile
     assert "ARG DIRECT3D_S2_WEIGHTS_REVISION=8b04a8eddb7a56a0f4e89fe5f5b840c7d5610c00" in dockerfile
+    assert "ARG TORCHSPARSE_COMMIT=385f5ce8718fcae93540511b7f5832f4e71fd835" in dockerfile
+    assert "libsparsehash-dev" in dockerfile
+    assert "flash-attn==2.8.3" in dockerfile
+    assert "cd /opt/Direct3D-S2/third_party/voxelize" in dockerfile
+    assert "import flash_attn" in dockerfile
+    assert "import udf_ext" in dockerfile
+    assert "uv pip install --system accelerate kornia prettytable" in dockerfile
     assert "DIRECT3D_S2_WEIGHTS_PATH=/workspace/weights/Direct3D-S2" in dockerfile
     assert "HF_HOME=/workspace/hf" in dockerfile
     assert "TORCH_HOME=/workspace/torch" in dockerfile

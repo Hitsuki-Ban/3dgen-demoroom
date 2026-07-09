@@ -2,7 +2,7 @@ FROM nvidia/cuda:12.8.1-cudnn-devel-ubuntu22.04
 
 ARG DIRECT3D_S2_COMMIT=a1cf235b2881cff04a91900060a9546b40e7ee5d
 ARG DIRECT3D_S2_WEIGHTS_REVISION=8b04a8eddb7a56a0f4e89fe5f5b840c7d5610c00
-ARG TORCHSPARSE_COMMIT=74099a0dc08756f5b1ef35a92e4f35f5ff2893a7
+ARG TORCHSPARSE_COMMIT=385f5ce8718fcae93540511b7f5832f4e71fd835
 ARG UV_VERSION=0.11.19
 
 ENV DEBIAN_FRONTEND=noninteractive \
@@ -72,6 +72,10 @@ RUN uv pip install --system "setuptools<81" wheel \
         triton==3.3.1 \
     && uv pip install --system "git+https://github.com/EasternJournalist/utils3d.git"
 
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libsparsehash-dev \
+    && rm -rf /var/lib/apt/lists/*
+
 RUN mkdir -p /tmp/extensions \
     && git clone https://github.com/mit-han-lab/torchsparse.git /tmp/extensions/torchsparse \
     && cd /tmp/extensions/torchsparse \
@@ -79,7 +83,21 @@ RUN mkdir -p /tmp/extensions \
     && MAX_JOBS=1 uv pip install --system --no-build-isolation /tmp/extensions/torchsparse \
     && rm -rf /tmp/extensions
 
+RUN MAX_JOBS=1 uv pip install --system --no-build-isolation flash-attn==2.8.3
+
 RUN uv pip install --system --no-build-isolation -e /opt/Direct3D-S2
+
+RUN cd /opt/Direct3D-S2/third_party/voxelize \
+    && MAX_JOBS=1 uv pip install --system --no-build-isolation .
+
+RUN uv pip install --system accelerate kornia prettytable
+
+RUN python3 - <<'PY'
+import flash_attn
+import udf_ext
+
+print("Direct3D-S2 compiled extensions import successfully")
+PY
 
 COPY bench/src /opt/bench/src
 COPY tasks /opt/3dgen-tasks
