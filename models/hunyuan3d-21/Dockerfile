@@ -45,7 +45,11 @@ RUN curl -LsSf https://astral.sh/uv/${UV_VERSION}/install.sh | UV_INSTALL_DIR=/u
 RUN git clone https://github.com/tencent-hunyuan/hunyuan3d-2.1.git /opt/Hunyuan3D-2.1 \
     && cd /opt/Hunyuan3D-2.1 \
     && git checkout ${HUNYUAN3D_21_COMMIT} \
-    && test "$(git rev-parse HEAD)" = "${HUNYUAN3D_21_COMMIT}"
+    && test "$(git rev-parse HEAD)" = "${HUNYUAN3D_21_COMMIT}" \
+    && sed -i 's#^bpy==4\.0$#bpy @ https://download.blender.org/pypi/bpy/bpy-4.0.0-cp310-cp310-manylinux_2_28_x86_64.whl#' requirements.txt \
+    && grep -Fx 'bpy @ https://download.blender.org/pypi/bpy/bpy-4.0.0-cp310-cp310-manylinux_2_28_x86_64.whl' requirements.txt \
+    && sed -i 's#`python -m pybind11 --includes`#`python3 -m pybind11 --includes`#' hy3dpaint/DifferentiableRenderer/compile_mesh_painter.sh \
+    && grep -F '`python3 -m pybind11 --includes`' hy3dpaint/DifferentiableRenderer/compile_mesh_painter.sh
 
 RUN uv pip install --system "setuptools<81" wheel \
     && uv pip install --system \
@@ -54,7 +58,16 @@ RUN uv pip install --system "setuptools<81" wheel \
         torchaudio==2.5.1 \
         --index-url https://download.pytorch.org/whl/cu124 \
     && uv pip install --system xformers==0.0.28.post3 --index-url https://download.pytorch.org/whl/cu124 \
-    && uv pip install --system -r /opt/Hunyuan3D-2.1/requirements.txt
+    && printf '%s\n' \
+        'torch==2.5.1' \
+        'torchvision==0.20.1' \
+        'torchaudio==2.5.1' \
+        'xformers==0.0.28.post3' \
+        > /tmp/hunyuan3d-21-requirements-constraints.txt \
+    && MAX_JOBS=1 uv pip install --system --no-build-isolation \
+        --index-strategy unsafe-best-match \
+        --constraint /tmp/hunyuan3d-21-requirements-constraints.txt \
+        -r /opt/Hunyuan3D-2.1/requirements.txt
 
 RUN uv pip install --system --no-build-isolation /opt/Hunyuan3D-2.1/hy3dpaint/custom_rasterizer \
     && cd /opt/Hunyuan3D-2.1/hy3dpaint/DifferentiableRenderer \

@@ -8,8 +8,7 @@
   "external_weight_dependencies": [
     "camenduru/dinov3-vitl16-pretrain-lvd1689m",
     "Ruicheng/moge-2-vitl",
-    "ZhengPeng7/BiRefNet",
-    "black-forest-labs/FLUX.1-dev"
+    "briaai/RMBG-2.0"
   ],
   "default_parameters": {
     "resolution": 1536,

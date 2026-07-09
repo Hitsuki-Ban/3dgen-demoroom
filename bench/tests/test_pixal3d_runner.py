@@ -114,6 +114,9 @@ def test_pixal3d_model_spec_records_current_pins_and_standard_protocol() -> None
     assert spec["default_parameters"]["low_vram"] is False
     assert "camenduru/dinov3-vitl16-pretrain-lvd1689m" in spec["external_weight_dependencies"]
     assert "Ruicheng/moge-2-vitl" in spec["external_weight_dependencies"]
+    assert "briaai/RMBG-2.0" in spec["external_weight_dependencies"]
+    assert "ZhengPeng7/BiRefNet" not in spec["external_weight_dependencies"]
+    assert "black-forest-labs/FLUX.1-dev" not in spec["external_weight_dependencies"]
 
 
 def test_pixal3d_dockerfile_uses_runtime_only_volume_paths() -> None:

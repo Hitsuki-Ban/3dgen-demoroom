@@ -140,6 +140,12 @@ def test_hunyuan3d_21_dockerfile_uses_runtime_only_volume_paths() -> None:
     assert "HF_TOKEN" not in dockerfile
     assert "RUN pip install" not in dockerfile
     assert "uv pip install --system" in dockerfile
+    assert "bpy-4.0.0-cp310-cp310-manylinux_2_28_x86_64.whl" in dockerfile
+    assert "python3 -m pybind11 --includes" in dockerfile
+    assert "hunyuan3d-21-requirements-constraints.txt" in dockerfile
+    assert "MAX_JOBS=1 uv pip install --system --no-build-isolation" in dockerfile
+    assert "--index-strategy unsafe-best-match" in dockerfile
+    assert "--constraint /tmp/hunyuan3d-21-requirements-constraints.txt" in dockerfile
     assert "custom_rasterizer" in dockerfile
     assert "compile_mesh_painter.sh" in dockerfile
     assert "COPY models/hunyuan3d-21/runner.py /opt/3dgen-runner/hunyuan3d_21_runner.py" in dockerfile
