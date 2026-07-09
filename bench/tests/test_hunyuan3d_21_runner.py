@@ -139,6 +139,7 @@ def test_hunyuan3d_21_dockerfile_uses_runtime_only_volume_paths() -> None:
     assert "snapshot_download(" not in dockerfile
     assert "HF_TOKEN" not in dockerfile
     assert "RUN pip install" not in dockerfile
+    assert 'TORCH_CUDA_ARCH_LIST="8.0;8.9"' in dockerfile
     assert "uv pip install --system" in dockerfile
     assert "bpy-4.0.0-cp310-cp310-manylinux_2_28_x86_64.whl" in dockerfile
     assert "python3 -m pybind11 --includes" in dockerfile
