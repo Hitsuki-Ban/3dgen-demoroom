@@ -1,0 +1,24 @@
+{
+  "id": "step1x-3d",
+  "name": "Step1X-3D",
+  "code_repo": "https://github.com/stepfun-ai/Step1X-3D",
+  "code_commit": "cb5ac944709c6c913109070c7b90c3447f57f3d4",
+  "weights_repo": "stepfun-ai/Step1X-3D",
+  "weights_revision": "bf7084495b3a72222f36549b7942948aa4d9daa7",
+  "external_weight_dependencies": [
+    "stabilityai/stable-diffusion-xl-base-1.0",
+    "madebyollin/sdxl-vae-fp16-fix",
+    "ZhengPeng7/BiRefNet"
+  ],
+  "default_parameters": {
+    "geometry_subfolder": "Step1X-3D-Geometry-1300m",
+    "texture_subfolder": "Step1X-3D-Texture",
+    "num_inference_steps": 50,
+    "guidance_scale": 7.5,
+    "octree_resolution": 384,
+    "max_facenum": 200000,
+    "texture": true,
+    "texture_seed_source": "benchmark_task_seed",
+    "step1x_3d_weights_path": "/workspace/weights/Step1X-3D"
+  }
+}

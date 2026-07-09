@@ -1,0 +1,46 @@
+{
+  "id": "hunyuan3d-21",
+  "name": "Hunyuan3D-2.1",
+  "code_repo": "https://github.com/tencent-hunyuan/hunyuan3d-2.1",
+  "code_commit": "82920d643c0dc2f7bfd7255f45f62d386edfe60c",
+  "weights_repo": "tencent/Hunyuan3D-2.1",
+  "weights_revision": "0b94677654c57bb9a6b6845cd7b704ccf551d327",
+  "external_weight_dependencies": [
+    "facebook/dinov2-giant",
+    "RealESRGAN_x4plus.pth"
+  ],
+  "distribution_restrictions": {
+    "source": "Tencent Hunyuan Community License, section 5(c)",
+    "block_regions": [
+      "EU27",
+      "GB",
+      "KR"
+    ]
+  },
+  "runpod_policy": {
+    "preferred_data_center_id": "US-KS-2",
+    "fallback_data_center_ids": [
+      "US-MO-1"
+    ],
+    "disallowed_data_center_regions": [
+      "EU",
+      "UK",
+      "KR"
+    ]
+  },
+  "default_parameters": {
+    "shape_subfolder": "hunyuan3d-dit-v2-1",
+    "texture_subfolder": "hunyuan3d-paintpbr-v2-1",
+    "num_inference_steps": 50,
+    "guidance_scale": 5.0,
+    "octree_resolution": 384,
+    "num_chunks": 8000,
+    "texture": true,
+    "texture_max_num_view": 6,
+    "texture_resolution": 512,
+    "texture_render_size": 2048,
+    "texture_size": 4096,
+    "attention_backend": "xformers",
+    "hunyuan3d_21_weights_path": "/workspace/weights/Hunyuan3D-2.1"
+  }
+}

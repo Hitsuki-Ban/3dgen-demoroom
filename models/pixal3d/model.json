@@ -1,0 +1,48 @@
+{
+  "id": "pixal3d",
+  "name": "Pixal3D",
+  "code_repo": "https://github.com/TencentARC/Pixal3D",
+  "code_commit": "cdbb2bbffbf4e6f298b5f2af3d1d76a8d823d2af",
+  "weights_repo": "TencentARC/Pixal3D",
+  "weights_revision": "0b31f9160aa400719af409098bff7936a932f726",
+  "external_weight_dependencies": [
+    "camenduru/dinov3-vitl16-pretrain-lvd1689m",
+    "Ruicheng/moge-2-vitl",
+    "ZhengPeng7/BiRefNet",
+    "black-forest-labs/FLUX.1-dev"
+  ],
+  "default_parameters": {
+    "resolution": 1536,
+    "pipeline_type": "1536_cascade",
+    "low_vram": false,
+    "manual_fov": -1.0,
+    "image_resolution": 512,
+    "max_num_tokens": 49152,
+    "sparse_structure_sampler_params": {
+      "steps": 12,
+      "guidance_strength": 7.5,
+      "guidance_rescale": 0.7,
+      "rescale_t": 5.0
+    },
+    "shape_slat_sampler_params": {
+      "steps": 12,
+      "guidance_strength": 7.5,
+      "guidance_rescale": 0.5,
+      "rescale_t": 3.0
+    },
+    "tex_slat_sampler_params": {
+      "steps": 12,
+      "guidance_strength": 1.0,
+      "guidance_rescale": 0.0,
+      "rescale_t": 3.0
+    },
+    "decimation_target": 1000000,
+    "texture_size": 4096,
+    "remesh": true,
+    "remesh_band": 1,
+    "remesh_project": 0,
+    "export_webp": true,
+    "attention_backend": "flash_attn",
+    "pixal3d_weights_path": "/workspace/weights/Pixal3D"
+  }
+}

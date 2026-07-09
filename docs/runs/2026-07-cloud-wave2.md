@@ -58,10 +58,10 @@ Both published prefixes were rechecked after upload:
 - Batch B:
   - `trellis2`: runner/spec/Dockerfile added. Actual staging requires `HF_TOKEN` plus accepted access for `facebook/dinov3-vitl16-pretrain-lvd1689m` and `briaai/RMBG-2.0`; current local env does not provide `HF_TOKEN`.
   - `direct3d-s2`: runner/spec/Dockerfile added. Next step is image build + weight staging + 1-2 task smoke before the 25-task run.
-  - `step1x-3d`
-  - `pixal3d`
+  - `step1x-3d`: runner/spec/Dockerfile added after checking upstream `stepfun-ai/Step1X-3D` at commit `cb5ac944709c6c913109070c7b90c3447f57f3d4` and HF weights revision `bf7084495b3a72222f36549b7942948aa4d9daa7`. The benchmark path is official base geometry `Step1X-3D-Geometry-1300m` plus `Step1X-3D-Texture`; label geometry is not used.
+  - `pixal3d`: runner/spec/Dockerfile added after checking upstream `TencentARC/Pixal3D` at commit `cdbb2bbffbf4e6f298b5f2af3d1d76a8d823d2af` and HF weights revision `0b31f9160aa400719af409098bff7936a932f726`. The benchmark path forces the official standard `1536_cascade`; it does not switch to low-VRAM `1024` on OOM.
 - Batch C:
-  - `hunyuan3d-21` on a non-EU/non-UK/non-KR data center with a dedicated network volume.
+  - `hunyuan3d-21`: runner/spec/Dockerfile added after checking upstream `tencent-hunyuan/hunyuan3d-2.1` at commit `82920d643c0dc2f7bfd7255f45f62d386edfe60c` and HF weights revision `0b94677654c57bb9a6b6845cd7b704ccf551d327`. The spec records the EU27/GB/KR distribution block and preferred non-EU RunPod DC `US-KS-2`; actual execution still needs a dedicated non-EU network volume.
 - Conditional:
   - `sf3d`, blocked until the owner provides a gated Hugging Face token with the Stability license accepted.
 
@@ -76,3 +76,6 @@ Current local secret state checked before this draft:
 - TRELLIS: https://github.com/microsoft/TRELLIS
 - 3DTopia-XL: https://github.com/3DTopia/3DTopia-XL
 - PyTorch3D v0.7.9 source tag: https://github.com/facebookresearch/pytorch3d/releases/tag/v0.7.9
+- Step1X-3D: https://github.com/stepfun-ai/Step1X-3D
+- Pixal3D: https://github.com/TencentARC/Pixal3D
+- Hunyuan3D-2.1: https://github.com/tencent-hunyuan/hunyuan3d-2.1
