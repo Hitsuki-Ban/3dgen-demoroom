@@ -149,4 +149,5 @@ def test_hunyuan3d_21_dockerfile_uses_runtime_only_volume_paths() -> None:
     assert "--constraint /tmp/hunyuan3d-21-requirements-constraints.txt" in dockerfile
     assert "custom_rasterizer" in dockerfile
     assert "compile_mesh_painter.sh" in dockerfile
+    assert "uv pip install --system boto3" in dockerfile
     assert "COPY models/hunyuan3d-21/runner.py /opt/3dgen-runner/hunyuan3d_21_runner.py" in dockerfile

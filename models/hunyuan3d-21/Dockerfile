@@ -73,6 +73,8 @@ RUN uv pip install --system --no-build-isolation /opt/Hunyuan3D-2.1/hy3dpaint/cu
     && cd /opt/Hunyuan3D-2.1/hy3dpaint/DifferentiableRenderer \
     && bash compile_mesh_painter.sh
 
+RUN uv pip install --system boto3
+
 COPY bench/src /opt/bench/src
 COPY tasks /opt/3dgen-tasks
 COPY models/common/runner_utils.py /opt/3dgen-runner/runner_utils.py

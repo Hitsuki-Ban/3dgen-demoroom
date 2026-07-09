@@ -135,14 +135,21 @@ def test_build_cloud_run_command_uploads_status_even_when_runner_fails() -> None
     assert "mkdir -p /run/sshd" in command
     assert "service ssh start" in command
     assert "ssh_exit_code=$?" in command
+    assert "runpod-startup.json" in command
+    assert "startup_status_exit_code=$?" in command
+    assert "startup_upload_exit_code=$?" in command
     assert command.index("service ssh start") < command.index("python3 /opt/3dgen-runner/triposg_runner.py")
+    assert command.index("runpod-startup.json") < command.index("python3 /opt/3dgen-runner/triposg_runner.py")
+    assert command.index("startup_upload_exit_code=$?") < command.index("python3 /opt/3dgen-runner/triposg_runner.py")
     assert "runner_exit_code=$?" in command
     assert "runpod-status.json" in command
     assert "upload_exit_code=$?" in command
     assert "status_exit_code=$?" in command
     assert "bench_harness.cli upload-s3" in command
-    assert command.index("runner_exit_code=$?") < command.index("bench_harness.cli upload-s3")
+    assert command.index("startup_upload_exit_code=$?") < command.index("runner_exit_code=$?")
+    assert command.index("runner_exit_code=$?") < command.rindex("bench_harness.cli upload-s3")
     assert "https://rest.runpod.io/v1/pods/" in command
+    assert 'elif [ "$startup_upload_exit_code" -ne 0 ]; then' in command
     assert 'if [ "$upload_exit_code" -ne 0 ]; then exit "$upload_exit_code"; fi' in command
     assert 'if [ "$status_exit_code" -ne 0 ]; then exit "$status_exit_code"; fi' in command
     assert "exit \"$runner_exit_code\"" in command
