@@ -35,6 +35,9 @@ The remaining Batch B/C models stay in scope for the same issue/PR.
   - `hunyuan3d-21`: `runs/hunyuan3d-21/wave2-smoke/20260709T172306Z/`, `US-KS-2`, GPU priority `NVIDIA L40S` / `NVIDIA L40` / `NVIDIA RTX 6000 Ada Generation`, REST response `There are no instances currently available`.
   - `hunyuan3d-21`: `runs/hunyuan3d-21/wave2-smoke/20260709T172329Z/`, `US-KS-2`, A100 priority `NVIDIA A100 80GB PCIe` / `NVIDIA A100-SXM4-80GB`, REST response `There are no instances currently available`.
   - `step1x-3d`: `runs/step1x-3d/wave2-smoke/20260709T172350Z/`, `EU-RO-1`, RTX 5090-only, REST response `There are no instances currently available`.
+  - `step1x-3d`: `runs/step1x-3d/wave2-smoke/20260709T173108Z/`, `EU-RO-1`, RTX 5090-only, REST response `There are no instances currently available`.
+  - `hunyuan3d-21`: `runs/hunyuan3d-21/wave2-smoke/20260709T173108Z-ada/`, `US-KS-2`, GPU priority `NVIDIA L40S` / `NVIDIA L40` / `NVIDIA RTX 6000 Ada Generation`, REST response `There are no instances currently available`.
+  - `hunyuan3d-21`: `runs/hunyuan3d-21/wave2-smoke/20260709T173108Z-a100/`, `US-KS-2`, A100 priority `NVIDIA A100 80GB PCIe` / `NVIDIA A100-SXM4-80GB`, REST response `There are no instances currently available`.
 - Staged Batch A payloads included:
   - `/workspace/weights/TRELLIS-image-large/`
   - `/workspace/weights/3DTopia-XL/`
@@ -106,14 +109,14 @@ Both published prefixes were rechecked after upload:
   - Initial post-v6 attempt: `US-KS-2`, RTX 6000 Ada only, REST response `There are no instances currently available`.
   - `20260709T161427Z`: `US-KS-2`, L40S / L40 / RTX 6000 Ada priority, REST response `There are no instances currently available` for all three GPU types.
 - Hunyuan3D-2.1 v7 A100 fallback smoke at `runs/hunyuan3d-21/wave2-smoke/20260709T164646Z/` created pod `zpwqutkz3k41dr` on `US-KS-2` `NVIDIA A100-SXM4-80GB`, but no task output or `runpod-status.json` reached R2 before the pod lost `publicIp`. The smoke was manually deleted at about 15 minutes to stay within the budget guardrail. RunPod REST returned 400 for guessed pod log paths such as `/v1/pods/zpwqutkz3k41dr/logs`, so no container logs were available through the current API path.
-- Hunyuan v8 could not be smoke-tested after build because both US-KS-2 48GB Ada and A100 priorities returned capacity misses before pod creation.
+- Hunyuan v8 could not be smoke-tested after build because repeated US-KS-2 48GB Ada and A100 priorities returned capacity misses before pod creation, most recently at `20260709T173108Z`.
 
 ## Remaining
 
 - Batch B:
   - `trellis2`: runner/spec/Dockerfile added. Actual staging requires `HF_TOKEN` plus accepted access for `facebook/dinov3-vitl16-pretrain-lvd1689m` and `briaai/RMBG-2.0`; current local env does not provide `HF_TOKEN`.
   - `direct3d-s2`: complete and published.
-  - `step1x-3d`: runner/spec/Dockerfile added after checking upstream `stepfun-ai/Step1X-3D` at commit `cb5ac944709c6c913109070c7b90c3447f57f3d4` and HF weights revision `bf7084495b3a72222f36549b7942948aa4d9daa7`. The benchmark path is official base geometry `Step1X-3D-Geometry-1300m` plus `Step1X-3D-Texture`; label geometry is not used. Main weights and external HF cache dependencies are staged; the next action is a new 2-task RTX 5090-only smoke when EU-RO-1 5090 capacity returns. The latest capacity-only attempt at `20260709T161510Z` did not create a pod.
+  - `step1x-3d`: runner/spec/Dockerfile added after checking upstream `stepfun-ai/Step1X-3D` at commit `cb5ac944709c6c913109070c7b90c3447f57f3d4` and HF weights revision `bf7084495b3a72222f36549b7942948aa4d9daa7`. The benchmark path is official base geometry `Step1X-3D-Geometry-1300m` plus `Step1X-3D-Texture`; label geometry is not used. Main weights and external HF cache dependencies are staged; the next action is a new 2-task RTX 5090-only smoke when EU-RO-1 5090 capacity returns. The latest capacity-only attempt at `20260709T173108Z` did not create a pod.
   - `pixal3d`: runner/spec/Dockerfile added after checking upstream `TencentARC/Pixal3D` at commit `cdbb2bbffbf4e6f298b5f2af3d1d76a8d823d2af` and HF weights revision `0b31f9160aa400719af409098bff7936a932f726`. The benchmark path forces the official standard `1536_cascade`; it does not switch to low-VRAM `1024` on OOM. Actual cloud staging/execution needs `HF_TOKEN` with accepted access for `briaai/RMBG-2.0`.
 - Batch C:
   - `hunyuan3d-21`: runner/spec/Dockerfile added after checking upstream `tencent-hunyuan/hunyuan3d-2.1` at commit `82920d643c0dc2f7bfd7255f45f62d386edfe60c` and HF weights revision `0b94677654c57bb9a6b6845cd7b704ccf551d327`. The spec records the EU27/GB/KR distribution block and preferred non-EU RunPod DC `US-KS-2`; dedicated volume `dzy02pljaw` is staged and verified. Runtime image v8 is built and pushed for `sm_80;sm_89` with explicit R2 upload dependencies; actual publish is still pending because US-KS-2 48GB Ada and A100 capacity are unavailable.
