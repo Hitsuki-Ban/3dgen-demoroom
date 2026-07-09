@@ -20,10 +20,20 @@ DEFAULT_ALLOWED_CUDA_VERSIONS = ("12.8",)
 RUNPOD_VOLUME_MOUNT_PATH = "/workspace"
 RUNPOD_WEIGHT_ROOT = f"{RUNPOD_VOLUME_MOUNT_PATH}/weights"
 RUNPOD_HF_HOME = f"{RUNPOD_VOLUME_MOUNT_PATH}/hf"
+RUNPOD_TORCH_HOME = f"{RUNPOD_VOLUME_MOUNT_PATH}/torch"
+RUNPOD_U2NET_HOME = f"{RUNPOD_WEIGHT_ROOT}/rembg"
 REQUIRED_R2_ENV_VARS = ("R2_ENDPOINT", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY")
 MODEL_RUNNER_PATHS = {
     "triposg": "/opt/3dgen-runner/triposg_runner.py",
     "partcrafter": "/opt/3dgen-runner/partcrafter_runner.py",
+    "trellis1": "/opt/3dgen-runner/trellis1_runner.py",
+    "3dtopia-xl": "/opt/3dgen-runner/3dtopia_xl_runner.py",
+    "trellis2": "/opt/3dgen-runner/trellis2_runner.py",
+    "direct3d-s2": "/opt/3dgen-runner/direct3d_s2_runner.py",
+    "step1x-3d": "/opt/3dgen-runner/step1x_3d_runner.py",
+    "pixal3d": "/opt/3dgen-runner/pixal3d_runner.py",
+    "hunyuan3d-21": "/opt/3dgen-runner/hunyuan3d_21_runner.py",
+    "sf3d": "/opt/3dgen-runner/sf3d_runner.py",
 }
 MODEL_WEIGHT_ENVS = {
     "triposg": {
@@ -33,6 +43,30 @@ MODEL_WEIGHT_ENVS = {
     "partcrafter": {
         "PARTCRAFTER_WEIGHTS_PATH": f"{RUNPOD_WEIGHT_ROOT}/PartCrafter",
         "RMBG_WEIGHTS_PATH": f"{RUNPOD_WEIGHT_ROOT}/RMBG-1.4",
+    },
+    "trellis1": {
+        "TRELLIS1_WEIGHTS_PATH": f"{RUNPOD_WEIGHT_ROOT}/TRELLIS-image-large",
+    },
+    "3dtopia-xl": {
+        "TOPIA_XL_WEIGHTS_PATH": f"{RUNPOD_WEIGHT_ROOT}/3DTopia-XL",
+    },
+    "trellis2": {
+        "TRELLIS2_WEIGHTS_PATH": f"{RUNPOD_WEIGHT_ROOT}/TRELLIS.2-4B",
+    },
+    "direct3d-s2": {
+        "DIRECT3D_S2_WEIGHTS_PATH": f"{RUNPOD_WEIGHT_ROOT}/Direct3D-S2",
+    },
+    "step1x-3d": {
+        "STEP1X_3D_WEIGHTS_PATH": f"{RUNPOD_WEIGHT_ROOT}/Step1X-3D",
+    },
+    "pixal3d": {
+        "PIXAL3D_WEIGHTS_PATH": f"{RUNPOD_WEIGHT_ROOT}/Pixal3D",
+    },
+    "hunyuan3d-21": {
+        "HUNYUAN3D_21_WEIGHTS_PATH": f"{RUNPOD_WEIGHT_ROOT}/Hunyuan3D-2.1",
+    },
+    "sf3d": {
+        "SF3D_WEIGHTS_PATH": f"{RUNPOD_WEIGHT_ROOT}/stable-fast-3d",
     },
 }
 
@@ -407,6 +441,8 @@ def build_model_weight_env(model_id: str) -> dict[str, str]:
         "HF_HOME": RUNPOD_HF_HOME,
         "HF_HUB_OFFLINE": "1",
         "TRANSFORMERS_OFFLINE": "1",
+        "TORCH_HOME": RUNPOD_TORCH_HOME,
+        "U2NET_HOME": RUNPOD_U2NET_HOME,
         **weight_env,
     }
 

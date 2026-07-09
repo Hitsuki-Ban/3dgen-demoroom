@@ -1,0 +1,47 @@
+{
+  "id": "trellis2",
+  "name": "TRELLIS.2-4B",
+  "code_repo": "https://github.com/microsoft/TRELLIS.2",
+  "code_commit": "75fbf0183001ed9876c8dbb35de6b68552ee08bd",
+  "weights_repo": "microsoft/TRELLIS.2-4B",
+  "weights_revision": "af44b45f2e35a493886929c6d786e563ec68364d",
+  "requires_hf_token": true,
+  "external_weight_dependencies": [
+    "facebook/dinov3-vitl16-pretrain-lvd1689m",
+    "briaai/RMBG-2.0",
+    "microsoft/TRELLIS-image-large"
+  ],
+  "default_parameters": {
+    "num_samples": 1,
+    "resolution": "1024",
+    "pipeline_type": "1024_cascade",
+    "sparse_structure_sampler_params": {
+      "steps": 12,
+      "guidance_strength": 7.5,
+      "guidance_rescale": 0.7,
+      "rescale_t": 5.0
+    },
+    "shape_slat_sampler_params": {
+      "steps": 12,
+      "guidance_strength": 7.5,
+      "guidance_rescale": 0.5,
+      "rescale_t": 3.0
+    },
+    "tex_slat_sampler_params": {
+      "steps": 12,
+      "guidance_strength": 1.0,
+      "guidance_rescale": 0.0,
+      "rescale_t": 3.0
+    },
+    "max_num_tokens": 49152,
+    "simplify_faces": 16777216,
+    "decimation_target": 1000000,
+    "texture_size": 4096,
+    "remesh": true,
+    "remesh_band": 1,
+    "remesh_project": 0,
+    "export_webp": true,
+    "attention_backend": "xformers",
+    "trellis2_weights_path": "/workspace/weights/TRELLIS.2-4B"
+  }
+}

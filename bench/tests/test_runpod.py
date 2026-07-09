@@ -9,6 +9,8 @@ from bench_harness.runpod import (
     DEFAULT_GPU_TYPE_IDS,
     DEFAULT_MAX_RUNTIME_MIN,
     DEFAULT_MIN_BALANCE_USD,
+    MODEL_RUNNER_PATHS,
+    MODEL_WEIGHT_ENVS,
     R2Credentials,
     RunPodApiError,
     RunPodClient,
@@ -28,6 +30,42 @@ def make_r2_credentials() -> R2Credentials:
         access_key_id="access-key",
         secret_access_key="secret-key",
     )
+
+
+WAVE2_MODELS = {
+    "trellis1": {
+        "runner": "/opt/3dgen-runner/trellis1_runner.py",
+        "env": {"TRELLIS1_WEIGHTS_PATH": "/workspace/weights/TRELLIS-image-large"},
+    },
+    "3dtopia-xl": {
+        "runner": "/opt/3dgen-runner/3dtopia_xl_runner.py",
+        "env": {"TOPIA_XL_WEIGHTS_PATH": "/workspace/weights/3DTopia-XL"},
+    },
+    "trellis2": {
+        "runner": "/opt/3dgen-runner/trellis2_runner.py",
+        "env": {"TRELLIS2_WEIGHTS_PATH": "/workspace/weights/TRELLIS.2-4B"},
+    },
+    "direct3d-s2": {
+        "runner": "/opt/3dgen-runner/direct3d_s2_runner.py",
+        "env": {"DIRECT3D_S2_WEIGHTS_PATH": "/workspace/weights/Direct3D-S2"},
+    },
+    "step1x-3d": {
+        "runner": "/opt/3dgen-runner/step1x_3d_runner.py",
+        "env": {"STEP1X_3D_WEIGHTS_PATH": "/workspace/weights/Step1X-3D"},
+    },
+    "pixal3d": {
+        "runner": "/opt/3dgen-runner/pixal3d_runner.py",
+        "env": {"PIXAL3D_WEIGHTS_PATH": "/workspace/weights/Pixal3D"},
+    },
+    "hunyuan3d-21": {
+        "runner": "/opt/3dgen-runner/hunyuan3d_21_runner.py",
+        "env": {"HUNYUAN3D_21_WEIGHTS_PATH": "/workspace/weights/Hunyuan3D-2.1"},
+    },
+    "sf3d": {
+        "runner": "/opt/3dgen-runner/sf3d_runner.py",
+        "env": {"SF3D_WEIGHTS_PATH": "/workspace/weights/stable-fast-3d"},
+    },
+}
 
 
 def test_build_balance_query_requests_client_balance() -> None:
@@ -123,6 +161,48 @@ def test_build_cloud_run_command_rejects_unknown_model() -> None:
         )
 
 
+@pytest.mark.parametrize("model_id,expected", WAVE2_MODELS.items())
+def test_wave2_models_have_cloud_runner_paths(model_id: str, expected: dict[str, object]) -> None:
+    command = build_cloud_run_command(
+        model_id=model_id,
+        output_root="/work/output",
+        s3_target=f"s3://3dgen-runs/runs/{model_id}/wave2/20260709T000000Z",
+    )
+
+    assert MODEL_RUNNER_PATHS[model_id] == expected["runner"]
+    assert f"python3 {expected['runner']}" in command
+    assert f"--input-root /opt/3dgen-tasks" in command
+    assert f"--output-root /work/output" in command
+
+
+@pytest.mark.parametrize("model_id,expected", WAVE2_MODELS.items())
+def test_wave2_models_have_explicit_volume_weight_env(model_id: str, expected: dict[str, object]) -> None:
+    payload = build_pod_payload(
+        RunPodLaunchConfig(
+            name=f"3dgen-{model_id}-wave2",
+            image_name=f"ghcr.io/hitsuki-ban/3dgen-{model_id}-runtime:wave2",
+            model_id=model_id,
+            s3_target=f"s3://3dgen-runs/runs/{model_id}/wave2/20260709T000000Z",
+            max_runtime_min=90,
+            gpu_type_ids=("NVIDIA GeForce RTX 4090",),
+            allowed_cuda_versions=("12.8",),
+            r2_credentials=make_r2_credentials(),
+            network_volume_id="volume-123",
+            data_center_id="EU-RO-1",
+            startup_timeout_min=10,
+        ),
+        runpod_api_key="token",
+    )
+
+    assert MODEL_WEIGHT_ENVS[model_id] == expected["env"]
+    for name, value in expected["env"].items():
+        assert payload["env"][name] == value
+    assert payload["env"]["HF_HUB_OFFLINE"] == "1"
+    assert payload["env"]["TRANSFORMERS_OFFLINE"] == "1"
+    assert payload["env"]["TORCH_HOME"] == "/workspace/torch"
+    assert payload["env"]["U2NET_HOME"] == "/workspace/weights/rembg"
+
+
 def test_build_pod_payload_uses_on_demand_gpu_priority_and_runtime_env() -> None:
     payload = build_pod_payload(
         RunPodLaunchConfig(
@@ -161,6 +241,8 @@ def test_build_pod_payload_uses_on_demand_gpu_priority_and_runtime_env() -> None
     assert payload["env"]["HF_HOME"] == "/workspace/hf"
     assert payload["env"]["HF_HUB_OFFLINE"] == "1"
     assert payload["env"]["TRANSFORMERS_OFFLINE"] == "1"
+    assert payload["env"]["TORCH_HOME"] == "/workspace/torch"
+    assert payload["env"]["U2NET_HOME"] == "/workspace/weights/rembg"
     assert payload["env"]["RUNPOD_INCREMENTAL_S3_TARGET"] == "s3://3dgen-runs/runs/triposg/rtx-5090/20260708T000000Z"
     assert payload["env"]["TRIPOSG_WEIGHTS_PATH"] == "/workspace/weights/TripoSG"
     assert payload["env"]["RMBG_WEIGHTS_PATH"] == "/workspace/weights/RMBG-1.4"
