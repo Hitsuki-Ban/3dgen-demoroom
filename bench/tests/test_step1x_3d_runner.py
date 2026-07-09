@@ -112,6 +112,12 @@ def test_step1x_3d_model_spec_records_current_pins() -> None:
     assert spec["code_commit"] == "cb5ac944709c6c913109070c7b90c3447f57f3d4"
     assert spec["weights_repo"] == "stepfun-ai/Step1X-3D"
     assert spec["weights_revision"] == "bf7084495b3a72222f36549b7942948aa4d9daa7"
+    assert spec["external_weight_dependencies"] == [
+        "facebook/dinov2-with-registers-large",
+        "stabilityai/stable-diffusion-xl-base-1.0",
+        "madebyollin/sdxl-vae-fp16-fix",
+        "ZhengPeng7/BiRefNet",
+    ]
     assert spec["default_parameters"]["geometry_subfolder"] == "Step1X-3D-Geometry-1300m"
     assert spec["default_parameters"]["texture_subfolder"] == "Step1X-3D-Texture"
     assert spec["default_parameters"]["num_inference_steps"] == 50
@@ -131,6 +137,7 @@ def test_step1x_3d_dockerfile_uses_runtime_only_volume_paths() -> None:
     assert "HF_TOKEN" not in dockerfile
     assert "RUN pip install" not in dockerfile
     assert "uv pip install --system" in dockerfile
+    assert "MAX_JOBS=1 uv pip install --system --no-build-isolation -r /opt/Step1X-3D/requirements.txt" in dockerfile
     assert "custom_rasterizer" in dockerfile
     assert "differentiable_renderer" in dockerfile
     assert "COPY models/step1x-3d/runner.py /opt/3dgen-runner/step1x_3d_runner.py" in dockerfile

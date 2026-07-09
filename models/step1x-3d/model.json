@@ -6,6 +6,7 @@
   "weights_repo": "stepfun-ai/Step1X-3D",
   "weights_revision": "bf7084495b3a72222f36549b7942948aa4d9daa7",
   "external_weight_dependencies": [
+    "facebook/dinov2-with-registers-large",
     "stabilityai/stable-diffusion-xl-base-1.0",
     "madebyollin/sdxl-vae-fp16-fix",
     "ZhengPeng7/BiRefNet"

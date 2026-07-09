@@ -50,8 +50,9 @@ RUN uv pip install --system "setuptools<81" wheel \
         torchvision==0.22.1 \
         torchaudio==2.7.1 \
         --index-url https://download.pytorch.org/whl/cu128 \
-    && uv pip install --system torch-cluster -f https://data.pyg.org/whl/torch-2.7.0+cu128.html \
-    && uv pip install --system -r /opt/Step1X-3D/requirements.txt
+    && uv pip install --system torch-cluster -f https://data.pyg.org/whl/torch-2.7.0+cu128.html
+
+RUN MAX_JOBS=1 uv pip install --system --no-build-isolation -r /opt/Step1X-3D/requirements.txt
 
 RUN uv pip install --system --no-build-isolation /opt/Step1X-3D/step1x3d_texture/custom_rasterizer \
     && uv pip install --system --no-build-isolation /opt/Step1X-3D/step1x3d_texture/differentiable_renderer
