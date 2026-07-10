@@ -8,13 +8,13 @@ Issue: #37
 Batch A, `direct3d-s2`, `sf3d`, and `trellis2` have completed and have been published to the public site-data prefixes in R2.
 The remaining Batch B/C models stay in scope for the same issue/PR.
 
-- Active RunPod pods are checked before and after every paid launch; the latest Pixal3D full-run create is polling US-WA-1 capacity with no orphan pods left by failed creates.
-- RunPod balance after the Pixal3D 48GB smoke: `$7.5629838829`.
+- Active RunPod pods after Pixal3D publish and temporary-volume cleanup: `[]`.
+- Final RunPod balance for this report: `$5.5579990944`.
 - RunPod GraphQL balance and runtime telemetry work with the explicit harness User-Agent; REST Pods and Billing remain the authoritative lifecycle and cost endpoints.
 - RunPod reported the EU-RO-1 RTX 4090 runtime price as `$0.69/hr` during the paid runs, higher than the `$0.34/hr` value captured in the issue text.
 - RunPod reported the EU-RO-1 RTX 5090 runtime price as `$0.99/hr` during `direct3d-s2` staging, smoke, and full runs.
 - EU-RO-1 network volume `wnqijpazd5` was expanded from 30GB to 80GB and then to 120GB for wave 2 staging.
-- Hunyuan3D-2.1 dedicated non-EU network volume `dzy02pljaw` was created in `US-KS-2` with size 40GB.
+- Hunyuan3D-2.1 dedicated non-EU network volume `dzy02pljaw` was created in `US-KS-2` with size 40GB, then deleted with HTTP 204 after the DC lost target GPU capacity and the remaining budget could no longer fund execution.
 - Stable Fast 3D staging reports:
   - `runs/staging/20260710T035828Z/network-volume-wnqijpazd5-sf3d-v1.json` staged the gated SF3D snapshot and public DINOv2 Large cache.
   - `runs/staging/20260710T040724Z/network-volume-wnqijpazd5-sf3d-openclip-v1.json` staged the OpenCLIP dependency found by the first smoke.
@@ -26,7 +26,7 @@ The remaining Batch B/C models stay in scope for the same issue/PR.
   - `runs/staging/20260710T092538Z/network-volume-wnqijpazd5-pixal3d-main-v5-cpu-clean-sequential.json` removed that exact disposable cache and validated all 16 main files (`24,044,873,669` bytes).
   - `runs/staging/20260710T092850Z/network-volume-wnqijpazd5-pixal3d-external-v1-cpu.json` staged DINOv3, MoGe-2, RMBG-2.0, and the pinned NAF source/checkpoint (`3,405,262,748` bytes).
   - `runs/staging/20260710T094028Z/network-volume-wnqijpazd5-trellis2-pixal3d-validate-v1.json` jointly validated 22 required files, five exact HF refs, the NAF commit marker, and checkpoint SHA-256.
-  - `runs/staging/20260710T110413Z/pixal3d-us-48gb-v1.json` staged the same pinned assets on temporary 80GB US-WA-1 volume `i778cihpqd`: `24,044,888,779` main bytes and `15,451,314,021` external/cache bytes. The RTX 6000 Ada staging pod ran at `$0.77/hr` for about 3.4 minutes and self-deleted.
+  - `runs/staging/20260710T110413Z/pixal3d-us-48gb-v1.json` staged the same pinned assets on temporary 80GB US-WA-1 volume `i778cihpqd`: `24,044,888,779` main bytes and `15,451,314,021` external/cache bytes. The RTX 6000 Ada staging pod ran at `$0.77/hr` for about 3.4 minutes and self-deleted; the volume was deleted with HTTP 204 after publish validation.
 - Wave 2 staging validation report: `runs/staging/20260709T005450Z/network-volume-wnqijpazd5-wave2-batch-a-validate.json`
 - Direct3D-S2 staging validation report: `runs/staging/20260709T090135Z/network-volume-wnqijpazd5-direct3d-s2-v2-fast.json`
 - Step1X-3D main weights staging report: `runs/staging/20260709T131830Z/network-volume-wnqijpazd5-step1x-3d-v1.json`
@@ -82,15 +82,18 @@ The remaining Batch B/C models stay in scope for the same issue/PR.
 | `direct3d-s2` | `runs/direct3d-s2/wave2/20260709T103859Z/` | `site-data/direct3d-s2/` | 25 | 0 | 75 | `140.106` | `30.590 GiB` |
 | `sf3d` | `runs/sf3d/wave2/20260710T042618Z/` | `site-data/sf3d/` | 25 | 0 | 75 | `11.609` | `7.668 GiB` |
 | `trellis2` | `runs/trellis2/wave2/20260710T080630Z/` | `site-data/trellis2/` | 25 | 0 | 75 | `280.977` | `33.148 GiB` |
+| `pixal3d` | `runs/pixal3d/wave2/20260710T113319Z/` | `site-data/pixal3d/` | 23 | 2 | 71 | `331.811` | `45.900 GiB` |
 
 Trellis v1 task metadata spans `2026-07-09T01:39:44Z` through `2026-07-09T02:03:48Z`.
 3DTopia-XL task metadata spans `2026-07-09T05:12:14Z` through `2026-07-09T05:54:51Z`.
 Direct3D-S2 task metadata spans `2026-07-09T10:43:05Z` through `2026-07-09T11:56:53Z`.
 Stable Fast 3D task metadata spans `2026-07-10T04:29:37Z` through `2026-07-10T04:37:15Z`.
 TRELLIS.2 task metadata spans `2026-07-10T08:09:37Z` through the 96GB exact retry at `2026-07-10T10:31:31Z`.
+Pixal3D successful task metadata spans `2026-07-10T11:42:03Z` through `2026-07-10T14:02:55Z`; its 23 top-level GLBs total `931,217,000` bytes.
 The final successful 3DTopia-XL run moved the balance by about `$0.5625982428`.
 Latest REST billing visible after the Direct3D-S2 publish included `$1.0415233377` across the Direct3D-S2 staging/smoke/full pods, but the full-run pod's final billing appeared partially delayed at check time. Runtime estimate for the full pod is about `$1.4` at `$0.99/hr`.
 Stable Fast 3D moved the GraphQL balance from `$12.3439651237` to `$12.1234134208`, or about `$0.220552` total for two CPU staging pods, one dependency-failure smoke, one successful smoke, and the 25-task full run. Per-pod REST billing had not backfilled at the final check.
+Final REST billing for the TRELLIS.2 5090 full and 96GB exact-retry pods is `$2.124035` and `$0.520187`. Pixal3D US-WA-1 staging, 48GB smoke, and full pods cost `$0.047023`, `$0.285622`, and `$1.250501`; the earlier 5090 OOM smoke cost `$0.172966`.
 
 Both published prefixes were rechecked after upload:
 
@@ -99,6 +102,7 @@ Both published prefixes were rechecked after upload:
 - `site-data/direct3d-s2/`: 75 objects, 25 task directories, sample `meta.json` has `model_id="direct3d-s2"` and `gpu_name="NVIDIA GeForce RTX 5090"`.
 - `site-data/sf3d/`: 75 objects, 25 task directories, sample `meta.json` has `model_id="sf3d"`.
 - `site-data/trellis2/`: 75 objects, 25 task directories, no `failure.json`; the exact-retry sample records `gpu_name="NVIDIA RTX PRO 6000 Blackwell Workstation Edition"`.
+- `site-data/pixal3d/`: 71 objects, 25 task directories, 23 `meta.json`/GLB results and two `failure.json` records for the CuMesh postprocess OOM tasks.
 
 ## Debug Notes
 
@@ -144,6 +148,7 @@ Both published prefixes were rechecked after upload:
 - Hugging Face Xet can collapse underlying volume I/O errors into `Internal Writer Error: Background writer channel closed`. The Pixal3D disk audit showed that repeated interrupted `local_dir` downloads had retained 73.192GB in `.cache` while only 2.048GB of final files existed. Removing only that reproducible cache made the next sequential Xet download complete in `76.586s`.
 - Pixal3D uses the official NATTEN 0.21.0 source build for both `sm_89` and `sm_120`. A four-worker local build on the 32GB workstation projected several hours and kept Docker's WSL VHD on C: large, so the wheel build moved to a 16-vCPU/128GB RunPod CPU pod and records the official sdist SHA-256 in R2.
 - Pixal3D standard 1536 smoke `runs/pixal3d/wave2-smoke/20260710T103501Z/` recorded 2/2 CUDA OOM failures on RTX 5090; the first needed another 6.75GiB with only 5.19GiB free. No low-VRAM 1024 path was used. After US-WA-1 restaging, `runs/pixal3d/wave2-smoke/20260710T110858Z-us-wa-1-48gb/` completed 2/2 on RTX 6000 Ada in `571.842s` and `472.670s`, with peak VRAM about `41.35GiB`. The measured 25-task projection is `3.627h / $2.793` at `$0.77/hr`, below the issue's `$3/model` guardrail.
+- Pixal3D full run completed 23/25 on RTX 6000 Ada. `ornate-treasure-chest` and `old-oak-tree` both reached CuMesh simplify after inference but OOMed in postprocess. A combined 96GB exact-task retry at US-WA-1 returned no capacity before pod creation, so the two protocol failures were published rather than changing resolution or postprocess defaults.
 - Docker Desktop's internal store was pruned to zero, its empty 112.7GiB C: VHD was recreated, and Docker Desktop's supported disk-image-location setting moved the new data root to `F:\WorkSpace\3DGSDemoRoom\.docker-data\DockerDesktopWSL`. External buildx caches remain under `.docker-build`; both directories are ignored by Git.
 - The shared cloud command invokes `python3 -m bench_harness.cli upload-s3` for startup and final telemetry. `bench_harness.cli` previously lacked a module entrypoint, so those invocations were no-ops even though per-task direct uploads worked. The CLI now calls `main()` under `if __name__ == "__main__"`, with a subprocess regression test. New runtime images built from this commit will upload `runpod-startup.json` and `runpod-status.json` as intended.
 
@@ -153,11 +158,13 @@ Both published prefixes were rechecked after upload:
   - `trellis2`: complete and published, 25 success / 0 failure after one exact-task 96GB retry.
   - `direct3d-s2`: complete and published.
   - `step1x-3d`: runner/spec/Dockerfile added after checking upstream `stepfun-ai/Step1X-3D` at commit `cb5ac944709c6c913109070c7b90c3447f57f3d4` and HF weights revision `bf7084495b3a72222f36549b7942948aa4d9daa7`. The benchmark path is official base geometry `Step1X-3D-Geometry-1300m` plus `Step1X-3D-Texture`; label geometry is not used. Main weights and external HF cache dependencies are staged. The RTX 5090 texture path OOMs above 32GB, so the next retry is a one-task 96GB RTX PRO 6000 Blackwell smoke when EU-RO-1 capacity returns.
-  - `pixal3d`: NATTEN artifact and runtime images are complete. The official standard `1536_cascade` needs more than 32GB; the US-WA-1 RTX 6000 Ada smoke passed 2/2 and projects below `$3`. The full-run create is waiting for the same low-stock 48GB GPU to become available; temporary volume `i778cihpqd` remains only until completion or final capacity cutoff.
+  - `pixal3d`: published with 23 success / 2 documented CuMesh OOM failures at the official standard `1536_cascade`; no low-VRAM fallback was used and the temporary US volume is deleted.
 - Batch C:
-  - `hunyuan3d-21`: runner/spec/Dockerfile added after checking upstream `tencent-hunyuan/hunyuan3d-2.1` at commit `82920d643c0dc2f7bfd7255f45f62d386edfe60c` and HF weights revision `0b94677654c57bb9a6b6845cd7b704ccf551d327`. The spec records the EU27/GB/KR distribution block and preferred non-EU RunPod DC `US-KS-2`; dedicated volume `dzy02pljaw` is staged and verified. Runtime image v8 is built and pushed for `sm_80;sm_89` with explicit R2 upload dependencies; actual publish is still pending because US-KS-2 48GB Ada and A100 capacity are unavailable.
+  - `hunyuan3d-21`: runner/spec/Dockerfile added after checking upstream `tencent-hunyuan/hunyuan3d-2.1` at commit `82920d643c0dc2f7bfd7255f45f62d386edfe60c` and HF weights revision `0b94677654c57bb9a6b6845cd7b704ccf551d327`. Runtime image v8 is built for `sm_80;sm_89` with explicit R2 upload dependencies. The historical US-KS-2 staging reports remain in R2, but volume `dzy02pljaw` was deleted after that DC lost target GPU capacity; a future funded retry must stage into a supported non-EU DC with live 48GB/A100 inventory.
 - Conditional:
   - `sf3d`: complete and published.
+
+The remaining balance margin above the `$4` stop line is `$1.558`. That is insufficient for either the measured Step1X high-memory full path or Hunyuan3D-2.1 staging plus full execution, so neither model receives another paid launch in this report.
 
 Current local secret state checked before this draft:
 
