@@ -31,7 +31,12 @@ RUN apt-get update \
         libglib2.0-0 \
         libgl1 \
         libgl1-mesa-dev \
+        libice6 \
         libjpeg-dev \
+        libsm6 \
+        libxi6 \
+        libxkbcommon0 \
+        libxrender1 \
         make \
         ninja-build \
         openssh-server \

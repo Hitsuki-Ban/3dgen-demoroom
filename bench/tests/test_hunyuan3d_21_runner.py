@@ -148,6 +148,8 @@ def test_hunyuan3d_21_dockerfile_uses_runtime_only_volume_paths() -> None:
     assert 'TORCH_CUDA_ARCH_LIST="8.0;8.9"' in dockerfile
     assert "uv pip install --system" in dockerfile
     assert "bpy-4.0.0-cp310-cp310-manylinux_2_28_x86_64.whl" in dockerfile
+    for runtime_library in ("libice6", "libsm6", "libxi6", "libxkbcommon0", "libxrender1"):
+        assert runtime_library in dockerfile
     assert "python3 -m pybind11 --includes" in dockerfile
     assert "hunyuan3d-21-requirements-constraints.txt" in dockerfile
     assert "MAX_JOBS=1 uv pip install --system --no-build-isolation" in dockerfile
