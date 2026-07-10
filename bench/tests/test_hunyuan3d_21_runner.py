@@ -155,6 +155,8 @@ def test_hunyuan3d_21_dockerfile_uses_runtime_only_volume_paths() -> None:
     assert "MAX_JOBS=1 uv pip install --system --no-build-isolation" in dockerfile
     assert "--index-strategy unsafe-best-match" in dockerfile
     assert "--constraint /tmp/hunyuan3d-21-requirements-constraints.txt" in dockerfile
+    assert "from torchvision.transforms.functional_tensor import rgb_to_grayscale" in dockerfile
+    assert "from torchvision.transforms.functional import rgb_to_grayscale" in dockerfile
     assert "custom_rasterizer" in dockerfile
     assert "compile_mesh_painter.sh" in dockerfile
     assert "uv pip install --system boto3" in dockerfile

@@ -72,7 +72,13 @@ RUN uv pip install --system "setuptools<81" wheel \
     && MAX_JOBS=1 uv pip install --system --no-build-isolation \
         --index-strategy unsafe-best-match \
         --constraint /tmp/hunyuan3d-21-requirements-constraints.txt \
-        -r /opt/Hunyuan3D-2.1/requirements.txt
+        -r /opt/Hunyuan3D-2.1/requirements.txt \
+    && grep -Fx 'from torchvision.transforms.functional_tensor import rgb_to_grayscale' \
+        /usr/local/lib/python3.10/dist-packages/basicsr/data/degradations.py \
+    && sed -i 's#^from torchvision.transforms.functional_tensor import rgb_to_grayscale$#from torchvision.transforms.functional import rgb_to_grayscale#' \
+        /usr/local/lib/python3.10/dist-packages/basicsr/data/degradations.py \
+    && grep -Fx 'from torchvision.transforms.functional import rgb_to_grayscale' \
+        /usr/local/lib/python3.10/dist-packages/basicsr/data/degradations.py
 
 RUN uv pip install --system --no-build-isolation /opt/Hunyuan3D-2.1/hy3dpaint/custom_rasterizer \
     && cd /opt/Hunyuan3D-2.1/hy3dpaint/DifferentiableRenderer \
