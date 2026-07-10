@@ -1,7 +1,20 @@
+import subprocess
+import sys
 from pathlib import Path
 
 from bench_harness import cli
 from bench_harness.runpod import RunPodLaunchConfig
+
+
+def test_cli_module_entrypoint_invokes_main() -> None:
+    completed = subprocess.run(
+        [sys.executable, "-m", "bench_harness.cli", "--help"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert "usage: bench-harness" in completed.stdout
 
 
 class FakeUploader:

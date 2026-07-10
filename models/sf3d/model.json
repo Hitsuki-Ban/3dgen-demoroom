@@ -1,0 +1,33 @@
+{
+  "id": "sf3d",
+  "name": "Stable Fast 3D",
+  "input": "image",
+  "output": "textured-mesh",
+  "code_repo": "https://github.com/Stability-AI/stable-fast-3d",
+  "code_commit": "ff21fc491b4dc5314bf6734c7c0dabd86b5f5bb2",
+  "weights_repo": "stabilityai/stable-fast-3d",
+  "weights_revision": "f0c9a8ffd62cb1bbc8a7a53c9f87a0be1b6be778",
+  "external_weight_dependencies": {
+    "dinov2_large": {
+      "repo": "facebook/dinov2-large",
+      "revision": "47b73eefe95e8d44ec3623f8890bd894b6ea2d6c"
+    },
+    "openclip": {
+      "repo": "laion/CLIP-ViT-B-32-laion2B-s34B-b79K",
+      "revision": "1a25a446712ba5ee05982a381eed697ef9b435cf"
+    },
+    "rembg_model": "u2net"
+  },
+  "license": "Stability AI Community License",
+  "default_parameters": {
+    "device": "cuda",
+    "foreground_ratio": 0.85,
+    "texture_resolution": 1024,
+    "remesh": "none",
+    "target_vertex_count": -1,
+    "batch_size": 1,
+    "dtype": "bfloat16",
+    "attention_backend": "torch-default",
+    "sf3d_weights_path": "/workspace/weights/stable-fast-3d"
+  }
+}

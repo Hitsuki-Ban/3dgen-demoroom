@@ -5,7 +5,7 @@ Issue: #37
 
 ## Status
 
-Batch A and `direct3d-s2` have completed and have been published to the public site-data prefixes in R2.
+Batch A, `direct3d-s2`, and `sf3d` have completed and have been published to the public site-data prefixes in R2.
 The remaining Batch B/C models stay in scope for the same issue/PR.
 
 - Active RunPod pods after the latest Hunyuan/Step1X capacity attempts and manual A100 smoke cleanup: `[]`
@@ -15,6 +15,9 @@ The remaining Batch B/C models stay in scope for the same issue/PR.
 - RunPod reported the EU-RO-1 RTX 5090 runtime price as `$0.99/hr` during `direct3d-s2` staging, smoke, and full runs.
 - EU-RO-1 network volume `wnqijpazd5` was expanded from 30GB to 80GB for wave 2 staging.
 - Hunyuan3D-2.1 dedicated non-EU network volume `dzy02pljaw` was created in `US-KS-2` with size 40GB.
+- Stable Fast 3D staging reports:
+  - `runs/staging/20260710T035828Z/network-volume-wnqijpazd5-sf3d-v1.json` staged the gated SF3D snapshot and public DINOv2 Large cache.
+  - `runs/staging/20260710T040724Z/network-volume-wnqijpazd5-sf3d-openclip-v1.json` staged the OpenCLIP dependency found by the first smoke.
 - Wave 2 staging validation report: `runs/staging/20260709T005450Z/network-volume-wnqijpazd5-wave2-batch-a-validate.json`
 - Direct3D-S2 staging validation report: `runs/staging/20260709T090135Z/network-volume-wnqijpazd5-direct3d-s2-v2-fast.json`
 - Step1X-3D main weights staging report: `runs/staging/20260709T131830Z/network-volume-wnqijpazd5-step1x-3d-v1.json`
@@ -54,6 +57,7 @@ The remaining Batch B/C models stay in scope for the same issue/PR.
 | Direct3D-S2 | `ghcr.io/hitsuki-ban/3dgen-direct3d-s2-runtime:2026-07-cloud-wave2-batch-b-v4` | index `sha256:b039ea24105baaef1ab09b551452164bd34acf7bb5b658c32c1ae488dd91cff9`; linux/amd64 `sha256:5c9aadd6d180208cdc437a65b430810e886364d4244e591e67b8b47a457c70e2` | CUDA 12.8 / torch 2.7.1, source-built `torchsparse`, `flash-attn==2.8.3`, and Direct3D-S2 voxelize `udf_ext`; runner records upstream `LICENSE.txt`. |
 | Step1X-3D | `ghcr.io/hitsuki-ban/3dgen-step1x-3d-runtime:2026-07-cloud-wave2-batch-b-v1` | index `sha256:98136326d753401b0092130fc484ae30249b52b833c4dac00106ca43335f131c`; linux/amd64 `sha256:b3b3420343459cb1391c128b71c66eb035bc20a1f4135f8821bd1fb80d138b3e` | CUDA 12.8 / torch 2.7.1 runtime-only image. Step1X requirements need `--no-build-isolation` because upstream `pytorch3d@stable` imports the already-installed torch during build. |
 | Hunyuan3D-2.1 | `ghcr.io/hitsuki-ban/3dgen-hunyuan3d-21-runtime:2026-07-cloud-wave2-batch-c-v8` | index `sha256:38519b32e32495cdbe29bd8d99e2554f10f836041f3eba951d16d7b22e5005cf`; linux/amd64 `sha256:7541ce5555e5c3d5b5f10f5e4f76af6691c54f02b26bdf7b583afef5c0b69720` | CUDA 12.4 / torch 2.5.1+cu124 runtime-only image, compiled for A100 `sm_80` and Ada `sm_89`; explicitly installs `boto3` for R2 uploads. Actual execution is waiting for US-KS-2 GPU capacity. |
+| Stable Fast 3D | `ghcr.io/hitsuki-ban/3dgen-sf3d-runtime:2026-07-cloud-wave2-v2` | index `sha256:85216246b71697fc81288fc13d887d7738fa1ab5835192122e46b96be5a6dbb8`; linux/amd64 `sha256:9554af7dd8bdf3f07991a63e0237e3fff30ac10696545630fd8822d7a59aa08d` | CUDA 12.8 / torch 2.7.1 runtime-only image. Uses staged SF3D, DINOv2 Large, OpenCLIP, and U2NET assets with Hub offline mode enabled. |
 
 ## Published Site Data
 
@@ -62,18 +66,22 @@ The remaining Batch B/C models stay in scope for the same issue/PR.
 | `trellis1` | `runs/trellis1/wave2/20260709T013634Z/` | `site-data/trellis1/` | 25 | 0 | 75 | `47.011` | `19.588 GiB` |
 | `3dtopia-xl` | `runs/3dtopia-xl/wave2/20260709T050629Z/` | `site-data/3dtopia-xl/` | 25 | 0 | 75 | `76.362` | `10.016 GiB` |
 | `direct3d-s2` | `runs/direct3d-s2/wave2/20260709T103859Z/` | `site-data/direct3d-s2/` | 25 | 0 | 75 | `140.106` | `30.590 GiB` |
+| `sf3d` | `runs/sf3d/wave2/20260710T042618Z/` | `site-data/sf3d/` | 25 | 0 | 75 | `11.609` | `7.668 GiB` |
 
 Trellis v1 task metadata spans `2026-07-09T01:39:44Z` through `2026-07-09T02:03:48Z`.
 3DTopia-XL task metadata spans `2026-07-09T05:12:14Z` through `2026-07-09T05:54:51Z`.
 Direct3D-S2 task metadata spans `2026-07-09T10:43:05Z` through `2026-07-09T11:56:53Z`.
+Stable Fast 3D task metadata spans `2026-07-10T04:29:37Z` through `2026-07-10T04:37:15Z`.
 The final successful 3DTopia-XL run moved the balance by about `$0.5625982428`.
 Latest REST billing visible after the Direct3D-S2 publish included `$1.0415233377` across the Direct3D-S2 staging/smoke/full pods, but the full-run pod's final billing appeared partially delayed at check time. Runtime estimate for the full pod is about `$1.4` at `$0.99/hr`.
+Stable Fast 3D moved the GraphQL balance from `$12.3439651237` to `$12.1234134208`, or about `$0.220552` total for two CPU staging pods, one dependency-failure smoke, one successful smoke, and the 25-task full run. Per-pod REST billing had not backfilled at the final check.
 
 Both published prefixes were rechecked after upload:
 
 - `site-data/trellis1/`: 75 objects, 25 task directories, sample `meta.json` has `model_id="trellis1"`.
 - `site-data/3dtopia-xl/`: 75 objects, 25 task directories, sample `meta.json` has `model_id="3dtopia-xl"`.
 - `site-data/direct3d-s2/`: 75 objects, 25 task directories, sample `meta.json` has `model_id="direct3d-s2"` and `gpu_name="NVIDIA GeForce RTX 5090"`.
+- `site-data/sf3d/`: 75 objects, 25 task directories, sample `meta.json` has `model_id="sf3d"`.
 
 ## Debug Notes
 
@@ -110,24 +118,26 @@ Both published prefixes were rechecked after upload:
   - `20260709T161427Z`: `US-KS-2`, L40S / L40 / RTX 6000 Ada priority, REST response `There are no instances currently available` for all three GPU types.
 - Hunyuan3D-2.1 v7 A100 fallback smoke at `runs/hunyuan3d-21/wave2-smoke/20260709T164646Z/` created pod `zpwqutkz3k41dr` on `US-KS-2` `NVIDIA A100-SXM4-80GB`, but no task output or `runpod-status.json` reached R2 before the pod lost `publicIp`. The smoke was manually deleted at about 15 minutes to stay within the budget guardrail. RunPod REST returned 400 for guessed pod log paths such as `/v1/pods/zpwqutkz3k41dr/logs`, so no container logs were available through the current API path.
 - Hunyuan v8 could not be smoke-tested after build because repeated US-KS-2 48GB Ada and A100 priorities returned capacity misses before pod creation, most recently at `20260709T173108Z`.
+- Stable Fast 3D is pinned to code commit `ff21fc491b4dc5314bf6734c7c0dabd86b5f5bb2` and weights revision `f0c9a8ffd62cb1bbc8a7a53c9f87a0be1b6be778`. Its first smoke at `runs/sf3d/wave2-smoke/20260710T040101Z/` found the official config's implicit OpenCLIP dependency; both tasks failed before inference and the pod was deleted. After staging `laion/CLIP-ViT-B-32-laion2B-s34B-b79K` revision `1a25a446712ba5ee05982a381eed697ef9b435cf`, the v2 smoke at `runs/sf3d/wave2-smoke/20260710T042004Z/` completed 2/2 tasks. The first task took `58.945s` including cold model/cache load, and the second took `9.390s`.
+- The shared cloud command invokes `python3 -m bench_harness.cli upload-s3` for startup and final telemetry. `bench_harness.cli` previously lacked a module entrypoint, so those invocations were no-ops even though per-task direct uploads worked. The CLI now calls `main()` under `if __name__ == "__main__"`, with a subprocess regression test. New runtime images built from this commit will upload `runpod-startup.json` and `runpod-status.json` as intended.
 
 ## Remaining
 
 - Batch B:
-  - `trellis2`: runner/spec/Dockerfile added. Actual staging requires `HF_TOKEN` plus accepted access for `facebook/dinov3-vitl16-pretrain-lvd1689m` and `briaai/RMBG-2.0`; current local env does not provide `HF_TOKEN`.
+  - `trellis2`: runner/spec/Dockerfile added. `HF_TOKEN` and gated access for `facebook/dinov3-vitl16-pretrain-lvd1689m` and `briaai/RMBG-2.0` are now available; staging and execution remain.
   - `direct3d-s2`: complete and published.
   - `step1x-3d`: runner/spec/Dockerfile added after checking upstream `stepfun-ai/Step1X-3D` at commit `cb5ac944709c6c913109070c7b90c3447f57f3d4` and HF weights revision `bf7084495b3a72222f36549b7942948aa4d9daa7`. The benchmark path is official base geometry `Step1X-3D-Geometry-1300m` plus `Step1X-3D-Texture`; label geometry is not used. Main weights and external HF cache dependencies are staged; the next action is a new 2-task RTX 5090-only smoke when EU-RO-1 5090 capacity returns. The latest capacity-only attempt at `20260709T173108Z` did not create a pod.
-  - `pixal3d`: runner/spec/Dockerfile added after checking upstream `TencentARC/Pixal3D` at commit `cdbb2bbffbf4e6f298b5f2af3d1d76a8d823d2af` and HF weights revision `0b31f9160aa400719af409098bff7936a932f726`. The benchmark path forces the official standard `1536_cascade`; it does not switch to low-VRAM `1024` on OOM. Actual cloud staging/execution needs `HF_TOKEN` with accepted access for `briaai/RMBG-2.0`.
+  - `pixal3d`: runner/spec/Dockerfile added after checking upstream `TencentARC/Pixal3D` at commit `cdbb2bbffbf4e6f298b5f2af3d1d76a8d823d2af` and HF weights revision `0b31f9160aa400719af409098bff7936a932f726`. The benchmark path forces the official standard `1536_cascade`; it does not switch to low-VRAM `1024` on OOM. HF gated access is now available; staging and execution remain.
 - Batch C:
   - `hunyuan3d-21`: runner/spec/Dockerfile added after checking upstream `tencent-hunyuan/hunyuan3d-2.1` at commit `82920d643c0dc2f7bfd7255f45f62d386edfe60c` and HF weights revision `0b94677654c57bb9a6b6845cd7b704ccf551d327`. The spec records the EU27/GB/KR distribution block and preferred non-EU RunPod DC `US-KS-2`; dedicated volume `dzy02pljaw` is staged and verified. Runtime image v8 is built and pushed for `sm_80;sm_89` with explicit R2 upload dependencies; actual publish is still pending because US-KS-2 48GB Ada and A100 capacity are unavailable.
 - Conditional:
-  - `sf3d`, blocked until the owner provides a gated Hugging Face token with the Stability license accepted.
+  - `sf3d`: complete and published.
 
 Current local secret state checked before this draft:
 
 - `F:\WorkSpace\3DGSDemoRoom\.env` has `RUNPOD_API_KEY`.
 - R2 S3 variables are present and were used for Direct3D-S2 publish.
-- `HF_TOKEN` is not present in the file or current process environment; this blocks `trellis2`, `pixal3d`, and `sf3d` gated dependencies.
+- `HF_TOKEN` is present and was verified against the gated dependencies required by `sf3d`, `pixal3d`, and `trellis2`.
 
 ## Source Checks
 
@@ -138,4 +148,5 @@ Current local secret state checked before this draft:
 - Step1X-3D: https://github.com/stepfun-ai/Step1X-3D
 - Pixal3D: https://github.com/TencentARC/Pixal3D
 - Hunyuan3D-2.1: https://github.com/tencent-hunyuan/hunyuan3d-2.1
+- Stable Fast 3D: https://github.com/Stability-AI/stable-fast-3d and https://huggingface.co/stabilityai/stable-fast-3d
 - Blender `bpy` archived wheels: https://download.blender.org/pypi/bpy/

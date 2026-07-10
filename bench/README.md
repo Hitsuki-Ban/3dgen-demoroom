@@ -96,6 +96,7 @@ Implemented runner containers:
 - `models/3dtopia-xl/` — 3DTopia-XL image-to-3D runner. Builds a pinned CUDA 11.8 + Python 3.9 image, uses staged `3DTopia-XL` weights, and exports the official PBR GLB output.
 - `models/trellis2/` — TRELLIS.2-4B image-to-3D runner. Builds a pinned CUDA 12.8 + torch 2.7 image, uses staged `TRELLIS.2-4B` weights plus gated HF cache dependencies, and exports the official PBR GLB output.
 - `models/direct3d-s2/` — Direct3D-S2 image-to-geometry runner. Builds a pinned CUDA 12.8 + torch 2.7 image, uses staged `direct3d-s2-v-1-1` weights, and exports a geometry-only GLB plus raw OBJ.
+- `models/sf3d/` — Stable Fast 3D image-to-textured-mesh runner. Builds a pinned CUDA 12.8 + torch 2.7 runtime-only image, uses staged gated weights and DINOv2 cache, and preserves the official 1024-texture no-remesh defaults.
 
 ## Local Validation Scope
 

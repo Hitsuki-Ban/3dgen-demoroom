@@ -128,3 +128,7 @@ def main() -> None:
     elif args.command == "runpod-terminate":
         pod = RunPodClient(api_key=required_env("RUNPOD_API_KEY")).terminate_pod(args.pod_id)
         print(json.dumps(pod, sort_keys=True))
+
+
+if __name__ == "__main__":
+    main()
