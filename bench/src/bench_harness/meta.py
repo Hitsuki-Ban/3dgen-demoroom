@@ -26,6 +26,12 @@ REQUIRED_META_KEYS = frozenset(
         "license_file",
     }
 )
+OPTIONAL_META_KEYS = frozenset(
+    {
+        "external_weight_revisions",
+        "external_code_revisions",
+    }
+)
 
 
 def load_run_metadata(path: Path) -> dict[str, Any]:
@@ -35,7 +41,7 @@ def load_run_metadata(path: Path) -> dict[str, Any]:
 
     keys = set(raw)
     missing = REQUIRED_META_KEYS - keys
-    unknown = keys - REQUIRED_META_KEYS
+    unknown = keys - REQUIRED_META_KEYS - OPTIONAL_META_KEYS
     if missing:
         raise ValueError(f"{path} missing required field(s): {', '.join(sorted(missing))}")
     if unknown:
