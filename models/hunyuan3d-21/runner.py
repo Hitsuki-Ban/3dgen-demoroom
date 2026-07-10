@@ -258,6 +258,7 @@ def run_hunyuan3d_21_infer(args: argparse.Namespace) -> None:
     sys.path.insert(0, str(HUNYUAN3D_ROOT / "hy3dpaint"))
 
     install_local_snapshot_download(weights_path)
+    prepare_local_diffusers_module(weights_path)
 
     import torch
     from PIL import Image
@@ -341,6 +342,24 @@ def install_local_snapshot_download(weights_path: Path) -> None:
         return original_snapshot_download(repo_id, *args, **kwargs)
 
     huggingface_hub.snapshot_download = snapshot_download
+
+
+def prepare_local_diffusers_module(weights_path: Path) -> None:
+    component_root = weights_path / DEFAULT_PARAMETERS["texture_subfolder"] / "unet"
+    for filename in ("attn_processor.py", "modules.py"):
+        path = component_root / filename
+        if not path.is_file():
+            raise FileNotFoundError(f"missing staged Hunyuan Diffusers module: {path}")
+
+    from diffusers.utils.dynamic_modules_utils import get_class_from_dynamic_module
+
+    model_class = get_class_from_dynamic_module(
+        str(component_root),
+        module_file="modules.py",
+        class_name="UNet2p5DConditionModel",
+    )
+    if model_class.__name__ != "UNet2p5DConditionModel":
+        raise RuntimeError(f"unexpected staged Hunyuan Diffusers class: {model_class.__name__}")
 
 
 def require_staged_hf_snapshot(

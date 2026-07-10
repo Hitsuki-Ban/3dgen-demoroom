@@ -169,9 +169,35 @@ def test_hunyuan_installs_local_snapshot_redirect_before_pipeline_import() -> No
     assert source.index('os.environ["HF_MODULES_CACHE"]') < source.index(
         "from textureGenPipeline import"
     )
+    assert source.index("prepare_local_diffusers_module(weights_path)") < source.index(
+        "from textureGenPipeline import"
+    )
     assert source.index("install_local_snapshot_download(weights_path)") < source.index(
         "from textureGenPipeline import"
     )
+
+
+def test_hunyuan_prepares_pinned_local_diffusers_module(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("HUNYUAN3D_21_WEIGHTS_PATH", "/workspace/weights/Hunyuan3D-2.1")
+    runner = load_hunyuan3d_21_runner()
+    component_root = tmp_path / runner.DEFAULT_PARAMETERS["texture_subfolder"] / "unet"
+    component_root.mkdir(parents=True)
+    for filename in ("attn_processor.py", "modules.py"):
+        (component_root / filename).write_text("# fixture\n", encoding="utf-8")
+
+    calls: list[tuple[str, str, str]] = []
+    dynamic_module = ModuleType("diffusers.utils.dynamic_modules_utils")
+
+    def get_class_from_dynamic_module(path: str, *, module_file: str, class_name: str) -> type:
+        calls.append((path, module_file, class_name))
+        return type("UNet2p5DConditionModel", (), {})
+
+    dynamic_module.get_class_from_dynamic_module = get_class_from_dynamic_module
+    monkeypatch.setitem(sys.modules, "diffusers.utils.dynamic_modules_utils", dynamic_module)
+
+    runner.prepare_local_diffusers_module(tmp_path)
+
+    assert calls == [(str(component_root), "modules.py", "UNet2p5DConditionModel")]
 
 
 def test_hunyuan_staged_dependency_checks(monkeypatch, tmp_path: Path) -> None:
