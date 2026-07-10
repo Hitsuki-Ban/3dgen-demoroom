@@ -125,6 +125,51 @@ def test_build_cloud_run_command_rejects_nonpositive_task_limit() -> None:
         )
 
 
+def test_build_cloud_run_command_passes_exact_task_ids_to_runner() -> None:
+    command = build_cloud_run_command(
+        model_id="trellis2",
+        output_root="/work/output",
+        s3_target="s3://3dgen-runs/runs/trellis2/retry/20260710T000000Z",
+        task_ids=("fluffy-monster-plush", "cartoon apple"),
+    )
+
+    assert "--task-id fluffy-monster-plush" in command
+    assert "--task-id 'cartoon apple'" in command
+
+
+@pytest.mark.parametrize(
+    ("task_limit", "task_ids", "message"),
+    [
+        (1, ("fluffy-monster-plush",), "mutually exclusive"),
+        (None, ("",), "empty"),
+        (None, ("fluffy-monster-plush", "fluffy-monster-plush"), "duplicates"),
+    ],
+)
+def test_build_cloud_run_command_rejects_invalid_task_selection(
+    task_limit: int | None,
+    task_ids: tuple[str, ...],
+    message: str,
+) -> None:
+    with pytest.raises(ValueError, match=message):
+        build_cloud_run_command(
+            model_id="trellis2",
+            output_root="/work/output",
+            s3_target="s3://3dgen-runs/runs/trellis2/retry/20260710T000000Z",
+            task_limit=task_limit,
+            task_ids=task_ids,
+        )
+
+
+def test_build_cloud_run_command_rejects_task_ids_for_unsupported_runner() -> None:
+    with pytest.raises(ValueError, match="not supported for model"):
+        build_cloud_run_command(
+            model_id="step1x-3d",
+            output_root="/work/output",
+            s3_target="s3://3dgen-runs/runs/step1x-3d/retry/20260710T000000Z",
+            task_ids=("cartoon-apple",),
+        )
+
+
 def test_build_cloud_run_command_uploads_status_even_when_runner_fails() -> None:
     command = build_cloud_run_command(
         model_id="triposg",

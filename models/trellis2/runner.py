@@ -19,6 +19,7 @@ from runner_utils import (
     require_infer_arg,
     required_env,
     run_with_peak_vram,
+    select_tasks,
     terminate_runpod_if_needed,
     upload_task_increment_if_configured,
     utc_now,
@@ -30,11 +31,21 @@ from runner_utils import (
 MODEL_ID = "trellis2"
 MODEL_GIT_COMMIT = "75fbf0183001ed9876c8dbb35de6b68552ee08bd"
 WEIGHTS_REVISION = "af44b45f2e35a493886929c6d786e563ec68364d"
+DINO_V3_REVISION = "ea8dc2863c51be0a264bab82070e3e8836b02d51"
+RMBG_REVISION = "5df4c9c76d8170882c34f6986e848ee07fd0ba43"
+TRELLIS1_WEIGHTS_REVISION = "25e0d31ffbebe4b5a97464dd851910efc3002d96"
 TRELLIS2_ROOT = Path("/opt/TRELLIS.2")
 MAX_TASK_ATTEMPTS = 2
 
 
 TRELLIS2_WEIGHTS_PATH = required_env("TRELLIS2_WEIGHTS_PATH")
+HF_HOME = Path(required_env("HF_HOME"))
+
+EXTERNAL_WEIGHT_REVISIONS = {
+    "facebook/dinov3-vitl16-pretrain-lvd1689m": DINO_V3_REVISION,
+    "briaai/RMBG-2.0": RMBG_REVISION,
+    "microsoft/TRELLIS-image-large": TRELLIS1_WEIGHTS_REVISION,
+}
 
 DEFAULT_PARAMETERS = {
     "num_samples": 1,
@@ -66,7 +77,7 @@ DEFAULT_PARAMETERS = {
     "remesh_band": 1,
     "remesh_project": 0,
     "export_webp": True,
-    "attention_backend": "xformers",
+    "attention_backend": "flash_attn",
     "trellis2_weights_path": TRELLIS2_WEIGHTS_PATH,
 }
 
@@ -76,6 +87,7 @@ def main() -> None:
     parser.add_argument("--input-root", type=Path, default=Path("/work/input"))
     parser.add_argument("--output-root", type=Path, default=Path("/work/output"))
     parser.add_argument("--task-limit", type=int)
+    parser.add_argument("--task-id", dest="task_ids", action="append")
     parser.add_argument("--infer-image", type=Path, help=argparse.SUPPRESS)
     parser.add_argument("--infer-output-dir", type=Path, help=argparse.SUPPRESS)
     parser.add_argument("--infer-seed", type=int, help=argparse.SUPPRESS)
@@ -90,14 +102,38 @@ def main() -> None:
     max_runtime_seconds = parse_max_runtime_seconds(os.environ)
     started_at = time.monotonic()
     tasks = load_tasks(args.input_root / "tasks.json")
-    if args.task_limit is not None:
-        if args.task_limit <= 0:
-            raise ValueError("--task-limit must be a positive integer")
-        tasks = tasks[: args.task_limit]
+    tasks = select_tasks(tasks, task_ids=args.task_ids or [], task_limit=args.task_limit)
 
     license_sources = [
         LicenseSource("TRELLIS.2 LICENSE", TRELLIS2_ROOT / "LICENSE"),
         LicenseSource("TRELLIS.2-4B model card and license metadata", Path(TRELLIS2_WEIGHTS_PATH) / "README.md"),
+        LicenseSource(
+            "DINOv3 license",
+            HF_HOME
+            / "hub"
+            / "models--facebook--dinov3-vitl16-pretrain-lvd1689m"
+            / "snapshots"
+            / DINO_V3_REVISION
+            / "LICENSE.md",
+        ),
+        LicenseSource(
+            "BRIA RMBG-2.0 model card and license metadata",
+            HF_HOME
+            / "hub"
+            / "models--briaai--RMBG-2.0"
+            / "snapshots"
+            / RMBG_REVISION
+            / "README.md",
+        ),
+        LicenseSource(
+            "TRELLIS-image-large model card and license metadata",
+            HF_HOME
+            / "hub"
+            / "models--microsoft--TRELLIS-image-large"
+            / "snapshots"
+            / TRELLIS1_WEIGHTS_REVISION
+            / "README.md",
+        ),
     ]
 
     for task in tasks:
@@ -217,12 +253,12 @@ def run_trellis2_infer(args: argparse.Namespace) -> None:
     if args.infer_resolution != DEFAULT_PARAMETERS["resolution"]:
         raise ValueError("--infer-resolution must be 1024 for the wave 2 TRELLIS.2 protocol")
     weights_path = args.infer_trellis2_weights_path
-    if not (weights_path / "pipeline.json").is_file():
-        raise FileNotFoundError(f"missing TRELLIS.2 pipeline.json: {weights_path / 'pipeline.json'}")
+    validate_staged_dependencies(weights_path, HF_HOME)
 
     os.environ["OPENCV_IO_ENABLE_OPENEXR"] = "1"
     os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
     os.environ["ATTN_BACKEND"] = DEFAULT_PARAMETERS["attention_backend"]
+    os.environ["SPARSE_ATTN_BACKEND"] = DEFAULT_PARAMETERS["attention_backend"]
     sys.path.insert(0, str(TRELLIS2_ROOT))
 
     from PIL import Image
@@ -303,6 +339,7 @@ def prepare_task_output(
         "model_id": MODEL_ID,
         "model_git_commit": MODEL_GIT_COMMIT,
         "weights_revision": WEIGHTS_REVISION,
+        "external_weight_revisions": EXTERNAL_WEIGHT_REVISIONS,
         "gpu_name": runtime.gpu_name,
         "wall_clock_seconds": wall_clock_seconds,
         "peak_vram_bytes": runtime.peak_vram_bytes,
@@ -318,6 +355,37 @@ def prepare_task_output(
         "license_file": "LICENSES.txt",
     }
     (task_output_dir / "meta.json").write_text(json.dumps(meta, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
+
+def validate_staged_dependencies(weights_path: Path, hf_home: Path) -> None:
+    required = [weights_path / "pipeline.json"]
+    cache_requirements = {
+        "facebook/dinov3-vitl16-pretrain-lvd1689m": (
+            DINO_V3_REVISION,
+            ("LICENSE.md", "config.json", "model.safetensors"),
+        ),
+        "briaai/RMBG-2.0": (
+            RMBG_REVISION,
+            ("README.md", "BiRefNet_config.py", "birefnet.py", "config.json", "model.safetensors"),
+        ),
+        "microsoft/TRELLIS-image-large": (
+            TRELLIS1_WEIGHTS_REVISION,
+            (
+                "README.md",
+                "ckpts/ss_dec_conv3d_16l8_fp16.json",
+                "ckpts/ss_dec_conv3d_16l8_fp16.safetensors",
+            ),
+        ),
+    }
+    for repo_id, (revision, filenames) in cache_requirements.items():
+        repo_dir = hf_home / "hub" / ("models--" + repo_id.replace("/", "--"))
+        ref = repo_dir / "refs" / "main"
+        if not ref.is_file() or ref.read_text(encoding="utf-8") != revision:
+            raise FileNotFoundError(f"missing pinned HF main ref for {repo_id}: {ref}")
+        required.extend(repo_dir / "snapshots" / revision / filename for filename in filenames)
+    missing = [str(path) for path in required if not path.is_file()]
+    if missing:
+        raise FileNotFoundError(f"missing staged TRELLIS.2 dependencies: {missing}")
 
 
 if __name__ == "__main__":

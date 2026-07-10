@@ -11,6 +11,11 @@
     "briaai/RMBG-2.0",
     "microsoft/TRELLIS-image-large"
   ],
+  "external_weight_revisions": {
+    "facebook/dinov3-vitl16-pretrain-lvd1689m": "ea8dc2863c51be0a264bab82070e3e8836b02d51",
+    "briaai/RMBG-2.0": "5df4c9c76d8170882c34f6986e848ee07fd0ba43",
+    "microsoft/TRELLIS-image-large": "25e0d31ffbebe4b5a97464dd851910efc3002d96"
+  },
   "default_parameters": {
     "num_samples": 1,
     "resolution": "1024",
@@ -41,7 +46,7 @@
     "remesh_band": 1,
     "remesh_project": 0,
     "export_webp": true,
-    "attention_backend": "xformers",
+    "attention_backend": "flash_attn",
     "trellis2_weights_path": "/workspace/weights/TRELLIS.2-4B"
   }
 }

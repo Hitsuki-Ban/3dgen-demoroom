@@ -66,3 +66,35 @@ def test_write_task_failure_includes_subprocess_diagnostics(tmp_path: Path) -> N
     assert failure["error_type"] == "RunnerSubprocessError"
     assert failure["error_returncode"] == 7
     assert failure["error_output_tail"] == "ModuleNotFoundError: No module named 'onnxruntime'"
+
+
+def test_select_tasks_runs_only_requested_ids_in_requested_order() -> None:
+    tasks = [
+        runner_utils.TaskDefinition(id="a", prompt="a", image="a.png", seed=1),
+        runner_utils.TaskDefinition(id="b", prompt="b", image="b.png", seed=2),
+    ]
+
+    selected = runner_utils.select_tasks(tasks, task_ids=["b", "a"], task_limit=None)
+
+    assert [task.id for task in selected] == ["b", "a"]
+
+
+@pytest.mark.parametrize(
+    ("task_ids", "task_limit", "message"),
+    [
+        (["missing"], None, "unknown --task-id"),
+        (["a"], 1, "mutually exclusive"),
+        (["a", "a"], None, "duplicates"),
+        ([""], None, "must not be empty"),
+        ([], 0, "positive integer"),
+    ],
+)
+def test_select_tasks_rejects_invalid_selection(
+    task_ids: list[str],
+    task_limit: int | None,
+    message: str,
+) -> None:
+    tasks = [runner_utils.TaskDefinition(id="a", prompt="a", image="a.png", seed=1)]
+
+    with pytest.raises(ValueError, match=message):
+        runner_utils.select_tasks(tasks, task_ids=task_ids, task_limit=task_limit)

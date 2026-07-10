@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import shutil
@@ -20,6 +21,7 @@ from runner_utils import (
     require_int,
     required_env,
     run_with_peak_vram,
+    select_tasks,
     terminate_runpod_if_needed,
     upload_task_increment_if_configured,
     utc_now,
@@ -31,11 +33,47 @@ from runner_utils import (
 MODEL_ID = "pixal3d"
 MODEL_GIT_COMMIT = "cdbb2bbffbf4e6f298b5f2af3d1d76a8d823d2af"
 WEIGHTS_REVISION = "0b31f9160aa400719af409098bff7936a932f726"
+DINO_V3_REVISION = "3c276edd87d6f6e569ff0c4400e086807d0f3881"
+MOGE_WEIGHTS_REVISION = "39c4d5e957afe587e04eec59dc2bcc3be5ecd968"
+RMBG_REVISION = "5df4c9c76d8170882c34f6986e848ee07fd0ba43"
+NAF_REVISION = "37f2dfc180f2de53d98bd601109c0da0dd6b0f43"
+NAF_CHECKPOINT_SHA256 = "c096c1ab2217a5c3ac136365f721685e2201379cb69d509cfb0261183847c98f"
+MOGE_CODE_REVISION = "07444410f1e33f402353b99d6ccd26bd31e469e8"
 PIXAL3D_ROOT = Path("/opt/Pixal3D")
 MAX_TASK_ATTEMPTS = 1
 
 
 PIXAL3D_WEIGHTS_PATH = required_env("PIXAL3D_WEIGHTS_PATH")
+HF_HOME = Path(required_env("HF_HOME"))
+TORCH_HOME = Path(required_env("TORCH_HOME"))
+
+EXTERNAL_WEIGHT_REVISIONS = {
+    "camenduru/dinov3-vitl16-pretrain-lvd1689m": DINO_V3_REVISION,
+    "Ruicheng/moge-2-vitl": MOGE_WEIGHTS_REVISION,
+    "briaai/RMBG-2.0": RMBG_REVISION,
+    "valeoai/NAF": NAF_REVISION,
+}
+
+EXTERNAL_CODE_REVISIONS = {"microsoft/MoGe": MOGE_CODE_REVISION}
+
+REQUIRED_WEIGHT_FILES = (
+    "README.md",
+    "pipeline.json",
+    "ckpts/ss_dec_conv3d_16l8_fp16.json",
+    "ckpts/ss_dec_conv3d_16l8_fp16.safetensors",
+    "ckpts/ss_flow_img_dit_1_3B_64_bf16.json",
+    "ckpts/ss_flow_img_dit_1_3B_64_bf16.safetensors",
+    "ckpts/shape_dec_next_dc_f16c32_fp16.json",
+    "ckpts/shape_dec_next_dc_f16c32_fp16.safetensors",
+    "ckpts/slat_flow_img2shape_dit_1_3B_512_bf16.json",
+    "ckpts/slat_flow_img2shape_dit_1_3B_512_bf16.safetensors",
+    "ckpts/slat_flow_img2shape_dit_1_3B_1024_bf16.json",
+    "ckpts/slat_flow_img2shape_dit_1_3B_1024_bf16.safetensors",
+    "ckpts/slat_flow_imgshape2tex_dit_1_3B_1024_bf16.json",
+    "ckpts/slat_flow_imgshape2tex_dit_1_3B_1024_bf16.safetensors",
+    "ckpts/tex_dec_next_dc_f16c32_fp16.json",
+    "ckpts/tex_dec_next_dc_f16c32_fp16.safetensors",
+)
 
 DEFAULT_PARAMETERS = {
     "resolution": 1536,
@@ -78,6 +116,7 @@ def main() -> None:
     parser.add_argument("--input-root", type=Path, default=Path("/work/input"))
     parser.add_argument("--output-root", type=Path, default=Path("/work/output"))
     parser.add_argument("--task-limit", type=int)
+    parser.add_argument("--task-id", dest="task_ids", action="append")
     parser.add_argument("--infer-image", type=Path, help=argparse.SUPPRESS)
     parser.add_argument("--infer-output-dir", type=Path, help=argparse.SUPPRESS)
     parser.add_argument("--infer-seed", type=int, help=argparse.SUPPRESS)
@@ -92,14 +131,29 @@ def main() -> None:
     max_runtime_seconds = parse_max_runtime_seconds(os.environ)
     started_at = time.monotonic()
     tasks = load_tasks(args.input_root / "tasks.json")
-    if args.task_limit is not None:
-        if args.task_limit <= 0:
-            raise ValueError("--task-limit must be a positive integer")
-        tasks = tasks[: args.task_limit]
+    tasks = select_tasks(tasks, task_ids=args.task_ids or [], task_limit=args.task_limit)
 
     license_sources = [
         LicenseSource("Pixal3D LICENSE", PIXAL3D_ROOT / "LICENSE"),
         LicenseSource("Pixal3D model card and license metadata", Path(PIXAL3D_WEIGHTS_PATH) / "README.md"),
+        LicenseSource(
+            "DINOv3 mirror model card and license metadata",
+            HF_HOME
+            / "hub"
+            / "models--camenduru--dinov3-vitl16-pretrain-lvd1689m"
+            / "snapshots"
+            / DINO_V3_REVISION
+            / "README.md",
+        ),
+        LicenseSource(
+            "MoGe-2 model card and license metadata",
+            HF_HOME / "hub" / "models--Ruicheng--moge-2-vitl" / "snapshots" / MOGE_WEIGHTS_REVISION / "README.md",
+        ),
+        LicenseSource(
+            "BRIA RMBG-2.0 model card and license metadata",
+            HF_HOME / "hub" / "models--briaai--RMBG-2.0" / "snapshots" / RMBG_REVISION / "README.md",
+        ),
+        LicenseSource("NAF LICENSE", TORCH_HOME / "hub" / "valeoai_NAF_main" / "LICENSE"),
     ]
 
     for task in tasks:
@@ -220,8 +274,7 @@ def run_pixal3d_infer(args: argparse.Namespace) -> None:
     if resolution != DEFAULT_PARAMETERS["resolution"]:
         raise ValueError("--infer-resolution must be 1536 for the wave 2 Pixal3D standard protocol")
     weights_path = args.infer_pixal3d_weights_path
-    if not (weights_path / "pipeline.json").is_file():
-        raise FileNotFoundError(f"missing Pixal3D pipeline.json: {weights_path / 'pipeline.json'}")
+    validate_staged_dependencies(weights_path, HF_HOME, TORCH_HOME)
 
     os.environ["OPENCV_IO_ENABLE_OPENEXR"] = "1"
     os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
@@ -289,6 +342,8 @@ def prepare_task_output(
         "model_id": MODEL_ID,
         "model_git_commit": MODEL_GIT_COMMIT,
         "weights_revision": WEIGHTS_REVISION,
+        "external_weight_revisions": EXTERNAL_WEIGHT_REVISIONS,
+        "external_code_revisions": EXTERNAL_CODE_REVISIONS,
         "gpu_name": runtime.gpu_name,
         "wall_clock_seconds": wall_clock_seconds,
         "peak_vram_bytes": runtime.peak_vram_bytes,
@@ -304,6 +359,45 @@ def prepare_task_output(
         "license_file": "LICENSES.txt",
     }
     (task_output_dir / "meta.json").write_text(json.dumps(meta, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
+
+def validate_staged_dependencies(weights_path: Path, hf_home: Path, torch_home: Path) -> None:
+    required = [weights_path / relative for relative in REQUIRED_WEIGHT_FILES]
+    cache_requirements = {
+        "camenduru/dinov3-vitl16-pretrain-lvd1689m": (
+            DINO_V3_REVISION,
+            ("README.md", "config.json", "model.safetensors"),
+        ),
+        "Ruicheng/moge-2-vitl": (MOGE_WEIGHTS_REVISION, ("README.md", "model.pt")),
+        "briaai/RMBG-2.0": (
+            RMBG_REVISION,
+            ("README.md", "BiRefNet_config.py", "birefnet.py", "config.json", "model.safetensors"),
+        ),
+    }
+    for repo_id, (revision, filenames) in cache_requirements.items():
+        repo_dir = hf_home / "hub" / ("models--" + repo_id.replace("/", "--"))
+        ref = repo_dir / "refs" / "main"
+        if not ref.is_file() or ref.read_text(encoding="utf-8") != revision:
+            raise FileNotFoundError(f"missing pinned HF main ref for {repo_id}: {ref}")
+        required.extend(repo_dir / "snapshots" / revision / filename for filename in filenames)
+    required.extend(
+        (
+            torch_home / "hub" / "valeoai_NAF_main" / "hubconf.py",
+            torch_home / "hub" / "valeoai_NAF_main" / "LICENSE",
+            torch_home / "hub" / "valeoai_NAF_main" / "src" / "model" / "naf.py",
+            torch_home / "hub" / "valeoai_NAF_main" / "src" / "layers" / "attentions.py",
+            torch_home / "hub" / "checkpoints" / "naf_release.pth",
+        )
+    )
+    missing = [str(path) for path in required if not path.is_file()]
+    if missing:
+        raise FileNotFoundError(f"missing staged Pixal3D dependencies: {missing}")
+    naf_revision_marker = torch_home / "hub" / "valeoai_NAF_main" / ".git-revision"
+    if not naf_revision_marker.is_file() or naf_revision_marker.read_text(encoding="utf-8") != NAF_REVISION:
+        raise FileNotFoundError(f"missing pinned NAF revision marker: {naf_revision_marker}")
+    naf_checkpoint = torch_home / "hub" / "checkpoints" / "naf_release.pth"
+    if hashlib.sha256(naf_checkpoint.read_bytes()).hexdigest() != NAF_CHECKPOINT_SHA256:
+        raise ValueError(f"NAF checkpoint SHA-256 mismatch: {naf_checkpoint}")
 
 
 if __name__ == "__main__":

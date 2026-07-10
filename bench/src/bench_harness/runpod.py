@@ -35,6 +35,7 @@ MODEL_RUNNER_PATHS = {
     "hunyuan3d-21": "/opt/3dgen-runner/hunyuan3d_21_runner.py",
     "sf3d": "/opt/3dgen-runner/sf3d_runner.py",
 }
+TASK_ID_MODEL_IDS = frozenset({"pixal3d", "trellis2"})
 MODEL_WEIGHT_ENVS = {
     "triposg": {
         "TRIPOSG_WEIGHTS_PATH": f"{RUNPOD_WEIGHT_ROOT}/TripoSG",
@@ -149,6 +150,7 @@ class RunPodLaunchConfig:
     data_center_id: str
     startup_timeout_min: int
     task_limit: int | None = None
+    task_ids: tuple[str, ...] = ()
     startup_poll_seconds: float = 15.0
     container_registry_auth_id: str | None = None
     container_disk_gb: int = 80
@@ -336,6 +338,7 @@ def build_cloud_run_command(
     s3_target: str,
     *,
     task_limit: int | None = None,
+    task_ids: tuple[str, ...] = (),
 ) -> str:
     try:
         runner_path = MODEL_RUNNER_PATHS[model_id]
@@ -345,6 +348,14 @@ def build_cloud_run_command(
         raise ValueError("RunPod cloud run S3 target must use s3://")
     if task_limit is not None and task_limit <= 0:
         raise ValueError("RunPod cloud run task_limit must be positive")
+    if task_limit is not None and task_ids:
+        raise ValueError("RunPod cloud run task_limit and task_ids are mutually exclusive")
+    if any(not task_id.strip() for task_id in task_ids):
+        raise ValueError("RunPod cloud run task_ids must not contain empty values")
+    if len(set(task_ids)) != len(task_ids):
+        raise ValueError("RunPod cloud run task_ids must not contain duplicates")
+    if task_ids and model_id not in TASK_ID_MODEL_IDS:
+        raise ValueError(f"RunPod cloud run task_ids are not supported for model: {model_id}")
     quoted_output_root = quote(output_root)
     quoted_s3_target = quote(s3_target)
     quoted_model_id = quote(model_id)
@@ -355,6 +366,8 @@ def build_cloud_run_command(
     )
     if task_limit is not None:
         run_command = f"{run_command} --task-limit {task_limit}"
+    for task_id in task_ids:
+        run_command = f"{run_command} --task-id {quote(task_id)}"
     ssh_command = (
         "mkdir -p /run/sshd\n"
         "if [ -n \"${PUBLIC_KEY:-}\" ]; then\n"
@@ -522,6 +535,7 @@ def build_pod_payload(config: RunPodLaunchConfig, *, runpod_api_key: str) -> dic
         config.output_root,
         config.s3_target,
         task_limit=config.task_limit,
+        task_ids=config.task_ids,
     )
     payload: dict[str, Any] = {
         "name": config.name,

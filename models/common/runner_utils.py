@@ -89,6 +89,32 @@ def load_tasks(path: Path) -> list[TaskDefinition]:
     return tasks
 
 
+def select_tasks(
+    tasks: list[TaskDefinition],
+    *,
+    task_ids: list[str],
+    task_limit: int | None,
+) -> list[TaskDefinition]:
+    if task_limit is not None and task_ids:
+        raise ValueError("--task-limit and --task-id are mutually exclusive")
+    if task_limit is not None:
+        if task_limit <= 0:
+            raise ValueError("--task-limit must be a positive integer")
+        return tasks[:task_limit]
+    if not task_ids:
+        return tasks
+    if any(not task_id.strip() for task_id in task_ids):
+        raise ValueError("--task-id must not be empty")
+    if len(set(task_ids)) != len(task_ids):
+        raise ValueError("--task-id must not contain duplicates")
+
+    tasks_by_id = {task.id: task for task in tasks}
+    missing = [task_id for task_id in task_ids if task_id not in tasks_by_id]
+    if missing:
+        raise ValueError(f"unknown --task-id value(s): {', '.join(missing)}")
+    return [tasks_by_id[task_id] for task_id in task_ids]
+
+
 def parse_max_runtime_seconds(env: dict[str, str]) -> int:
     raw_value = env.get("MAX_RUNTIME_MIN")
     if raw_value is None:

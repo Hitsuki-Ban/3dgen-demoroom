@@ -8,8 +8,18 @@
   "external_weight_dependencies": [
     "camenduru/dinov3-vitl16-pretrain-lvd1689m",
     "Ruicheng/moge-2-vitl",
-    "briaai/RMBG-2.0"
+    "briaai/RMBG-2.0",
+    "valeoai/NAF"
   ],
+  "external_weight_revisions": {
+    "camenduru/dinov3-vitl16-pretrain-lvd1689m": "3c276edd87d6f6e569ff0c4400e086807d0f3881",
+    "Ruicheng/moge-2-vitl": "39c4d5e957afe587e04eec59dc2bcc3be5ecd968",
+    "briaai/RMBG-2.0": "5df4c9c76d8170882c34f6986e848ee07fd0ba43",
+    "valeoai/NAF": "37f2dfc180f2de53d98bd601109c0da0dd6b0f43"
+  },
+  "external_code_revisions": {
+    "microsoft/MoGe": "07444410f1e33f402353b99d6ccd26bd31e469e8"
+  },
   "default_parameters": {
     "resolution": 1536,
     "pipeline_type": "1536_cascade",

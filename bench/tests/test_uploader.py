@@ -28,11 +28,26 @@ def test_local_uploader_rejects_parent_traversal(tmp_path: Path) -> None:
 
 
 class FakeS3Client:
-    def __init__(self) -> None:
+    def __init__(self, objects: set[str] | None = None) -> None:
         self.uploads: list[tuple[str, str, str]] = []
+        self.objects = set(objects or ())
+        self.deleted: list[list[str]] = []
 
     def upload_file(self, filename: str, bucket: str, key: str) -> None:
         self.uploads.append((filename, bucket, key))
+        self.objects.add(key)
+
+    def list_objects_v2(self, **request):
+        prefix = request["Prefix"]
+        return {
+            "Contents": [{"Key": key} for key in sorted(self.objects) if key.startswith(prefix)],
+            "IsTruncated": False,
+        }
+
+    def delete_objects(self, *, Bucket: str, Delete: dict[str, object]) -> None:
+        keys = [item["Key"] for item in Delete["Objects"]]
+        self.deleted.append(keys)
+        self.objects.difference_update(keys)
 
 
 def test_s3_config_requires_s3_uri_and_explicit_credentials() -> None:
@@ -121,6 +136,41 @@ def test_s3_uploader_omits_dot_segment_when_relative_name_is_empty(tmp_path: Pat
     assert fake_client.uploads == [
         (str(source / "probe.txt"), "3dgen-runs", "_codex-s3-probe/probe.txt")
     ]
+
+
+def test_s3_uploader_replaces_existing_task_prefix_before_retry_upload(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "failure.json").write_text("{}\n", encoding="utf-8")
+    old_keys = {
+        "runs/retry-task/LICENSES.txt",
+        "runs/retry-task/meta.json",
+        "runs/retry-task/output.glb",
+        "runs/retry-task/raw/mesh.glb",
+        "runs/other-task/meta.json",
+    }
+    fake_client = FakeS3Client(old_keys)
+    uploader = S3Uploader(
+        S3UploadConfig(
+            bucket="3dgen-runs",
+            prefix="runs",
+            endpoint_url="https://example.r2.cloudflarestorage.com",
+            access_key_id="access-key",
+            secret_access_key="secret-key",
+        ),
+        client=fake_client,
+    )
+
+    uploaded = uploader.upload_run(source, "retry-task")
+
+    assert uploaded == ["runs/retry-task/failure.json"]
+    assert fake_client.deleted == [[
+        "runs/retry-task/LICENSES.txt",
+        "runs/retry-task/meta.json",
+        "runs/retry-task/output.glb",
+        "runs/retry-task/raw/mesh.glb",
+    ]]
+    assert fake_client.objects == {"runs/retry-task/failure.json", "runs/other-task/meta.json"}
 
 
 def test_create_uploader_builds_s3_uploader_from_env() -> None:

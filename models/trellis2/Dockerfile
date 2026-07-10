@@ -3,8 +3,10 @@ FROM nvidia/cuda:12.8.1-cudnn-devel-ubuntu22.04
 ARG TRELLIS2_COMMIT=75fbf0183001ed9876c8dbb35de6b68552ee08bd
 ARG TRELLIS2_WEIGHTS_REVISION=af44b45f2e35a493886929c6d786e563ec68364d
 ARG UTILS3D_COMMIT=9a4eb15e4021b67b12c460c7057d642626897ec8
-ARG NVDIFFRAST_REF=v0.4.0
-ARG NVDIFFREC_REF=renderutils
+ARG NVDIFFRAST_COMMIT=253ac4fcea7de5f396371124af597e6cc957bfae
+ARG NVDIFFREC_COMMIT=b296927cc7fd01c2ac1087c8065c4d7248f72da4
+ARG CUMESH_COMMIT=12289e1062f0603f2f0d0771b02e1395d247f26f
+ARG FLEXGEMM_COMMIT=6dd94a859c26ee8246888502eada3dd8ad85532e
 ARG UV_VERSION=0.11.19
 
 ENV DEBIAN_FRONTEND=noninteractive \
@@ -24,7 +26,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     CUDA_HOME=/usr/local/cuda \
     FORCE_CUDA=1 \
     CPATH=/usr/local/cuda/include \
-    LIBRARY_PATH=/usr/local/cuda/lib64
+    LIBRARY_PATH=/usr/local/cuda/lib64:/usr/local/cuda/lib64/stubs
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
@@ -56,7 +58,7 @@ RUN uv pip install --system "setuptools<81" wheel \
         torch==2.7.1 \
         torchvision==0.22.1 \
         --index-url https://download.pytorch.org/whl/cu128 \
-    && uv pip install --system xformers --index-url https://download.pytorch.org/whl/cu128 \
+    && uv pip install --system xformers==0.0.31 --index-url https://download.pytorch.org/whl/cu128 \
     && uv pip install --system \
         boto3 \
         cmake \
@@ -79,17 +81,36 @@ RUN uv pip install --system "setuptools<81" wheel \
         zstandard \
     && uv pip install --system "git+https://github.com/EasternJournalist/utils3d.git@${UTILS3D_COMMIT}"
 
-RUN mkdir -p /tmp/extensions \
-    && git clone -b ${NVDIFFRAST_REF} https://github.com/NVlabs/nvdiffrast.git /tmp/extensions/nvdiffrast \
-    && MAX_JOBS=1 uv pip install --system --no-build-isolation /tmp/extensions/nvdiffrast \
-    && git clone -b ${NVDIFFREC_REF} https://github.com/JeffreyXiang/nvdiffrec.git /tmp/extensions/nvdiffrec \
-    && MAX_JOBS=1 uv pip install --system --no-build-isolation /tmp/extensions/nvdiffrec \
-    && git clone --recurse-submodules https://github.com/JeffreyXiang/CuMesh.git /tmp/extensions/CuMesh \
-    && MAX_JOBS=1 uv pip install --system --no-build-isolation /tmp/extensions/CuMesh \
-    && git clone --recurse-submodules https://github.com/JeffreyXiang/FlexGEMM.git /tmp/extensions/FlexGEMM \
-    && MAX_JOBS=1 uv pip install --system --no-build-isolation /tmp/extensions/FlexGEMM \
-    && MAX_JOBS=1 uv pip install --system --no-build-isolation /opt/TRELLIS.2/o-voxel \
-    && rm -rf /tmp/extensions
+RUN git clone https://github.com/NVlabs/nvdiffrast.git /tmp/nvdiffrast \
+    && git -C /tmp/nvdiffrast checkout ${NVDIFFRAST_COMMIT} \
+    && MAX_JOBS=1 uv pip install --system --no-build-isolation /tmp/nvdiffrast \
+    && rm -rf /tmp/nvdiffrast
+
+RUN git clone https://github.com/JeffreyXiang/nvdiffrec.git /tmp/nvdiffrec \
+    && git -C /tmp/nvdiffrec checkout ${NVDIFFREC_COMMIT} \
+    && MAX_JOBS=1 uv pip install --system --no-build-isolation /tmp/nvdiffrec \
+    && rm -rf /tmp/nvdiffrec
+
+RUN git clone --recurse-submodules https://github.com/JeffreyXiang/CuMesh.git /tmp/CuMesh \
+    && git -C /tmp/CuMesh checkout ${CUMESH_COMMIT} \
+    && git -C /tmp/CuMesh submodule update --init --recursive \
+    && MAX_JOBS=1 uv pip install --system --no-build-isolation /tmp/CuMesh \
+    && rm -rf /tmp/CuMesh
+
+RUN git clone --recurse-submodules https://github.com/JeffreyXiang/FlexGEMM.git /tmp/FlexGEMM \
+    && git -C /tmp/FlexGEMM checkout ${FLEXGEMM_COMMIT} \
+    && git -C /tmp/FlexGEMM submodule update --init --recursive \
+    && MAX_JOBS=1 uv pip install --system --no-build-isolation /tmp/FlexGEMM \
+    && rm -rf /tmp/FlexGEMM
+
+RUN MAX_JOBS=1 uv pip install --system --no-build-isolation --no-deps /opt/TRELLIS.2/o-voxel
+
+RUN uv pip install --system transformers==4.57.3
+
+RUN MAX_JOBS=1 uv pip install --system flash-attn==2.8.3 --no-build-isolation
+
+ENV ATTN_BACKEND=flash_attn \
+    SPARSE_ATTN_BACKEND=flash_attn
 
 COPY bench/src /opt/bench/src
 COPY tasks /opt/3dgen-tasks

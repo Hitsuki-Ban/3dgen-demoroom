@@ -40,5 +40,6 @@ def test_root_dockerignore_excludes_generated_large_paths() -> None:
     assert ".git" in dockerignore
     assert ".worktrees" in dockerignore
     assert ".docker-build" in dockerignore
+    assert ".docker-data" in dockerignore
     assert "outputs" in dockerignore
     assert "bench/.venv" in dockerignore

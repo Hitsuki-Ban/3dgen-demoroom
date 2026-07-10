@@ -16,6 +16,7 @@ __pycache__/
 # Benchmark outputs (large binaries live in R2, not git)
 outputs/
 .docker-build/
+.docker-data/
 .worktrees/
 *.glb
 *.ply
