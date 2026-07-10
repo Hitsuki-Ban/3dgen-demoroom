@@ -11,6 +11,7 @@ The remaining Batch B/C models stay in scope for the same issue/PR.
 - Active RunPod pods after Pixal3D publish and temporary-volume cleanup: `[]`.
 - Final RunPod balance for this report: `$5.5579990944`.
 - RunPod GraphQL balance and runtime telemetry work with the explicit harness User-Agent; REST Pods and Billing remain the authoritative lifecycle and cost endpoints.
+- GitHub Actions deploy run `29099614257` synced R2 and published the public Worker after the final model uploads. Live `manifest.json` generated at `2026-07-10T14:25:02.481Z` contains 222 results across 9 models, including `sf3d=25`, `trellis2=25`, and `pixal3d=23`. Public HEAD checks for TRELLIS.2 and Pixal3D sample GLBs returned HTTP 200 with `Content-Type: model/gltf-binary`.
 - RunPod reported the EU-RO-1 RTX 4090 runtime price as `$0.69/hr` during the paid runs, higher than the `$0.34/hr` value captured in the issue text.
 - RunPod reported the EU-RO-1 RTX 5090 runtime price as `$0.99/hr` during `direct3d-s2` staging, smoke, and full runs.
 - EU-RO-1 network volume `wnqijpazd5` was expanded from 30GB to 80GB and then to 120GB for wave 2 staging.
