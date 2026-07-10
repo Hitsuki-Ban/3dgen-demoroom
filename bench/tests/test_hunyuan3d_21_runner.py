@@ -166,6 +166,9 @@ def test_hunyuan3d_21_dockerfile_uses_runtime_only_volume_paths() -> None:
 def test_hunyuan_installs_local_snapshot_redirect_before_pipeline_import() -> None:
     source = (REPO_ROOT / "models" / "hunyuan3d-21" / "runner.py").read_text(encoding="utf-8")
 
+    assert source.index('os.environ["HF_MODULES_CACHE"]') < source.index(
+        "from textureGenPipeline import"
+    )
     assert source.index("install_local_snapshot_download(weights_path)") < source.index(
         "from textureGenPipeline import"
     )

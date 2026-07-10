@@ -250,6 +250,7 @@ def run_hunyuan3d_21_infer(args: argparse.Namespace) -> None:
 
     os.environ["HF_HUB_OFFLINE"] = "1"
     os.environ["TRANSFORMERS_OFFLINE"] = "1"
+    os.environ["HF_MODULES_CACHE"] = str(args.infer_output_dir / "hf-modules")
     os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
     os.environ["ATTN_BACKEND"] = DEFAULT_PARAMETERS["attention_backend"]
     sys.path.insert(0, str(HUNYUAN3D_ROOT))
