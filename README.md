@@ -1,20 +1,60 @@
 # 3DGen DemoRoom
 
-オープンソースの 3D 生成モデル(text-to-3D / image-to-3D)を**同一課題**でベンチマークし、生成結果をブラウザ上の 3D ビューアで見比べられる公開展示サイト。
+オープンソースの 3D 生成モデル(text/image-to-3D)11 種を**同一の 25 課題・公式デフォルト設定・固定シード**でベンチマークし、生成メッシュそのものをブラウザで見比べられる公開展示室。
 
-**想定読者:** コンソールゲームのグラフィックス開発者。テキスト・画像リファレンスからの 3D アセット生成が「いま実際にどこまでできるのか」を、デモ映像やマーケティングではなく実物のメッシュで判断できる場を目指す。
+### ▶ [展示サイトを開く](https://3dgen-demoroom.houtei-ban.workers.dev)
 
-## ステータス
+<!-- TODO(screenshot-tool): サイトのヒーロースクリーンショット(ギャラリー+3ペイン比較)をここに挿入 -->
 
-🚧 立ち上げ期(2026-07)。技術選定のためのリサーチ進行中 — [Issues](../../issues) を参照。
+生成時間・VRAM・ポリゴン数・使用パラメータ・**失敗を含む**全実測データを無修正で公開しています。想定読者はゲームグラフィックスの開発者 —「いま実際にどこまでできるのか」をデモ映像ではなく実物のメッシュで判断するための場です。
 
-## 計画中のアーキテクチャ(暫定)
+## 実測サマリ(2026-07-11 時点)
 
-- **ベンチ実行:** レンタル GPU 上で各モデルを Docker 実行し、同一のプロンプト / リファレンス画像セットから生成
-- **成果物:** GLB メッシュ(モデルによっては 3DGS も)+ メタデータ(生成時間・ポリゴン数・VRAM 使用量など)
-- **展示サイト:** Vite + Three.js の静的サイト。Cloudflare でホスティング、3D アセットは R2 から配信
-- 詳細設計は `docs/` 以下に順次追加する
+| モデル | 成功 | 平均生成時間 | 最長 | 最大 VRAM | 実行 GPU | 出力 |
+|---|---|---|---|---|---|---|
+| [Stable Fast 3D](https://github.com/Stability-AI/stable-fast-3d) | 25/25 | **11.6s** | 59.9s | 7.7 GiB | RTX 4090 | textured, UV 展開済み |
+| [TripoSG](https://github.com/VAST-AI-Research/TripoSG) | 25/25 | 19.0s | 59.9s | 11.8 GiB | RTX 4090 | geometry のみ |
+| [TripoSR](https://github.com/VAST-AI-Research/TripoSR) | 25/25 | 19.7s | 71.6s | 7.4 GiB | RTX 4070 Ti | textured |
+| [TRELLIS v1](https://github.com/microsoft/TRELLIS) | 25/25 | 47.0s | 79.5s | 19.6 GiB | RTX 4090 | textured |
+| [PartCrafter](https://github.com/wgsxm/PartCrafter) | 24/25 | 49.9s | 83.1s | 16.2 GiB | RTX 4090 | **パーツ分離** mesh |
+| [3DTopia-XL](https://github.com/3DTopia/3DTopia-XL) | 25/25 | 76.4s | 114.4s | 10.0 GiB | RTX 4090 | PBR |
+| [Direct3D-S2](https://github.com/DreamTechAI/Direct3D-S2) | 25/25 | 140.1s | 236.4s | 30.6 GiB | RTX 5090 | geometry のみ(高解像度) |
+| [TRELLIS.2-4B](https://github.com/microsoft/TRELLIS.2) | 25/25 | 281.0s | 1380.2s | 33.1 GiB | RTX 5090 ※1 | PBR |
+| [Pixal3D](https://github.com/TencentARC/Pixal3D) | 23/25 ※2 | 331.8s | 501.1s | **45.9 GiB** | RTX 6000 Ada 48GB | textured |
+| [Step1X-3D](https://github.com/stepfun-ai/Step1X-3D) | ベンチ実行中 | – | – | – | – | textured |
+| [Hunyuan3D 2.1](https://github.com/tencent-hunyuan/hunyuan3d-2.1) | ベンチ実行中 | – | – | – | ※3 | PBR |
 
-## 協業フロー
+<sub>※1 — 1 課題のみ 32GB で OOM、**設定を変えずに** 96GB GPU で再実行して成功。 ※2 — 2 課題は公式 1536 設定の後処理が 48GB でも OOM。低 VRAM モードへのフォールバックはせず**失敗として記録・公開**。 ※3 — ライセンス上 EU / 英国 / 韓国で実行・表示不可(後述)。</sub>
 
-このリポジトリは AI エージェント 2 体(Fable / Codex)+ 人間オーナーで運営される。詳細は [AGENTS.md](AGENTS.md)。
+**表の読み方:** 実行 GPU はモデルごとに異なります(動作する最小クラスに寄せる方針 — VRAM 要求自体が主要な測定項目)。生成時間の直接比較は同一 GPU 同士で。「最長」は各モデルの初回タスクの重みロードを含みます。
+
+## ベンチの原則
+
+1. 各モデルの**公式デフォルト設定のみ**(チューニングなし・低 VRAM モード等へのフォールバックなし)
+2. 固定シード `20260708`・各課題 1 回のみ(N=1)・手修正なし
+3. OOM 等の**失敗もそのまま公開**(失敗の傾向自体が比較情報)
+4. コード commit・重み revision・全パラメータを `meta.json` として成果物と一緒に公開
+
+課題設計(標準 20 + アニメ調 5)と完全なプロトコルは [docs/design/benchmark-tasks.md](docs/design/benchmark-tasks.md)。
+
+## ライセンスについて
+
+生成モデルのライセンスは採用判断に直結するため、本ベンチの展示対象です。要注意の 2 例:
+
+- **Hunyuan3D 2.1** — Community License 5(c) により EU・英国・韓国では Output の使用・表示が許諾されず、当該地域には生成物を配信しません(HTTP 451)
+- **Stable Fast 3D** — Stability Community License(商用は登録制、年商 $1M 超は Enterprise 要)
+
+全 11 モデルのライセンス整理(一次ソース付き): [docs/research/models-merged.md](docs/research/models-merged.md)
+
+## もっと詳しく
+
+| | |
+|---|---|
+| 課題とプロトコル | [docs/design/benchmark-tasks.md](docs/design/benchmark-tasks.md) |
+| モデル選定とライセンス | [docs/research/models-merged.md](docs/research/models-merged.md) |
+| 仕組み・再現性・コスト | [docs/architecture.md](docs/architecture.md) |
+| 実行レポート(GPU 単価・失敗記録) | [docs/runs/](docs/runs/) |
+
+---
+
+<sub>本リポジトリは AI エージェント 2 体+人間オーナー 1 名で運営されており、サイト上の 3D モデルはすべて AI 生成物です。リポジトリのコードは [MIT License](LICENSE)、各モデルとその出力はそれぞれのライセンスに従います。</sub>
