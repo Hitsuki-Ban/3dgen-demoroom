@@ -1,0 +1,37 @@
+{
+  "id": "trellis1",
+  "name": "TRELLIS v1",
+  "input": "image",
+  "output": "textured-mesh-and-3dgs",
+  "code_repo": "https://github.com/microsoft/TRELLIS",
+  "code_commit": "442aa1e1afb9014e80681d3bf604e8d728a86ee7",
+  "weights_repo": "microsoft/TRELLIS-image-large",
+  "weights_revision": "25e0d31ffbebe4b5a97464dd851910efc3002d96",
+  "auxiliary_weights": {
+    "dinov2_torch_hub": "facebookresearch/dinov2:dinov2_vitl14_reg",
+    "rembg_model": "u2net"
+  },
+  "license": "MIT plus bundled third-party notices",
+  "default_parameters": {
+    "num_samples": 1,
+    "sparse_structure_sampler_params": {
+      "steps": 25,
+      "cfg_strength": 5.0,
+      "cfg_interval": [0.5, 1.0],
+      "rescale_t": 3.0
+    },
+    "slat_sampler_params": {
+      "steps": 25,
+      "cfg_strength": 5.0,
+      "cfg_interval": [0.5, 1.0],
+      "rescale_t": 3.0
+    },
+    "formats": ["mesh", "gaussian", "radiance_field"],
+    "preprocess_image": true,
+    "simplify": 0.95,
+    "texture_size": 1024,
+    "attention_backend": "xformers",
+    "spconv_algo": "native",
+    "trellis1_weights_path": "/workspace/weights/TRELLIS-image-large"
+  }
+}

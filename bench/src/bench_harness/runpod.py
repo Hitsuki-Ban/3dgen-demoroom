@@ -20,11 +20,22 @@ DEFAULT_ALLOWED_CUDA_VERSIONS = ("12.8",)
 RUNPOD_VOLUME_MOUNT_PATH = "/workspace"
 RUNPOD_WEIGHT_ROOT = f"{RUNPOD_VOLUME_MOUNT_PATH}/weights"
 RUNPOD_HF_HOME = f"{RUNPOD_VOLUME_MOUNT_PATH}/hf"
+RUNPOD_TORCH_HOME = f"{RUNPOD_VOLUME_MOUNT_PATH}/torch"
+RUNPOD_U2NET_HOME = f"{RUNPOD_WEIGHT_ROOT}/rembg"
 REQUIRED_R2_ENV_VARS = ("R2_ENDPOINT", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY")
 MODEL_RUNNER_PATHS = {
     "triposg": "/opt/3dgen-runner/triposg_runner.py",
     "partcrafter": "/opt/3dgen-runner/partcrafter_runner.py",
+    "trellis1": "/opt/3dgen-runner/trellis1_runner.py",
+    "3dtopia-xl": "/opt/3dgen-runner/3dtopia_xl_runner.py",
+    "trellis2": "/opt/3dgen-runner/trellis2_runner.py",
+    "direct3d-s2": "/opt/3dgen-runner/direct3d_s2_runner.py",
+    "step1x-3d": "/opt/3dgen-runner/step1x_3d_runner.py",
+    "pixal3d": "/opt/3dgen-runner/pixal3d_runner.py",
+    "hunyuan3d-21": "/opt/3dgen-runner/hunyuan3d_21_runner.py",
+    "sf3d": "/opt/3dgen-runner/sf3d_runner.py",
 }
+TASK_ID_MODEL_IDS = frozenset({"pixal3d", "trellis2"})
 MODEL_WEIGHT_ENVS = {
     "triposg": {
         "TRIPOSG_WEIGHTS_PATH": f"{RUNPOD_WEIGHT_ROOT}/TripoSG",
@@ -33,6 +44,30 @@ MODEL_WEIGHT_ENVS = {
     "partcrafter": {
         "PARTCRAFTER_WEIGHTS_PATH": f"{RUNPOD_WEIGHT_ROOT}/PartCrafter",
         "RMBG_WEIGHTS_PATH": f"{RUNPOD_WEIGHT_ROOT}/RMBG-1.4",
+    },
+    "trellis1": {
+        "TRELLIS1_WEIGHTS_PATH": f"{RUNPOD_WEIGHT_ROOT}/TRELLIS-image-large",
+    },
+    "3dtopia-xl": {
+        "TOPIA_XL_WEIGHTS_PATH": f"{RUNPOD_WEIGHT_ROOT}/3DTopia-XL",
+    },
+    "trellis2": {
+        "TRELLIS2_WEIGHTS_PATH": f"{RUNPOD_WEIGHT_ROOT}/TRELLIS.2-4B",
+    },
+    "direct3d-s2": {
+        "DIRECT3D_S2_WEIGHTS_PATH": f"{RUNPOD_WEIGHT_ROOT}/Direct3D-S2",
+    },
+    "step1x-3d": {
+        "STEP1X_3D_WEIGHTS_PATH": f"{RUNPOD_WEIGHT_ROOT}/Step1X-3D",
+    },
+    "pixal3d": {
+        "PIXAL3D_WEIGHTS_PATH": f"{RUNPOD_WEIGHT_ROOT}/Pixal3D",
+    },
+    "hunyuan3d-21": {
+        "HUNYUAN3D_21_WEIGHTS_PATH": f"{RUNPOD_WEIGHT_ROOT}/Hunyuan3D-2.1",
+    },
+    "sf3d": {
+        "SF3D_WEIGHTS_PATH": f"{RUNPOD_WEIGHT_ROOT}/stable-fast-3d",
     },
 }
 
@@ -114,6 +149,8 @@ class RunPodLaunchConfig:
     network_volume_id: str
     data_center_id: str
     startup_timeout_min: int
+    task_limit: int | None = None
+    task_ids: tuple[str, ...] = ()
     startup_poll_seconds: float = 15.0
     container_registry_auth_id: str | None = None
     container_disk_gb: int = 80
@@ -295,13 +332,30 @@ def format_startup_state(response: dict[str, object] | None) -> str:
     return f" (last observed: {', '.join(parts)})"
 
 
-def build_cloud_run_command(model_id: str, output_root: str, s3_target: str) -> str:
+def build_cloud_run_command(
+    model_id: str,
+    output_root: str,
+    s3_target: str,
+    *,
+    task_limit: int | None = None,
+    task_ids: tuple[str, ...] = (),
+) -> str:
     try:
         runner_path = MODEL_RUNNER_PATHS[model_id]
     except KeyError as exc:
         raise ValueError(f"unknown model for RunPod cloud run: {model_id}") from exc
     if not s3_target.startswith("s3://"):
         raise ValueError("RunPod cloud run S3 target must use s3://")
+    if task_limit is not None and task_limit <= 0:
+        raise ValueError("RunPod cloud run task_limit must be positive")
+    if task_limit is not None and task_ids:
+        raise ValueError("RunPod cloud run task_limit and task_ids are mutually exclusive")
+    if any(not task_id.strip() for task_id in task_ids):
+        raise ValueError("RunPod cloud run task_ids must not contain empty values")
+    if len(set(task_ids)) != len(task_ids):
+        raise ValueError("RunPod cloud run task_ids must not contain duplicates")
+    if task_ids and model_id not in TASK_ID_MODEL_IDS:
+        raise ValueError(f"RunPod cloud run task_ids are not supported for model: {model_id}")
     quoted_output_root = quote(output_root)
     quoted_s3_target = quote(s3_target)
     quoted_model_id = quote(model_id)
@@ -310,6 +364,10 @@ def build_cloud_run_command(model_id: str, output_root: str, s3_target: str) -> 
         f"--input-root {quote('/opt/3dgen-tasks')} "
         f"--output-root {quoted_output_root}"
     )
+    if task_limit is not None:
+        run_command = f"{run_command} --task-limit {task_limit}"
+    for task_id in task_ids:
+        run_command = f"{run_command} --task-id {quote(task_id)}"
     ssh_command = (
         "mkdir -p /run/sshd\n"
         "if [ -n \"${PUBLIC_KEY:-}\" ]; then\n"
@@ -319,13 +377,38 @@ def build_cloud_run_command(model_id: str, output_root: str, s3_target: str) -> 
         "  chmod 600 /root/.ssh/authorized_keys\n"
         "fi\n"
         "service ssh start\n"
-        "ssh_exit_code=$?\n"
-        "if [ \"$ssh_exit_code\" -ne 0 ]; then\n"
-        "  runner_exit_code=\"$ssh_exit_code\"\n"
-        "else\n"
-        f"  {run_command}\n"
-        "  runner_exit_code=$?\n"
-        "fi"
+        "ssh_exit_code=$?"
+    )
+    startup_status_command = (
+        "python3 - "
+        f"{quoted_output_root} {quoted_model_id} {quoted_s3_target} "
+        '"$ssh_exit_code" <<\'PY_RUNPOD_STARTUP\'\n'
+        "from __future__ import annotations\n"
+        "import json\n"
+        "import os\n"
+        "import sys\n"
+        "from datetime import datetime, timezone\n"
+        "from pathlib import Path\n"
+        "\n"
+        "output_root = Path(sys.argv[1])\n"
+        "model_id = sys.argv[2]\n"
+        "s3_target = sys.argv[3]\n"
+        "ssh_exit_code = int(sys.argv[4])\n"
+        "output_root.mkdir(parents=True, exist_ok=True)\n"
+        "status = {\n"
+        "    'model_id': model_id,\n"
+        "    'pod_id': os.environ.get('RUNPOD_POD_ID'),\n"
+        "    's3_target': s3_target,\n"
+        "    'ssh_exit_code': ssh_exit_code,\n"
+        "    'started_at': datetime.now(timezone.utc).isoformat(),\n"
+        "    'status': 'started',\n"
+        "}\n"
+        "(output_root / 'runpod-startup.json').write_text(json.dumps(status, indent=2, sort_keys=True) + '\\n', encoding='utf-8')\n"
+        "PY_RUNPOD_STARTUP"
+    )
+    startup_upload_command = (
+        "PYTHONPATH=/opt/bench/src "
+        f"python3 -m bench_harness.cli upload-s3 {quoted_output_root} {quoted_s3_target}"
     )
     status_command = (
         "python3 - "
@@ -386,7 +469,22 @@ def build_cloud_run_command(model_id: str, output_root: str, s3_target: str) -> 
     )
     return (
         "set +e\n"
+        "runner_exit_code=0\n"
         f"{ssh_command}\n"
+        f"{startup_status_command}\n"
+        "startup_status_exit_code=$?\n"
+        f"{startup_upload_command}\n"
+        "startup_upload_exit_code=$?\n"
+        "if [ \"$ssh_exit_code\" -ne 0 ]; then\n"
+        "  runner_exit_code=\"$ssh_exit_code\"\n"
+        "elif [ \"$startup_status_exit_code\" -ne 0 ]; then\n"
+        "  runner_exit_code=\"$startup_status_exit_code\"\n"
+        "elif [ \"$startup_upload_exit_code\" -ne 0 ]; then\n"
+        "  runner_exit_code=\"$startup_upload_exit_code\"\n"
+        "else\n"
+        f"  {run_command}\n"
+        "  runner_exit_code=$?\n"
+        "fi\n"
         f"{status_command}\n"
         "status_exit_code=$?\n"
         f"{upload_command}\n"
@@ -407,6 +505,8 @@ def build_model_weight_env(model_id: str) -> dict[str, str]:
         "HF_HOME": RUNPOD_HF_HOME,
         "HF_HUB_OFFLINE": "1",
         "TRANSFORMERS_OFFLINE": "1",
+        "TORCH_HOME": RUNPOD_TORCH_HOME,
+        "U2NET_HOME": RUNPOD_U2NET_HOME,
         **weight_env,
     }
 
@@ -430,7 +530,13 @@ def build_pod_payload(config: RunPodLaunchConfig, *, runpod_api_key: str) -> dic
         raise ValueError("RunPod data_center_id is required")
     if config.container_registry_auth_id is not None and not config.container_registry_auth_id.strip():
         raise ValueError("RunPod container_registry_auth_id must not be empty")
-    command = build_cloud_run_command(config.model_id, config.output_root, config.s3_target)
+    command = build_cloud_run_command(
+        config.model_id,
+        config.output_root,
+        config.s3_target,
+        task_limit=config.task_limit,
+        task_ids=config.task_ids,
+    )
     payload: dict[str, Any] = {
         "name": config.name,
         "imageName": config.image_name,

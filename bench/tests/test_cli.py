@@ -1,7 +1,20 @@
+import subprocess
+import sys
 from pathlib import Path
 
 from bench_harness import cli
 from bench_harness.runpod import RunPodLaunchConfig
+
+
+def test_cli_module_entrypoint_invokes_main() -> None:
+    completed = subprocess.run(
+        [sys.executable, "-m", "bench_harness.cli", "--help"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert "usage: bench-harness" in completed.stdout
 
 
 class FakeUploader:
@@ -70,6 +83,8 @@ def test_runpod_launch_command_uses_env_credentials_and_issue_defaults(monkeypat
             "20",
             "--data-center-id",
             "US-IL-1",
+            "--task-id",
+            "cartoon-apple",
         ],
     )
 
@@ -86,6 +101,8 @@ def test_runpod_launch_command_uses_env_credentials_and_issue_defaults(monkeypat
     assert config.network_volume_id == "volume-123"
     assert config.data_center_id == "US-IL-1"
     assert config.startup_timeout_min == 20
+    assert config.task_limit is None
+    assert config.task_ids == ("cartoon-apple",)
     assert config.r2_credentials.endpoint == "https://example.r2.cloudflarestorage.com"
     assert capsys.readouterr().out == '{"desiredStatus": "RUNNING", "id": "pod-123"}\n'
 

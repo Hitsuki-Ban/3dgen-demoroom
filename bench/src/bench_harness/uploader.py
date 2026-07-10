@@ -72,6 +72,9 @@ class S3Uploader:
             raise FileNotFoundError(f"source directory does not exist: {source_dir}")
         relative_path = validate_relative_upload_name(relative_name)
         client = self.client if self.client is not None else create_s3_client(self.config)
+        if relative_path.parts:
+            task_prefix = "/".join(part for part in (self.config.prefix, relative_path.as_posix()) if part) + "/"
+            self._delete_prefix(client, task_prefix)
         uploaded_keys: list[str] = []
         for source_file in sorted(path for path in source_dir.rglob("*") if path.is_file()):
             key_parts = [
@@ -87,6 +90,25 @@ class S3Uploader:
             client.upload_file(str(source_file), self.config.bucket, key)
             uploaded_keys.append(key)
         return uploaded_keys
+
+    def _delete_prefix(self, client: Any, prefix: str) -> None:
+        continuation_token: str | None = None
+        while True:
+            request: dict[str, Any] = {"Bucket": self.config.bucket, "Prefix": prefix}
+            if continuation_token is not None:
+                request["ContinuationToken"] = continuation_token
+            response = client.list_objects_v2(**request)
+            keys = [item["Key"] for item in response.get("Contents", [])]
+            if keys:
+                client.delete_objects(
+                    Bucket=self.config.bucket,
+                    Delete={"Objects": [{"Key": key} for key in keys], "Quiet": True},
+                )
+            if not response.get("IsTruncated"):
+                return
+            continuation_token = response.get("NextContinuationToken")
+            if not continuation_token:
+                raise RuntimeError("S3 listing was truncated without a continuation token")
 
 
 def create_s3_client(config: S3UploadConfig) -> Any:

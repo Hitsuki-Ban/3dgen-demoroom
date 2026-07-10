@@ -1,0 +1,31 @@
+{
+  "id": "step1x-3d",
+  "name": "Step1X-3D",
+  "code_repo": "https://github.com/stepfun-ai/Step1X-3D",
+  "code_commit": "cb5ac944709c6c913109070c7b90c3447f57f3d4",
+  "weights_repo": "stepfun-ai/Step1X-3D",
+  "weights_revision": "bf7084495b3a72222f36549b7942948aa4d9daa7",
+  "external_weight_dependencies": [
+    "facebook/dinov2-with-registers-large",
+    "stabilityai/stable-diffusion-xl-base-1.0",
+    "madebyollin/sdxl-vae-fp16-fix",
+    "ZhengPeng7/BiRefNet"
+  ],
+  "external_weight_revisions": {
+    "facebook/dinov2-with-registers-large": "e4c89a4e05589de9b3e188688a303d0f3c04d0f3",
+    "stabilityai/stable-diffusion-xl-base-1.0": "462165984030d82259a11f4367a4eed129e94a7b",
+    "madebyollin/sdxl-vae-fp16-fix": "207b116dae70ace3637169f1ddd2434b91b3a8cd",
+    "ZhengPeng7/BiRefNet": "e2bf8e4460fc8fa32bba5ea4d94b3233d367b0e4"
+  },
+  "default_parameters": {
+    "geometry_subfolder": "Step1X-3D-Geometry-1300m",
+    "texture_subfolder": "Step1X-3D-Texture",
+    "num_inference_steps": 50,
+    "guidance_scale": 7.5,
+    "octree_resolution": 384,
+    "max_facenum": 200000,
+    "texture": true,
+    "texture_seed_source": "benchmark_task_seed",
+    "step1x_3d_weights_path": "/workspace/weights/Step1X-3D"
+  }
+}

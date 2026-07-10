@@ -1,15 +1,33 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true, Position = 0)]
-    [ValidateSet("triposr", "triposg", "partcrafter")]
+    [ValidateSet(
+        "triposr",
+        "triposg",
+        "partcrafter",
+        "trellis1",
+        "3dtopia-xl",
+        "trellis2",
+        "direct3d-s2",
+        "step1x-3d",
+        "pixal3d",
+        "hunyuan3d-21",
+        "sf3d"
+    )]
     [string] $Model,
 
     [string] $Tag,
 
-    [switch] $Load
+    [switch] $Load,
+
+    [switch] $Push
 )
 
 $ErrorActionPreference = "Stop"
+
+if ($Load -and $Push) {
+    throw "Use either -Load or -Push, not both."
+}
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $workspaceRoot = $repoRoot
@@ -74,6 +92,8 @@ if (Test-Path $cacheRoot) {
 
 if ($Load) {
     $dockerArgs += "--load"
+} elseif ($Push) {
+    $dockerArgs += "--push"
 } else {
     $safeImageName = ($Tag -replace "[/:\\]", "-")
     $imageTar = Join-Path $imageRoot "$safeImageName.tar"
@@ -97,7 +117,7 @@ if (Test-Path $cacheRoot) {
 }
 Move-Item -LiteralPath $newCacheRoot -Destination $cacheRoot
 
-if (-not $Load) {
+if (-not $Load -and -not $Push) {
     Write-Host "Image archive written under $imageRoot"
     Write-Host "Load it only when needed: docker load -i <archive>"
 }

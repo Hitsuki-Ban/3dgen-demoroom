@@ -1,0 +1,31 @@
+{
+  "id": "3dtopia-xl",
+  "name": "3DTopia-XL",
+  "input": "image",
+  "output": "pbr-textured-mesh",
+  "code_repo": "https://github.com/3DTopia/3DTopia-XL",
+  "code_commit": "4017e5bfbaab7f73632b47311a92a434abb9d2fc",
+  "weights_repo": "FrozenBurning/3DTopia-XL",
+  "weights_revision": "8a348b850d36d6354a26917d531eb8f2a5633515",
+  "auxiliary_weights": {
+    "dinov2_url": "https://dl.fbaipublicfiles.com/dinov2/dinov2_vitb14/dinov2_vitb14_reg4_pretrain.pth",
+    "rembg_model": "u2net"
+  },
+  "license": "Apache-2.0 plus bundled third-party notices",
+  "default_parameters": {
+    "ddim": 25,
+    "cfg": 6,
+    "precision": "fp16",
+    "export_glb": true,
+    "fast_unwrap": false,
+    "decimate": 100000,
+    "mc_resolution": 256,
+    "batch_size": 8192,
+    "remesh": false,
+    "image_height": 518,
+    "image_width": 518,
+    "checkpoint_path": "/workspace/weights/3DTopia-XL/model_sview_dit_fp16.pt",
+    "vae_checkpoint_path": "/workspace/weights/3DTopia-XL/model_vae_fp16.pt",
+    "topia_xl_weights_path": "/workspace/weights/3DTopia-XL"
+  }
+}

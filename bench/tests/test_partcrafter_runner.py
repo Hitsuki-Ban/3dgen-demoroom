@@ -136,6 +136,12 @@ def test_partcrafter_incremental_upload_uses_task_id_prefix(monkeypatch, tmp_pat
     uploaded = []
 
     class FakeS3Client:
+        def list_objects_v2(self, **request):
+            return {"Contents": [], "IsTruncated": False}
+
+        def delete_objects(self, **request) -> None:
+            raise AssertionError("empty task prefix must not issue a delete")
+
         def upload_file(self, source: str, bucket: str, key: str) -> None:
             uploaded.append((Path(source).name, bucket, key))
 

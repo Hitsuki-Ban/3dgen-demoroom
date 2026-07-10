@@ -78,6 +78,9 @@ def main() -> None:
     runpod_launch.add_argument("--network-volume-id", required=True)
     runpod_launch.add_argument("--data-center-id", required=True)
     runpod_launch.add_argument("--startup-timeout-min", type=int, required=True)
+    task_selection = runpod_launch.add_mutually_exclusive_group()
+    task_selection.add_argument("--task-limit", type=int)
+    task_selection.add_argument("--task-id", dest="task_ids", action="append")
 
     subcommands.add_parser("runpod-pods")
 
@@ -114,6 +117,8 @@ def main() -> None:
             network_volume_id=args.network_volume_id,
             data_center_id=args.data_center_id,
             startup_timeout_min=args.startup_timeout_min,
+            task_limit=args.task_limit,
+            task_ids=tuple(args.task_ids or ()),
         )
         min_balance_usd = parse_min_balance_usd(
             args.min_balance_usd if args.min_balance_usd is not None else os.environ.get("RUNPOD_MIN_BALANCE_USD")
@@ -126,3 +131,7 @@ def main() -> None:
     elif args.command == "runpod-terminate":
         pod = RunPodClient(api_key=required_env("RUNPOD_API_KEY")).terminate_pod(args.pod_id)
         print(json.dumps(pod, sort_keys=True))
+
+
+if __name__ == "__main__":
+    main()

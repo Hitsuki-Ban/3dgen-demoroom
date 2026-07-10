@@ -1,6 +1,7 @@
 .git
 .worktrees
 .docker-build
+.docker-data
 outputs
 bench/.venv
 bench/.pytest_cache

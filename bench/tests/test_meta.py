@@ -51,6 +51,28 @@ def test_load_run_metadata_rejects_missing_schema_field(tmp_path: Path) -> None:
         load_run_metadata(meta_file)
 
 
+def test_load_run_metadata_accepts_without_optional_fields(tmp_path: Path) -> None:
+    meta_file = tmp_path / "meta.json"
+    meta = _valid_meta()
+    meta_file.write_text(json.dumps(meta), encoding="utf-8")
+
+    assert load_run_metadata(meta_file) == meta
+
+
+def test_load_run_metadata_accepts_external_revision_fields(tmp_path: Path) -> None:
+    meta_file = tmp_path / "meta.json"
+    meta = _valid_meta()
+    meta["external_weight_revisions"] = {
+        "briaai/RMBG-2.0": "5df4c9c76d8170882c34f6986e848ee07fd0ba43"
+    }
+    meta["external_code_revisions"] = {
+        "microsoft/MoGe": "07444410f1e33f402353b99d6ccd26bd31e469e8"
+    }
+    meta_file.write_text(json.dumps(meta), encoding="utf-8")
+
+    assert load_run_metadata(meta_file) == meta
+
+
 def test_load_run_metadata_rejects_unknown_schema_field(tmp_path: Path) -> None:
     meta_file = tmp_path / "meta.json"
     meta = _valid_meta()
