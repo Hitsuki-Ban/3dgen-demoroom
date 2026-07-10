@@ -42,7 +42,7 @@ export interface ModelInfo {
   vramNote?: string;
 }
 
-/** bench の meta.json(REQUIRED_META_KEYS)と対応 */
+/** bench の meta.json(REQUIRED_META_KEYS + OPTIONAL_META_KEYS)と対応 */
 export interface RunMeta {
   task_id: string;
   model_id: string;
@@ -61,6 +61,9 @@ export interface RunMeta {
   started_at: string;
   finished_at: string;
   license_file: string;
+  /** OPTIONAL_META_KEYS: 外部依存(HF リポ等)の取得時 revision 記録。trellis2 / pixal3d 等が出力する */
+  external_weight_revisions?: Record<string, string>;
+  external_code_revisions?: Record<string, string>;
 }
 
 /** gltf-transform inspect から抽出(最適化パイプラインで生成) */
