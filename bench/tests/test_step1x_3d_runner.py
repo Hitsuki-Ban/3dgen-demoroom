@@ -100,6 +100,7 @@ def test_prepare_step1x_3d_task_output_writes_textured_meta_and_raw_geometry(tmp
     assert meta["parameters"]["num_inference_steps"] == 50
     assert meta["parameters"]["guidance_scale"] == 7.5
     assert meta["parameters"]["texture"] is True
+    assert meta["external_weight_revisions"] == runner.EXTERNAL_WEIGHT_REVISIONS
     assert (tmp_path / "task-output" / "output.glb").read_bytes() == b"textured-glb"
     assert (tmp_path / "task-output" / "raw" / "step1x-3d" / "geometry.glb").read_bytes() == b"geometry-glb"
 
@@ -118,6 +119,12 @@ def test_step1x_3d_model_spec_records_current_pins() -> None:
         "madebyollin/sdxl-vae-fp16-fix",
         "ZhengPeng7/BiRefNet",
     ]
+    assert spec["external_weight_revisions"] == {
+        "facebook/dinov2-with-registers-large": "e4c89a4e05589de9b3e188688a303d0f3c04d0f3",
+        "stabilityai/stable-diffusion-xl-base-1.0": "462165984030d82259a11f4367a4eed129e94a7b",
+        "madebyollin/sdxl-vae-fp16-fix": "207b116dae70ace3637169f1ddd2434b91b3a8cd",
+        "ZhengPeng7/BiRefNet": "e2bf8e4460fc8fa32bba5ea4d94b3233d367b0e4",
+    }
     assert spec["default_parameters"]["geometry_subfolder"] == "Step1X-3D-Geometry-1300m"
     assert spec["default_parameters"]["texture_subfolder"] == "Step1X-3D-Texture"
     assert spec["default_parameters"]["num_inference_steps"] == 50
@@ -141,3 +148,35 @@ def test_step1x_3d_dockerfile_uses_runtime_only_volume_paths() -> None:
     assert "custom_rasterizer" in dockerfile
     assert "differentiable_renderer" in dockerfile
     assert "COPY models/step1x-3d/runner.py /opt/3dgen-runner/step1x_3d_runner.py" in dockerfile
+
+
+def test_require_staged_hf_snapshot_checks_main_ref_and_files(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("STEP1X_3D_WEIGHTS_PATH", "/workspace/weights/Step1X-3D")
+    runner = load_step1x_3d_runner()
+    repo_cache = tmp_path / "hub" / "models--example--model"
+    snapshot = repo_cache / "snapshots" / "revision-123"
+    snapshot.mkdir(parents=True)
+    (repo_cache / "refs").mkdir()
+    (repo_cache / "refs" / "main").write_text("revision-123\n", encoding="utf-8")
+    (snapshot / "config.json").write_text("{}\n", encoding="utf-8")
+    (snapshot / "model.safetensors").write_bytes(b"weights")
+
+    assert runner.require_staged_hf_snapshot(
+        tmp_path,
+        repo_cache_name="models--example--model",
+        revision="revision-123",
+        required_files=("config.json", "model.safetensors"),
+    ) == snapshot
+
+    (repo_cache / "refs" / "main").write_text("unexpected\n", encoding="utf-8")
+    try:
+        runner.require_staged_hf_snapshot(
+            tmp_path,
+            repo_cache_name="models--example--model",
+            revision="revision-123",
+            required_files=("config.json", "model.safetensors"),
+        )
+    except ValueError as exc:
+        assert "unexpected staged Hugging Face revision" in str(exc)
+    else:
+        raise AssertionError("revision mismatch should fail before inference")

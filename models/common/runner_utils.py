@@ -125,6 +125,10 @@ def parse_max_runtime_seconds(env: dict[str, str]) -> int:
     return minutes * 60
 
 
+def should_retry_task_error(error: Exception, attempt_index: int, max_attempts: int) -> bool:
+    return not isinstance(error, TimeoutError) and attempt_index + 1 < max_attempts
+
+
 def upload_task_increment_if_configured(task_output_dir: Path, task_id: str, env: dict[str, str]) -> list[str]:
     target = env.get("RUNPOD_INCREMENTAL_S3_TARGET")
     if not target:

@@ -30,11 +30,22 @@ from runner_utils import (
 MODEL_ID = "step1x-3d"
 MODEL_GIT_COMMIT = "cb5ac944709c6c913109070c7b90c3447f57f3d4"
 WEIGHTS_REVISION = "bf7084495b3a72222f36549b7942948aa4d9daa7"
+DINOV2_REVISION = "e4c89a4e05589de9b3e188688a303d0f3c04d0f3"
+SDXL_REVISION = "462165984030d82259a11f4367a4eed129e94a7b"
+SDXL_VAE_REVISION = "207b116dae70ace3637169f1ddd2434b91b3a8cd"
+BIREFNET_REVISION = "e2bf8e4460fc8fa32bba5ea4d94b3233d367b0e4"
 STEP1X_3D_ROOT = Path("/opt/Step1X-3D")
 MAX_TASK_ATTEMPTS = 1
 
 
 STEP1X_3D_WEIGHTS_PATH = required_env("STEP1X_3D_WEIGHTS_PATH")
+
+EXTERNAL_WEIGHT_REVISIONS = {
+    "facebook/dinov2-with-registers-large": DINOV2_REVISION,
+    "stabilityai/stable-diffusion-xl-base-1.0": SDXL_REVISION,
+    "madebyollin/sdxl-vae-fp16-fix": SDXL_VAE_REVISION,
+    "ZhengPeng7/BiRefNet": BIREFNET_REVISION,
+}
 
 DEFAULT_PARAMETERS = {
     "geometry_subfolder": "Step1X-3D-Geometry-1300m",
@@ -208,6 +219,47 @@ def run_step1x_3d_infer(args: argparse.Namespace) -> None:
         if not path.is_file():
             raise FileNotFoundError(f"missing Step1X-3D weight file: {path}")
 
+    hf_home = Path(required_env("HF_HOME"))
+    require_staged_hf_snapshot(
+        hf_home,
+        repo_cache_name="models--facebook--dinov2-with-registers-large",
+        revision=DINOV2_REVISION,
+        required_files=("config.json", "model.safetensors", "preprocessor_config.json"),
+    )
+    require_staged_hf_snapshot(
+        hf_home,
+        repo_cache_name="models--stabilityai--stable-diffusion-xl-base-1.0",
+        revision=SDXL_REVISION,
+        required_files=(
+            "model_index.json",
+            "scheduler/scheduler_config.json",
+            "text_encoder/config.json",
+            "text_encoder/model.safetensors",
+            "text_encoder_2/config.json",
+            "text_encoder_2/model.safetensors",
+            "tokenizer/merges.txt",
+            "tokenizer/tokenizer_config.json",
+            "tokenizer/vocab.json",
+            "tokenizer_2/merges.txt",
+            "tokenizer_2/tokenizer_config.json",
+            "tokenizer_2/vocab.json",
+            "unet/config.json",
+            "unet/diffusion_pytorch_model.safetensors",
+        ),
+    )
+    require_staged_hf_snapshot(
+        hf_home,
+        repo_cache_name="models--madebyollin--sdxl-vae-fp16-fix",
+        revision=SDXL_VAE_REVISION,
+        required_files=("config.json", "diffusion_pytorch_model.safetensors"),
+    )
+    require_staged_hf_snapshot(
+        hf_home,
+        repo_cache_name="models--ZhengPeng7--BiRefNet",
+        revision=BIREFNET_REVISION,
+        required_files=("BiRefNet_config.py", "birefnet.py", "config.json", "model.safetensors"),
+    )
+
     sys.path.insert(0, str(STEP1X_3D_ROOT))
 
     import torch
@@ -265,6 +317,28 @@ def run_step1x_3d_infer(args: argparse.Namespace) -> None:
     )
 
 
+def require_staged_hf_snapshot(
+    hf_home: Path,
+    *,
+    repo_cache_name: str,
+    revision: str,
+    required_files: tuple[str, ...],
+) -> Path:
+    repo_cache = hf_home / "hub" / repo_cache_name
+    main_ref = repo_cache / "refs" / "main"
+    if not main_ref.is_file():
+        raise FileNotFoundError(f"missing staged Hugging Face main ref: {main_ref}")
+    actual_revision = main_ref.read_text(encoding="utf-8").strip()
+    if actual_revision != revision:
+        raise ValueError(f"unexpected staged Hugging Face revision for {repo_cache_name}: {actual_revision}")
+    snapshot = repo_cache / "snapshots" / revision
+    for required_file in required_files:
+        path = snapshot / required_file
+        if not path.is_file():
+            raise FileNotFoundError(f"missing staged Hugging Face file: {path}")
+    return snapshot
+
+
 def prepare_task_output(
     *,
     task: TaskDefinition,
@@ -308,6 +382,7 @@ def prepare_task_output(
         "started_at": started_at,
         "finished_at": finished_at,
         "license_file": "LICENSES.txt",
+        "external_weight_revisions": EXTERNAL_WEIGHT_REVISIONS,
     }
     (task_output_dir / "meta.json").write_text(json.dumps(meta, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 

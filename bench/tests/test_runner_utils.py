@@ -80,6 +80,23 @@ def test_select_tasks_runs_only_requested_ids_in_requested_order() -> None:
 
 
 @pytest.mark.parametrize(
+    ("error", "attempt_index", "max_attempts", "expected"),
+    [
+        (RuntimeError("retryable"), 0, 2, True),
+        (RuntimeError("last attempt"), 1, 2, False),
+        (TimeoutError("pod termination requested"), 0, 2, False),
+    ],
+)
+def test_should_retry_task_error(
+    error: Exception,
+    attempt_index: int,
+    max_attempts: int,
+    expected: bool,
+) -> None:
+    assert runner_utils.should_retry_task_error(error, attempt_index, max_attempts) is expected
+
+
+@pytest.mark.parametrize(
     ("task_ids", "task_limit", "message"),
     [
         (["missing"], None, "unknown --task-id"),

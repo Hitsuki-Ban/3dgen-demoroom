@@ -20,6 +20,7 @@ from runner_utils import (
     required_env,
     run_with_peak_vram,
     select_tasks,
+    should_retry_task_error,
     terminate_runpod_if_needed,
     upload_task_increment_if_configured,
     utc_now,
@@ -200,7 +201,7 @@ def run_task(
                 shutil.rmtree(work_dir)
             if task_output_dir.exists():
                 shutil.rmtree(task_output_dir)
-            if attempt_index + 1 < MAX_TASK_ATTEMPTS:
+            if should_retry_task_error(exc, attempt_index, MAX_TASK_ATTEMPTS):
                 continue
             write_task_failure(
                 task=task,
