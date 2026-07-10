@@ -9,6 +9,10 @@
     "facebook/dinov2-giant",
     "RealESRGAN_x4plus.pth"
   ],
+  "external_weight_revisions": {
+    "facebook/dinov2-giant": "611a9d42f2335e0f921f1e313ad3c1b7178d206d",
+    "RealESRGAN_x4plus.pth": "sha256:4fa0d38905f75ac06eb49a7951b426670021be3018265fd191d2125df9d682f1"
+  },
   "distribution_restrictions": {
     "source": "Tencent Hunyuan Community License, section 5(c)",
     "block_regions": [
