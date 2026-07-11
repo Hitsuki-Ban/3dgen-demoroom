@@ -26,6 +26,12 @@ interface Props {
   downloadUrl?: string;
   /** meta.json の内容(モーダル表示用に整形済み文字列) */
   metaJson?: string;
+  /** モデル別の向き補正(度)。適用の ON/OFF は ViewerCore のトグルが握る */
+  orientationFix?: { x?: number; y?: number; z?: number };
+  /** 拡大表示(単体フォーカス等): 正方形でなく高さ基準の大きなペインにする */
+  large?: boolean;
+  /** 未ロード時に薄く敷くプレビュー画像(リファレンス画像等) */
+  previewImage?: string;
 }
 
 export function ViewerPane({
@@ -37,6 +43,9 @@ export function ViewerPane({
   sizeBytes,
   downloadUrl,
   metaJson,
+  orientationFix,
+  large,
+  previewImage,
 }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const viewer = useViewer();
@@ -102,7 +111,7 @@ export function ViewerPane({
           disposeObject(object);
           return;
         }
-        paneId = viewer.addPane(ref.current!, object);
+        paneId = viewer.addPane(ref.current!, object, orientationFix);
         setStats(viewer.getStats(paneId));
       } catch (e) {
         if (cancelled || (e instanceof DOMException && e.name === 'AbortError')) return;
@@ -139,7 +148,21 @@ export function ViewerPane({
           </p>
         </div>
       ) : (
-        <div ref={ref} className="relative aspect-square w-full cursor-grab active:cursor-grabbing touch-none">
+        <div
+          ref={ref}
+          className={`relative w-full cursor-grab active:cursor-grabbing touch-none ${
+            large ? 'h-[70vh] min-h-[320px]' : 'aspect-square'
+          }`}
+        >
+          {!loaded && previewImage && (
+            // 未ロード時のプレビュー: 何の課題かを最低限確認できるようリファレンス画像を薄く敷く
+            <img
+              src={previewImage}
+              alt=""
+              aria-hidden
+              className="absolute inset-0 w-full h-full object-contain opacity-25 blur-[1px] pointer-events-none"
+            />
+          )}
           {needsClick && !accepted && (
             <button
               onClick={() => setAccepted(true)}

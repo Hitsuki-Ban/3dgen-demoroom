@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { MODELS } from '../data/models';
 import { TASKS } from '../data/tasks';
 import { useManifest } from '../data/useManifest';
-import { isRunResult, type ModelInfo, type RunResult } from '../data/types';
+import { isRunResult, type ModelInfo, type RunResult, type TaskInfo } from '../data/types';
 import { loadModel } from '../viewer/loadModel';
 import { useViewer } from '../viewer/ViewerContext';
 import { ViewerPane } from '../viewer/ViewerPane';
@@ -19,16 +19,53 @@ function paneBadge(m: ModelInfo): string | undefined {
   return undefined;
 }
 
-function makeLoadObject(m: ModelInfo, result: RunResult) {
-  return async (onProgress?: (fraction: number) => void, signal?: AbortSignal) => {
-    const object = await loadModel(result.glbUrl, onProgress, signal);
-    const fix = m.orientationFix;
-    if (fix) {
-      const d = Math.PI / 180;
-      object.rotation.set((fix.x ?? 0) * d, (fix.y ?? 0) * d, (fix.z ?? 0) * d);
-    }
-    return object;
-  };
+function makeLoadObject(result: RunResult) {
+  return (onProgress?: (fraction: number) => void, signal?: AbortSignal) =>
+    loadModel(result.glbUrl, onProgress, signal);
+}
+
+/** 表示状態: 全モデルグリッド / 2 モデル比較 / 単体フォーカス */
+type ViewState = { type: 'grid' } | { type: 'compare' } | { type: 'focus'; modelId: string };
+
+/** 大画面モード(比較・フォーカス)で使う共通ペイン */
+function ResultPane({
+  m,
+  result,
+  task,
+  large,
+  keyPrefix,
+  taskId,
+  headerExtra,
+}: {
+  m: ModelInfo;
+  result: RunResult;
+  task: TaskInfo;
+  large?: boolean;
+  keyPrefix: string;
+  taskId: string;
+  headerExtra?: React.ReactNode;
+}) {
+  return (
+    <ViewerPane
+      key={`${keyPrefix}:${taskId}:${m.id}`}
+      title={m.name}
+      badge={paneBadge(m)}
+      large={large}
+      headerExtra={headerExtra}
+      sizeBytes={result.glbSizeBytes}
+      downloadUrl={result.glbUrl}
+      metaJson={JSON.stringify(result.meta, null, 2)}
+      orientationFix={m.orientationFix}
+      previewImage={task.referenceImage}
+      loadObject={makeLoadObject(result)}
+      extraInfo={formatResultInfo(
+        result.metrics.wallClockSeconds,
+        result.metrics.peakVramBytes,
+        result.glbSizeBytes,
+        result.metrics.gpuName,
+      )}
+    />
+  );
 }
 
 export function TaskDetail({ taskId, onBack }: { taskId: string; onBack: () => void }) {
@@ -37,7 +74,7 @@ export function TaskDetail({ taskId, onBack }: { taskId: string; onBack: () => v
   const viewer = useViewer();
   /** 大画面比較に選択中のモデル id(最大 2 つ。3 つ目を選ぶと古い方から入れ替え) */
   const [compareSel, setCompareSel] = useState<string[]>([]);
-  const [comparing, setComparing] = useState(false);
+  const [view, setView] = useState<ViewState>({ type: 'grid' });
 
   // 課題を開くたびに表示状態を既定へ戻す(ViewerCore の mode はペインより長生きするため、
   // 前の課題で選んだ matcap 等が新しいペインへ引き継がれて UI 表示と食い違うのを防ぐ)
@@ -45,7 +82,7 @@ export function TaskDetail({ taskId, onBack }: { taskId: string; onBack: () => v
     viewer?.setDisplayMode('pbr');
     viewer?.setCameraSync(true);
     setCompareSel([]);
-    setComparing(false);
+    setView({ type: 'grid' });
   }, [viewer, taskId]);
 
   if (!task) return null;
@@ -61,6 +98,45 @@ export function TaskDetail({ taskId, onBack }: { taskId: string; onBack: () => v
   const compareModels = compareSel
     .map((id) => MODELS.find((m) => m.id === id))
     .filter((m): m is ModelInfo => !!m && resultByModel.has(m.id));
+
+  const focusModel = view.type === 'focus' ? MODELS.find((m) => m.id === view.modelId) : undefined;
+
+  // 大画面モード(比較 / フォーカス)はリファレンス列を畳んでフル幅を使う
+  if ((view.type === 'compare' && compareModels.length === 2) || (view.type === 'focus' && focusModel)) {
+    const largeModels = view.type === 'focus' ? [focusModel!] : compareModels;
+    return (
+      <section className="pt-6">
+        <div className="flex flex-wrap items-center gap-3">
+          <button onClick={() => setView({ type: 'grid' })} className="text-sm text-sky-400 hover:underline">
+            ← 全モデル表示に戻る
+          </button>
+          <h3 className="text-sm font-semibold text-slate-300">
+            {task.id} — {largeModels.map((m) => m.name).join(' vs ')}
+          </h3>
+          {/* 比較の基準としてリファレンスを小さく添える */}
+          <img
+            src={task.referenceImage}
+            alt={`${task.id} リファレンス画像`}
+            className="w-14 h-14 rounded border border-slate-700 object-cover ml-auto"
+          />
+        </div>
+        <ViewerToolbar />
+        <div className={`grid grid-cols-1 gap-4 ${largeModels.length === 2 ? 'md:grid-cols-2' : ''}`}>
+          {largeModels.map((m) => (
+            <ResultPane
+              key={`large:${taskId}:${m.id}`}
+              m={m}
+              result={resultByModel.get(m.id)!}
+              task={task}
+              large
+              keyPrefix="large"
+              taskId={taskId}
+            />
+          ))}
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="pt-6">
@@ -82,96 +158,57 @@ export function TaskDetail({ taskId, onBack }: { taskId: string; onBack: () => v
           </div>
         </div>
         <div>
-          {comparing && compareModels.length === 2 ? (
-            <>
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-slate-300">
-                  {compareModels[0].name} vs {compareModels[1].name}
-                </h3>
-                <button
-                  onClick={() => setComparing(false)}
-                  className="text-sm text-sky-400 hover:underline"
-                >
-                  ← 全モデル表示に戻る
-                </button>
-              </div>
-              <ViewerToolbar />
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {compareModels.map((m) => {
-                  const result = resultByModel.get(m.id)!;
-                  return (
-                    <ViewerPane
-                      key={`cmp:${taskId}:${m.id}`}
-                      title={m.name}
-                      badge={paneBadge(m)}
-                      sizeBytes={result.glbSizeBytes}
-                      downloadUrl={result.glbUrl}
-                      metaJson={JSON.stringify(result.meta, null, 2)}
-                      loadObject={makeLoadObject(m, result)}
-                      extraInfo={formatResultInfo(
-                        result.metrics.wallClockSeconds,
-                        result.metrics.peakVramBytes,
-                        result.glbSizeBytes,
-                        result.metrics.gpuName,
-                      )}
-                    />
-                  );
-                })}
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="flex items-center justify-between gap-3">
-                <h3 className="text-sm font-semibold text-slate-300">
-                  モデル別出力({doneCount}/{MODELS.length} 完了)
-                </h3>
-                {compareSel.length === 2 && (
-                  <button
-                    onClick={() => setComparing(true)}
-                    className="text-sm px-3 py-1.5 rounded-md bg-sky-700 text-white hover:bg-sky-600"
-                  >
-                    選択した 2 モデルを大きく比較
-                  </button>
-                )}
-              </div>
-              {doneCount > 0 && <ViewerToolbar />}
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-                {MODELS.map((m) => {
-                  const result = resultByModel.get(m.id);
-                  if (!result) return <ModelCard key={m.id} model={m} />;
-                  return (
-                    <ViewerPane
-                      // taskId を key に含めて課題切替時に必ず remount する
-                      // (同一 key の再利用だと GLB ロード effect が走らず前の課題のモデルが残る)
-                      key={`${taskId}:${m.id}`}
-                      title={m.name}
-                      badge={paneBadge(m)}
-                      headerExtra={
-                        <label className="flex items-center gap-1 text-xs text-slate-400 cursor-pointer select-none">
-                          <input
-                            type="checkbox"
-                            checked={compareSel.includes(m.id)}
-                            onChange={() => toggleCompare(m.id)}
-                          />
-                          比較
-                        </label>
-                      }
-                      sizeBytes={result.glbSizeBytes}
-                      downloadUrl={result.glbUrl}
-                      metaJson={JSON.stringify(result.meta, null, 2)}
-                      loadObject={makeLoadObject(m, result)}
-                      extraInfo={formatResultInfo(
-                        result.metrics.wallClockSeconds,
-                        result.metrics.peakVramBytes,
-                        result.glbSizeBytes,
-                        result.metrics.gpuName,
-                      )}
-                    />
-                  );
-                })}
-              </div>
-            </>
-          )}
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="text-sm font-semibold text-slate-300">
+              モデル別出力({doneCount}/{MODELS.length} 完了)
+            </h3>
+            {compareSel.length === 2 && (
+              <button
+                onClick={() => setView({ type: 'compare' })}
+                className="text-sm px-3 py-1.5 rounded-md bg-sky-700 text-white hover:bg-sky-600"
+              >
+                選択した 2 モデルを大きく比較
+              </button>
+            )}
+          </div>
+          {doneCount > 0 && <ViewerToolbar />}
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+            {MODELS.map((m) => {
+              const result = resultByModel.get(m.id);
+              if (!result) return <ModelCard key={m.id} model={m} />;
+              return (
+                <ResultPane
+                  // taskId を key に含めて課題切替時に必ず remount する
+                  // (同一 key の再利用だと GLB ロード effect が走らず前の課題のモデルが残る)
+                  key={`grid:${taskId}:${m.id}`}
+                  m={m}
+                  result={result}
+                  task={task}
+                  keyPrefix="grid"
+                  taskId={taskId}
+                  headerExtra={
+                    <>
+                      <label className="flex items-center gap-1 text-xs text-slate-400 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={compareSel.includes(m.id)}
+                          onChange={() => toggleCompare(m.id)}
+                        />
+                        比較
+                      </label>
+                      <button
+                        onClick={() => setView({ type: 'focus', modelId: m.id })}
+                        title="このモデルを単体で大きく表示"
+                        className="text-slate-400 hover:text-white text-sm leading-none"
+                      >
+                        ⛶
+                      </button>
+                    </>
+                  }
+                />
+              );
+            })}
+          </div>
         </div>
       </div>
     </section>
