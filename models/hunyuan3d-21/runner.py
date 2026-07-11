@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import shutil
@@ -31,11 +32,18 @@ from runner_utils import (
 MODEL_ID = "hunyuan3d-21"
 MODEL_GIT_COMMIT = "82920d643c0dc2f7bfd7255f45f62d386edfe60c"
 WEIGHTS_REVISION = "0b94677654c57bb9a6b6845cd7b704ccf551d327"
+DINOV2_REVISION = "611a9d42f2335e0f921f1e313ad3c1b7178d206d"
+REALESRGAN_SHA256 = "4fa0d38905f75ac06eb49a7951b426670021be3018265fd191d2125df9d682f1"
 HUNYUAN3D_ROOT = Path("/opt/Hunyuan3D-2.1")
 MAX_TASK_ATTEMPTS = 1
 
 
 HUNYUAN3D_21_WEIGHTS_PATH = required_env("HUNYUAN3D_21_WEIGHTS_PATH")
+
+EXTERNAL_WEIGHT_REVISIONS = {
+    "facebook/dinov2-giant": DINOV2_REVISION,
+    "RealESRGAN_x4plus.pth": f"sha256:{REALESRGAN_SHA256}",
+}
 
 DEFAULT_PARAMETERS = {
     "shape_subfolder": "hunyuan3d-dit-v2-1",
@@ -232,21 +240,30 @@ def run_hunyuan3d_21_infer(args: argparse.Namespace) -> None:
     for path in required_paths:
         if not path.exists():
             raise FileNotFoundError(f"missing Hunyuan3D-2.1 staged asset: {path}")
+    require_file_sha256(weights_path / "RealESRGAN_x4plus.pth", REALESRGAN_SHA256)
+    require_staged_hf_snapshot(
+        Path(required_env("HF_HOME")),
+        repo_cache_name="models--facebook--dinov2-giant",
+        revision=DINOV2_REVISION,
+        required_files=("config.json", "model.safetensors", "preprocessor_config.json"),
+    )
 
     os.environ["HF_HUB_OFFLINE"] = "1"
     os.environ["TRANSFORMERS_OFFLINE"] = "1"
+    os.environ["HF_MODULES_CACHE"] = str(args.infer_output_dir / "hf-modules")
     os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
     os.environ["ATTN_BACKEND"] = DEFAULT_PARAMETERS["attention_backend"]
     sys.path.insert(0, str(HUNYUAN3D_ROOT))
     sys.path.insert(0, str(HUNYUAN3D_ROOT / "hy3dshape"))
     sys.path.insert(0, str(HUNYUAN3D_ROOT / "hy3dpaint"))
 
+    install_local_snapshot_download(weights_path)
+    prepare_local_diffusers_module(weights_path)
+
     import torch
     from PIL import Image
     from hy3dshape.pipelines import Hunyuan3DDiTFlowMatchingPipeline
     from textureGenPipeline import Hunyuan3DPaintConfig, Hunyuan3DPaintPipeline
-
-    install_local_snapshot_download(weights_path)
 
     args.infer_output_dir.mkdir(parents=True, exist_ok=True)
     geometry_glb = args.infer_output_dir / "geometry.glb"
@@ -327,6 +344,56 @@ def install_local_snapshot_download(weights_path: Path) -> None:
     huggingface_hub.snapshot_download = snapshot_download
 
 
+def prepare_local_diffusers_module(weights_path: Path) -> None:
+    component_root = weights_path / DEFAULT_PARAMETERS["texture_subfolder"] / "unet"
+    for filename in ("attn_processor.py", "modules.py"):
+        path = component_root / filename
+        if not path.is_file():
+            raise FileNotFoundError(f"missing staged Hunyuan Diffusers module: {path}")
+
+    from diffusers.utils.dynamic_modules_utils import get_class_from_dynamic_module
+
+    model_class = get_class_from_dynamic_module(
+        str(component_root),
+        module_file="modules.py",
+        class_name="UNet2p5DConditionModel",
+    )
+    if model_class.__name__ != "UNet2p5DConditionModel":
+        raise RuntimeError(f"unexpected staged Hunyuan Diffusers class: {model_class.__name__}")
+
+
+def require_staged_hf_snapshot(
+    hf_home: Path,
+    *,
+    repo_cache_name: str,
+    revision: str,
+    required_files: tuple[str, ...],
+) -> Path:
+    repo_cache = hf_home / "hub" / repo_cache_name
+    main_ref = repo_cache / "refs" / "main"
+    if not main_ref.is_file():
+        raise FileNotFoundError(f"missing staged Hugging Face main ref: {main_ref}")
+    actual_revision = main_ref.read_text(encoding="utf-8").strip()
+    if actual_revision != revision:
+        raise ValueError(f"unexpected staged Hugging Face revision for {repo_cache_name}: {actual_revision}")
+    snapshot = repo_cache / "snapshots" / revision
+    for required_file in required_files:
+        path = snapshot / required_file
+        if not path.is_file():
+            raise FileNotFoundError(f"missing staged Hugging Face file: {path}")
+    return snapshot
+
+
+def require_file_sha256(path: Path, expected: str) -> None:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    actual = digest.hexdigest()
+    if actual != expected:
+        raise ValueError(f"unexpected SHA-256 for {path}: {actual}")
+
+
 def prepare_task_output(
     *,
     task: TaskDefinition,
@@ -370,6 +437,7 @@ def prepare_task_output(
         "started_at": started_at,
         "finished_at": finished_at,
         "license_file": "LICENSES.txt",
+        "external_weight_revisions": EXTERNAL_WEIGHT_REVISIONS,
     }
     (task_output_dir / "meta.json").write_text(json.dumps(meta, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 

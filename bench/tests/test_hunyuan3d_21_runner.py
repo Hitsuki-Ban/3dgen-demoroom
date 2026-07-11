@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -107,6 +108,7 @@ def test_prepare_hunyuan3d_21_task_output_writes_textured_meta_and_raw_geometry(
     assert meta["parameters"]["octree_resolution"] == 384
     assert meta["parameters"]["texture_resolution"] == 512
     assert meta["parameters"]["texture"] is True
+    assert meta["external_weight_revisions"] == runner.EXTERNAL_WEIGHT_REVISIONS
     assert (tmp_path / "task-output" / "output.glb").read_bytes() == b"textured-glb"
     assert (tmp_path / "task-output" / "raw" / "hunyuan3d-21" / "geometry.glb").read_bytes() == b"geometry-glb"
 
@@ -119,6 +121,10 @@ def test_hunyuan3d_21_model_spec_records_current_pins_and_region_policy() -> Non
     assert spec["code_commit"] == "82920d643c0dc2f7bfd7255f45f62d386edfe60c"
     assert spec["weights_repo"] == "tencent/Hunyuan3D-2.1"
     assert spec["weights_revision"] == "0b94677654c57bb9a6b6845cd7b704ccf551d327"
+    assert spec["external_weight_revisions"] == {
+        "facebook/dinov2-giant": "611a9d42f2335e0f921f1e313ad3c1b7178d206d",
+        "RealESRGAN_x4plus.pth": "sha256:4fa0d38905f75ac06eb49a7951b426670021be3018265fd191d2125df9d682f1",
+    }
     assert spec["default_parameters"]["shape_subfolder"] == "hunyuan3d-dit-v2-1"
     assert spec["default_parameters"]["texture_subfolder"] == "hunyuan3d-paintpbr-v2-1"
     assert spec["default_parameters"]["texture"] is True
@@ -142,12 +148,76 @@ def test_hunyuan3d_21_dockerfile_uses_runtime_only_volume_paths() -> None:
     assert 'TORCH_CUDA_ARCH_LIST="8.0;8.9"' in dockerfile
     assert "uv pip install --system" in dockerfile
     assert "bpy-4.0.0-cp310-cp310-manylinux_2_28_x86_64.whl" in dockerfile
+    for runtime_library in ("libice6", "libsm6", "libxi6", "libxkbcommon0", "libxrender1"):
+        assert runtime_library in dockerfile
     assert "python3 -m pybind11 --includes" in dockerfile
     assert "hunyuan3d-21-requirements-constraints.txt" in dockerfile
     assert "MAX_JOBS=1 uv pip install --system --no-build-isolation" in dockerfile
     assert "--index-strategy unsafe-best-match" in dockerfile
     assert "--constraint /tmp/hunyuan3d-21-requirements-constraints.txt" in dockerfile
+    assert "from torchvision.transforms.functional_tensor import rgb_to_grayscale" in dockerfile
+    assert "from torchvision.transforms.functional import rgb_to_grayscale" in dockerfile
     assert "custom_rasterizer" in dockerfile
     assert "compile_mesh_painter.sh" in dockerfile
     assert "uv pip install --system boto3" in dockerfile
     assert "COPY models/hunyuan3d-21/runner.py /opt/3dgen-runner/hunyuan3d_21_runner.py" in dockerfile
+
+
+def test_hunyuan_installs_local_snapshot_redirect_before_pipeline_import() -> None:
+    source = (REPO_ROOT / "models" / "hunyuan3d-21" / "runner.py").read_text(encoding="utf-8")
+
+    assert source.index('os.environ["HF_MODULES_CACHE"]') < source.index(
+        "from textureGenPipeline import"
+    )
+    assert source.index("prepare_local_diffusers_module(weights_path)") < source.index(
+        "from textureGenPipeline import"
+    )
+    assert source.index("install_local_snapshot_download(weights_path)") < source.index(
+        "from textureGenPipeline import"
+    )
+
+
+def test_hunyuan_prepares_pinned_local_diffusers_module(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("HUNYUAN3D_21_WEIGHTS_PATH", "/workspace/weights/Hunyuan3D-2.1")
+    runner = load_hunyuan3d_21_runner()
+    component_root = tmp_path / runner.DEFAULT_PARAMETERS["texture_subfolder"] / "unet"
+    component_root.mkdir(parents=True)
+    for filename in ("attn_processor.py", "modules.py"):
+        (component_root / filename).write_text("# fixture\n", encoding="utf-8")
+
+    calls: list[tuple[str, str, str]] = []
+    dynamic_module = ModuleType("diffusers.utils.dynamic_modules_utils")
+
+    def get_class_from_dynamic_module(path: str, *, module_file: str, class_name: str) -> type:
+        calls.append((path, module_file, class_name))
+        return type("UNet2p5DConditionModel", (), {})
+
+    dynamic_module.get_class_from_dynamic_module = get_class_from_dynamic_module
+    monkeypatch.setitem(sys.modules, "diffusers.utils.dynamic_modules_utils", dynamic_module)
+
+    runner.prepare_local_diffusers_module(tmp_path)
+
+    assert calls == [(str(component_root), "modules.py", "UNet2p5DConditionModel")]
+
+
+def test_hunyuan_staged_dependency_checks(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("HUNYUAN3D_21_WEIGHTS_PATH", "/workspace/weights/Hunyuan3D-2.1")
+    runner = load_hunyuan3d_21_runner()
+    repo_cache = tmp_path / "hub" / "models--facebook--dinov2-giant"
+    snapshot = repo_cache / "snapshots" / runner.DINOV2_REVISION
+    snapshot.mkdir(parents=True)
+    (repo_cache / "refs").mkdir()
+    (repo_cache / "refs" / "main").write_text(runner.DINOV2_REVISION + "\n", encoding="utf-8")
+    for filename in ("config.json", "model.safetensors", "preprocessor_config.json"):
+        (snapshot / filename).write_bytes(b"fixture")
+
+    assert runner.require_staged_hf_snapshot(
+        tmp_path,
+        repo_cache_name="models--facebook--dinov2-giant",
+        revision=runner.DINOV2_REVISION,
+        required_files=("config.json", "model.safetensors", "preprocessor_config.json"),
+    ) == snapshot
+
+    file_path = tmp_path / "asset.bin"
+    file_path.write_bytes(b"asset")
+    runner.require_file_sha256(file_path, hashlib.sha256(b"asset").hexdigest())
