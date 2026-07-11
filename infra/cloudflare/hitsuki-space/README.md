@@ -3,7 +3,7 @@
 This directory is the source of truth for the zone-level pieces of Issue #67:
 
 - proxied, originless apex DNS record;
-- Hunyuan3D 2.1 WAF country block;
+- Hunyuan3D 2.1 WAF block for Cloudflare's 34-code EU set plus GB and KR;
 - apex-to-Worker Single Redirect.
 
 The Worker Custom Domain itself is declared in `web/wrangler.jsonc`. **Do not apply or deploy either configuration until the `hitsuki.space` zone is Active.**
@@ -66,6 +66,7 @@ Deploy `web/wrangler.jsonc` only after the zone resources succeed. Cloudflare th
 ## References (verified 2026-07-12)
 
 - [Cloudflare WAF custom rules with Terraform](https://developers.cloudflare.com/terraform/additional-configurations/waf-custom-rules/)
+- [Cloudflare `ip.src.is_in_european_union` country list](https://developers.cloudflare.com/ruleset-engine/rules-language/fields/reference/ip.src.is_in_european_union/)
 - [Cloudflare Single Redirects](https://developers.cloudflare.com/rules/url-forwarding/single-redirects/)
 - [Cloudflare Custom Domains and originless redirect DNS](https://developers.cloudflare.com/workers/configuration/routing/custom-domains/)
 - [Cloudflare R2 remote backend](https://developers.cloudflare.com/terraform/advanced-topics/remote-backend/)

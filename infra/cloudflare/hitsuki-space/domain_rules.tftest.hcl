@@ -19,14 +19,20 @@ run "domain_contract" {
 
   assert {
     condition = (
-      length(local.hunyuan_blocked_countries) == 29 &&
-      length(toset(local.hunyuan_blocked_countries)) == 29 &&
+      length(local.hunyuan_blocked_countries) == 36 &&
+      length(toset(local.hunyuan_blocked_countries)) == 36 &&
+      toset(local.hunyuan_blocked_countries) == toset([
+        "AT", "AX", "BE", "BG", "CY", "CZ", "DE", "DK", "EE", "ES", "FI", "FR", "GF",
+        "GP", "GR", "HR", "HU", "IE", "IT", "LT", "LU", "LV", "MF", "MQ", "MT", "NL",
+        "PL", "PT", "RE", "RO", "SE", "SI", "SK", "YT",
+        "GB", "KR",
+      ]) &&
       alltrue([
         for country in local.hunyuan_blocked_countries :
         strcontains(local.hunyuan_waf_expression, "\"${country}\"")
       ])
     )
-    error_message = "The Hunyuan WAF country set must contain 29 unique EU27 + GB + KR codes."
+    error_message = "The Hunyuan WAF country set must contain Cloudflare's 34 EU codes plus GB and KR."
   }
 
   assert {

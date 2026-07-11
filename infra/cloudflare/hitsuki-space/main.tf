@@ -2,11 +2,13 @@ locals {
   zone_name       = "hitsuki.space"
   worker_hostname = "3dgen.hitsuki.space"
 
-  # EU27 + GB + KR (ISO 3166-1 alpha-2). Keep this list aligned with the
+  # Cloudflare's 34-code ip.src.is_in_european_union set + GB + KR. This
+  # includes EU regions with separate ISO codes. Keep it aligned with the
   # Worker-side deny list in web/src/worker.ts.
   hunyuan_blocked_countries = [
-    "AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR", "DE", "GR", "HU",
-    "IE", "IT", "LV", "LT", "LU", "MT", "NL", "PL", "PT", "RO", "SK", "SI", "ES", "SE",
+    "AT", "AX", "BE", "BG", "CY", "CZ", "DE", "DK", "EE", "ES", "FI", "FR", "GF",
+    "GP", "GR", "HR", "HU", "IE", "IT", "LT", "LU", "LV", "MF", "MQ", "MT", "NL",
+    "PL", "PT", "RE", "RO", "SE", "SI", "SK", "YT",
     "GB", "KR",
   ]
 
@@ -45,7 +47,7 @@ resource "cloudflare_ruleset" "hunyuan_geo_block" {
 
   rules = [{
     ref         = "block_hunyuan3d_21_eu_gb_kr"
-    description = "Block Hunyuan3D 2.1 assets in EU27, GB, and KR"
+    description = "Block Hunyuan3D 2.1 assets in EU territory, GB, and KR"
     expression  = local.hunyuan_waf_expression
     action      = "block"
     enabled     = true
