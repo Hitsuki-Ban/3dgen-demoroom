@@ -2,16 +2,17 @@
 
 Checked: 2026-07-11 JST
 Issue: #37
+Follow-up: #46
 
 ## Status
 
-All wave 2 models have completed their protocol runs and have been published to the public site-data prefixes in R2. Pixal3D retains two documented protocol failures; every other wave 2 model published 25 successes.
+All wave 2 models have completed their protocol runs and have been published to the public site-data prefixes in R2. Issue #46 reran Pixal3D's two 48GB OOM tasks with unchanged official settings on a 96GB GPU; the final canonical Pixal3D prefix is now 25/25 success.
 
-- Active RunPod pods after final Step1X publish and cleanup: `[]`.
+- Active RunPod pods after the Pixal3D retry and cleanup: `[]`.
 - Remaining RunPod network volumes after final cleanup: `[]`.
-- Final RunPod balance for this report: `$8.7001347015`.
+- Final RunPod balance for this report: `$6.6694984162`.
 - RunPod GraphQL balance and runtime telemetry work with the explicit harness User-Agent; REST Pods and Billing remain the authoritative lifecycle and cost endpoints.
-- GitHub Actions deploy runs `29114194452` and `29126004757` published Hunyuan3D-2.1 and Step1X-3D. Live `manifest.json` generated at `2026-07-10T21:53:09.486Z` contains 272 results across 11 models, including `hunyuan3d-21=25` and `step1x-3d=25`. The Step sample GLB returned HTTP 200 with `Content-Type: model/gltf-binary`, exact `Content-Length: 4820268`, and immutable caching.
+- GitHub Actions deploy runs `29114194452` and `29126004757` published Hunyuan3D-2.1 and Step1X-3D. That pre-#46 live `manifest.json`, generated at `2026-07-10T21:53:09.486Z`, contains 272 results across 11 models. Issue #46 updated the R2 deployment source to Pixal3D 25/25 and 75 objects; the follow-up site deployment remains with Fable. The Step sample GLB returned HTTP 200 with `Content-Type: model/gltf-binary`, exact `Content-Length: 4820268`, and immutable caching.
 - RunPod reported the EU-RO-1 RTX 4090 runtime price as `$0.69/hr` during the paid runs, higher than the `$0.34/hr` value captured in the issue text.
 - RunPod reported the EU-RO-1 RTX 5090 runtime price as `$0.99/hr` during `direct3d-s2` staging, smoke, and full runs.
 - EU-RO-1 network volume `wnqijpazd5` was expanded from 30GB to 80GB and then to 120GB for wave 2 staging, then deleted after the final Step1X publish.
@@ -29,6 +30,9 @@ All wave 2 models have completed their protocol runs and have been published to 
   - `runs/staging/20260710T092850Z/network-volume-wnqijpazd5-pixal3d-external-v1-cpu.json` staged DINOv3, MoGe-2, RMBG-2.0, and the pinned NAF source/checkpoint (`3,405,262,748` bytes).
   - `runs/staging/20260710T094028Z/network-volume-wnqijpazd5-trellis2-pixal3d-validate-v1.json` jointly validated 22 required files, five exact HF refs, the NAF commit marker, and checkpoint SHA-256.
   - `runs/staging/20260710T110413Z/pixal3d-us-48gb-v1.json` staged the same pinned assets on temporary 80GB US-WA-1 volume `i778cihpqd`: `24,044,888,779` main bytes and `15,451,314,021` external/cache bytes. The RTX 6000 Ada staging pod ran at `$0.77/hr` for about 3.4 minutes and self-deleted; the volume was deleted with HTTP 204 after publish validation.
+  - `runs/staging/20260711T051514Z/network-volume-v9uhn1n0mt-pixal3d-issue46.json` records the first #46 staging validation failure: external HF snapshots were written one directory above the runtime's expected `HF_HOME/hub` layout.
+  - `runs/staging/20260711T052833Z/network-volume-v9uhn1n0mt-pixal3d-issue46-v2.json` reused the completed downloads, moved them into the runtime cache layout, and validated 32 files.
+  - `runs/staging/20260711T055003Z/network-volume-v9uhn1n0mt-pixal3d-issue46-v3-full-naf.json` added the complete pinned NAF Python source after the first runtime exposed an incomplete-source validator blind spot; it validated 50 files and `27,450,192,913` bytes in `8.205s`.
 - Wave 2 staging validation report: `runs/staging/20260709T005450Z/network-volume-wnqijpazd5-wave2-batch-a-validate.json`
 - Direct3D-S2 staging validation report: `runs/staging/20260709T090135Z/network-volume-wnqijpazd5-direct3d-s2-v2-fast.json`
 - Step1X-3D main weights staging report: `runs/staging/20260709T131830Z/network-volume-wnqijpazd5-step1x-3d-v1.json`
@@ -73,7 +77,7 @@ All wave 2 models have completed their protocol runs and have been published to 
 | Hunyuan3D-2.1 | `ghcr.io/hitsuki-ban/3dgen-hunyuan3d-21-runtime:2026-07-cloud-wave2-batch-c-v13` | index `sha256:48b0a1f8932764efc3c66ce65a29c7d219aaffd28e7b7c404a2be2c5400dd8df`; linux/amd64 `sha256:df58c409548a467e09ced1214800b359042dce67baf13cb96908ebcac8a6b955` | CUDA 12.4 / torch 2.5.1+cu124 runtime-only image, compiled for A100 `sm_80` and Ada `sm_89`. Pins the DINOv2 processor, patches BasicSR for torchvision 0.20, installs Blender runtime libraries, and isolates/preloads Diffusers dynamic modules. |
 | Stable Fast 3D | `ghcr.io/hitsuki-ban/3dgen-sf3d-runtime:2026-07-cloud-wave2-v2` | index `sha256:85216246b71697fc81288fc13d887d7738fa1ab5835192122e46b96be5a6dbb8`; linux/amd64 `sha256:9554af7dd8bdf3f07991a63e0237e3fff30ac10696545630fd8822d7a59aa08d` | CUDA 12.8 / torch 2.7.1 runtime-only image. Uses staged SF3D, DINOv2 Large, OpenCLIP, and U2NET assets with Hub offline mode enabled. |
 | TRELLIS.2 | `ghcr.io/hitsuki-ban/3dgen-trellis2-runtime:2026-07-cloud-wave2-v6` | index `sha256:2353fe6ec49e440dd7fb7ef4197a491632b3afe537c0c1de5f588b89b056ad54`; linux/amd64 `sha256:f19b40ed4000e82c722cfe120ac0805f93e5108b8a2692bd4bfa088307027555` | CUDA 12.8 / torch 2.7.1, pinned Transformers 4.57.3 and FlashAttention 2.8.3. Adds exact task selection, staged external-cache validation, and task-prefix replacement uploads for auditable retries. |
-| Pixal3D | `ghcr.io/hitsuki-ban/3dgen-pixal3d-runtime:2026-07-cloud-wave2-v2` | index `sha256:2d2af8534def632e03f19f62673afbba5ca290359f98f270a01216db4959bc33`; linux/amd64 `sha256:4c1d1c76a865b81e62579a05b4f10ded25f279c857d07e8e0df624885cb299b4` | Installs a verified NATTEN 0.21.0 wheel from private builder manifest `sha256:bcbadc4205c6c80282d8360a3eeb4eeeae0f9d6c4b5f17f91cccff7281bdafb4`; wheel SHA-256 `a0bccfb8da194fc909eddaf77573b6a12303839a4bc70964240a7b10546631c0`. |
+| Pixal3D | `ghcr.io/hitsuki-ban/3dgen-pixal3d-runtime:2026-07-issue46-retry-v3` | index `sha256:54652848c680017d4b9f6eb125c73998eeea7b0e1a2af164749583c86ccd059e`; linux/amd64 `sha256:7453435b6b91cc645547624e120abb637a5ed9423768eee99f2ea014053928da` | Retains the verified NATTEN 0.21.0 wheel and adds explicit exact-task `retry_count` propagation. The final PR also strengthens staged NAF source validation after the first #46 runtime attempt exposed missing package files. |
 
 ## Published Site Data
 
@@ -85,7 +89,7 @@ All wave 2 models have completed their protocol runs and have been published to 
 | `sf3d` | `runs/sf3d/wave2/20260710T042618Z/` | `site-data/sf3d/` | 25 | 0 | 75 | `11.609` | `7.668 GiB` |
 | `trellis2` | `runs/trellis2/wave2/20260710T080630Z/` | `site-data/trellis2/` | 25 | 0 | 75 | `280.977` | `33.148 GiB` |
 | `step1x-3d` | `runs/step1x-3d/wave2/20260710T194121Z/` | `site-data/step1x-3d/` | 25 | 0 | 75 | `323.558` | `63.955 GiB` |
-| `pixal3d` | `runs/pixal3d/wave2/20260710T113319Z/` | `site-data/pixal3d/` | 23 | 2 | 71 | `331.811` | `45.900 GiB` |
+| `pixal3d` | `runs/pixal3d/wave2/20260710T113319Z/` | `site-data/pixal3d/` | 25 | 0 | 75 | `391.963` | `59.753 GiB` |
 | `hunyuan3d-21` | `runs/hunyuan3d-21/wave2/20260710T163923Z/` | `site-data/hunyuan3d-21/` | 25 | 0 | 75 | `180.887` | `16.521 GiB` |
 
 Trellis v1 task metadata spans `2026-07-09T01:39:44Z` through `2026-07-09T02:03:48Z`.
@@ -93,7 +97,7 @@ Trellis v1 task metadata spans `2026-07-09T01:39:44Z` through `2026-07-09T02:03:
 Direct3D-S2 task metadata spans `2026-07-09T10:43:05Z` through `2026-07-09T11:56:53Z`.
 Stable Fast 3D task metadata spans `2026-07-10T04:29:37Z` through `2026-07-10T04:37:15Z`.
 TRELLIS.2 task metadata spans `2026-07-10T08:09:37Z` through the 96GB exact retry at `2026-07-10T10:31:31Z`.
-Pixal3D successful task metadata spans `2026-07-10T11:42:03Z` through `2026-07-10T14:02:55Z`; its 23 top-level GLBs total `931,217,000` bytes.
+Pixal3D successful task metadata spans `2026-07-10T11:42:03Z` through the 96GB exact retry at `2026-07-11T06:31:50Z`; its 25 top-level GLBs total `1,042,142,224` bytes.
 Hunyuan3D-2.1 task metadata spans `2026-07-10T16:42:52Z` through `2026-07-10T18:08:05Z`; its 25 top-level GLBs total `134,826,916` bytes.
 Step1X-3D combines the two valid 96GB Server smoke tasks with 23 96GB Workstation tasks. Metadata spans `2026-07-10T18:37:54Z` through `2026-07-10T21:43:28Z`; its 25 top-level GLBs total `138,580,732` bytes.
 The final successful 3DTopia-XL run moved the balance by about `$0.5625982428`.
@@ -101,7 +105,8 @@ Latest REST billing visible after the Direct3D-S2 publish included `$1.041523337
 Stable Fast 3D moved the GraphQL balance from `$12.3439651237` to `$12.1234134208`, or about `$0.220552` total for two CPU staging pods, one dependency-failure smoke, one successful smoke, and the 25-task full run. Per-pod REST billing had not backfilled at the final check.
 Final REST billing for the TRELLIS.2 5090 full and 96GB exact-retry pods is `$2.124035` and `$0.520187`. Pixal3D US-WA-1 staging, 48GB smoke, and full pods cost `$0.047023`, `$0.285622`, and `$1.250501`; the earlier 5090 OOM smoke cost `$0.172966`.
 The final Hunyuan pod billing is `$1.276717`. Step1X moved the balance from `$13.8134797972` before its successful 96GB smoke to `$8.7001347015` after the remaining run and cleanup, about `$5.113345` across smoke, two no-heartbeat startup attempts, the successful 23-task run, and storage. REST billing for the final Step pod was still partially backfilled at the final check.
-Using the issue-opening balance of about `$17.78`, the later `$10` top-up, and the final balance, total wave 2 spend is approximately `$19.08`; the opening value was rounded, so this is not an accounting-grade total.
+Issue #46 moved the balance from `$8.7001347015` to `$6.6694984162`, or about `$2.030636`, across three CPU staging pods, one NAF-staging runtime failure, the successful 96GB retry, and temporary 80GB volume storage. This stayed below the `$2.5` cap and never crossed the `$6` stop threshold.
+Using the issue-opening balance of about `$17.78`, the later `$10` top-up, and the final balance, total wave 2 spend is approximately `$21.11`; the opening value was rounded, so this is not an accounting-grade total.
 
 Both published prefixes were rechecked after upload:
 
@@ -161,18 +166,18 @@ Both published prefixes were rechecked after upload:
 - Hugging Face Xet can collapse underlying volume I/O errors into `Internal Writer Error: Background writer channel closed`. The Pixal3D disk audit showed that repeated interrupted `local_dir` downloads had retained 73.192GB in `.cache` while only 2.048GB of final files existed. Removing only that reproducible cache made the next sequential Xet download complete in `76.586s`.
 - Pixal3D uses the official NATTEN 0.21.0 source build for both `sm_89` and `sm_120`. A four-worker local build on the 32GB workstation projected several hours and kept Docker's WSL VHD on C: large, so the wheel build moved to a 16-vCPU/128GB RunPod CPU pod and records the official sdist SHA-256 in R2.
 - Pixal3D standard 1536 smoke `runs/pixal3d/wave2-smoke/20260710T103501Z/` recorded 2/2 CUDA OOM failures on RTX 5090; the first needed another 6.75GiB with only 5.19GiB free. No low-VRAM 1024 path was used. After US-WA-1 restaging, `runs/pixal3d/wave2-smoke/20260710T110858Z-us-wa-1-48gb/` completed 2/2 on RTX 6000 Ada in `571.842s` and `472.670s`, with peak VRAM about `41.35GiB`. The measured 25-task projection is `3.627h / $2.793` at `$0.77/hr`, below the issue's `$3/model` guardrail.
-- Pixal3D full run completed 23/25 on RTX 6000 Ada. `ornate-treasure-chest` and `old-oak-tree` both reached CuMesh simplify after inference but OOMed in postprocess. A combined 96GB exact-task retry at US-WA-1 returned no capacity before pod creation, so the two protocol failures were published rather than changing resolution or postprocess defaults.
+- Pixal3D full run initially completed 23/25 on RTX 6000 Ada. `ornate-treasure-chest` and `old-oak-tree` both reached CuMesh simplify after inference but OOMed in postprocess. Issue #46 kept seed `20260708`, resolution `1536`, `1536_cascade`, and `low_vram=false`, changing only the GPU to a 96GB RTX PRO 6000 Blackwell Server. Exact retry prefix `runs/pixal3d/wave2-retry/20260711T055113Z/` completed both tasks in `1022.527s` / `1144.876s` at `59.753 GiB` / `49.706 GiB`; their complete canonical task prefixes and three-object site-data prefixes replaced the two failures.
 - Docker Desktop's supported disk-image-location setting moved its data root from C: to `F:\WorkSpace\3DGSDemoRoom\.docker-data\DockerDesktopWSL`; external build caches also use ignored `.docker-build`. After the final image pushes, external caches, images, and build history were removed. BuildKit retained one usage-zero imported lease that normal prune could not reclaim, so Docker/WSL was stopped and the disposable 36.35GiB F: VHD was deleted; the next Docker start will recreate it under the same F: setting.
 - The shared cloud command invokes `python3 -m bench_harness.cli upload-s3` for startup and final telemetry. `bench_harness.cli` previously lacked a module entrypoint, so those invocations were no-ops even though per-task direct uploads worked. The CLI now calls `main()` under `if __name__ == "__main__"`, with a subprocess regression test. New runtime images built from this commit will upload `runpod-startup.json` and `runpod-status.json` as intended.
 
 ## Completion
 
 - Batch A: `trellis1` and `3dtopia-xl` complete and published, 25/25 each.
-- Batch B: `direct3d-s2`, `sf3d`, `trellis2`, and `step1x-3d` complete and published, 25/25 each. `pixal3d` published 23 successes plus two documented official-path CuMesh OOM failures.
+- Batch B: `direct3d-s2`, `sf3d`, `trellis2`, `step1x-3d`, and `pixal3d` complete and published to R2, 25/25 each. Pixal3D's two 48GB CuMesh OOM tasks were replaced by unchanged-protocol 96GB exact retries under #46.
 - Batch C: `hunyuan3d-21` complete and published, 25/25 from a license-compliant non-EU run; the live Worker blocks EU27, GB, and KR with HTTP 451.
-- Final public manifest: 272 results across 11 models.
+- Final R2 deployment source: Pixal3D 25/25 with 75 site-data objects; Fable owns the post-merge Worker deployment and live verification for #46.
 - Final cloud cleanup: active pods `[]`, network volumes `[]`.
-- Final local cleanup: Docker has zero images, containers, volumes, and build cache. Its disposable F-drive data VHD was removed after verification, reclaiming about 63.29 GiB; Docker remains configured to recreate data under the ignored workspace path.
+- Final local cleanup: Docker has zero images, containers, volumes, and build cache. The #46 build cache and disposable F-drive data VHD were removed after verification, reclaiming about 46.4 GiB; Docker remains configured to recreate data under the ignored workspace path.
 
 Current local secret state checked before this draft:
 

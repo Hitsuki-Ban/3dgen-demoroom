@@ -22,16 +22,16 @@
 | [Hunyuan3D 2.1](https://github.com/tencent-hunyuan/hunyuan3d-2.1) ※3 | 25/25 | 180.9s | 225.0s | 16.5 GiB | RTX 6000 Ada 48GB | PBR |
 | [TRELLIS.2-4B](https://github.com/microsoft/TRELLIS.2) | 25/25 | 281.0s | 1380.2s | 33.1 GiB | RTX 5090 ※1 | PBR |
 | [Step1X-3D](https://github.com/stepfun-ai/Step1X-3D) | 25/25 | 323.6s | 543.5s | **64.0 GiB** ※4 | RTX PRO 6000 96GB | textured |
-| [Pixal3D](https://github.com/TencentARC/Pixal3D) | 23/25 ※2 | 331.8s | 501.1s | **45.9 GiB** | RTX 6000 Ada 48GB | textured |
+| [Pixal3D](https://github.com/TencentARC/Pixal3D) | 25/25 | 392.0s | 1144.9s | **59.8 GiB** ※2 | RTX 6000 Ada / RTX PRO 6000 96GB | textured |
 
-<sub>※1 — 1 課題のみ 32GB で OOM、**設定を変えずに** 96GB GPU で再実行して成功。 ※2 — 2 課題は公式 1536 設定の後処理が 48GB でも OOM。低 VRAM モードへのフォールバックはせず**失敗として記録・公開**。 ※3 — ライセンス上 EU / 英国 / 韓国では表示不可(後述)。実行も非 EU DC で実施。 ※4 — 公式デフォルトでは 96GB 級 GPU のみで完走可能(32GB / 48GB は texture 段で OOM)。</sub>
+<sub>※1 — 1 課題のみ 32GB で OOM、**設定を変えずに** 96GB GPU で再実行して成功。 ※2 — 2 課題は公式 1536 設定の後処理が 48GB で OOM。低 VRAM モードへ変更せず、GPU のみ 96GB にした exact-task retry で成功。 ※3 — ライセンス上 EU / 英国 / 韓国では表示不可(後述)。実行も非 EU DC で実施。 ※4 — 公式デフォルトでは 96GB 級 GPU のみで完走可能(32GB / 48GB は texture 段で OOM)。</sub>
 
 **表の読み方:** 実行 GPU はモデルごとに異なります(動作する最小クラスに寄せる方針 — VRAM 要求自体が主要な測定項目)。生成時間の直接比較は同一 GPU 同士で。「最長」は各モデルの初回タスクの重みロードを含みます。
 
 ## ベンチの原則
 
 1. 各モデルの**公式デフォルト設定のみ**(チューニングなし・低 VRAM モード等へのフォールバックなし)
-2. 固定シード `20260708`・各課題 1 回のみ(N=1)・手修正なし
+2. 固定シード `20260708`・各課題 1 回のみ(N=1、設定不変の OOM retry は注記)・手修正なし
 3. OOM 等の**失敗もそのまま公開**(失敗の傾向自体が比較情報)
 4. コード commit・重み revision・全パラメータを `meta.json` として成果物と一緒に公開
 
