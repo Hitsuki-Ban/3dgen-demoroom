@@ -124,6 +124,30 @@ export class ViewerCore {
   setDisplayMode(mode: DisplayMode) {
     this.mode = mode;
     for (const pane of this.panes.values()) this.applyMode(pane, mode);
+    this.emitChange();
+  }
+
+  /** UI(ツールバー等)が現在状態へ同期するためのゲッター。
+   *  mode / cameraSync の情報源は常にこのクラス(React 側で二重管理しない) */
+  getDisplayMode(): DisplayMode {
+    return this.mode;
+  }
+
+  getCameraSync(): boolean {
+    return this.cameraSync;
+  }
+
+  private changeListeners = new Set<() => void>();
+
+  /** mode / cameraSync の変更通知を購読する(解除関数を返す)。
+   *  ツールバーはどこで remount されても・誰が状態を変えても、常にコア状態を映す */
+  subscribeChange(listener: () => void): () => void {
+    this.changeListeners.add(listener);
+    return () => this.changeListeners.delete(listener);
+  }
+
+  private emitChange() {
+    for (const listener of this.changeListeners) listener();
   }
 
   setCameraSync(enabled: boolean) {
@@ -132,6 +156,7 @@ export class ViewerCore {
       const [first] = this.panes.values();
       this.broadcastCamera(first.id, true);
     }
+    this.emitChange();
   }
 
   resetCameras() {

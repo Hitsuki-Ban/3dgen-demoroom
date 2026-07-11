@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useViewer } from '../viewer/ViewerContext';
 import type { DisplayMode } from '../viewer/ViewerCore';
 
@@ -13,8 +13,22 @@ const MODES: { key: DisplayMode; label: string; hint: string }[] = [
 
 export function ViewerToolbar() {
   const viewer = useViewer();
-  const [mode, setMode] = useState<DisplayMode>('pbr');
-  const [sync, setSync] = useState(true);
+  // 情報源は ViewerCore。ローカル state はその写像で、変更通知を購読して常に同期する。
+  // ローカル既定値のままだと、グリッド↔比較の遷移でツールバーだけ remount される場面
+  // (PR #45 レビュー指摘)や、ハッシュ直遷移で remount されない課題切替の場面で
+  // 表示とコア状態が食い違う。
+  const [mode, setMode] = useState<DisplayMode>(() => viewer?.getDisplayMode() ?? 'pbr');
+  const [sync, setSync] = useState(() => viewer?.getCameraSync() ?? true);
+
+  useEffect(() => {
+    if (!viewer) return;
+    const syncFromCore = () => {
+      setMode(viewer.getDisplayMode());
+      setSync(viewer.getCameraSync());
+    };
+    syncFromCore();
+    return viewer.subscribeChange(syncFromCore);
+  }, [viewer]);
 
   return (
     <div className="flex flex-wrap items-center gap-2 py-3">
