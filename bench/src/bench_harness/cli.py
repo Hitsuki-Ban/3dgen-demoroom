@@ -81,6 +81,7 @@ def main() -> None:
     task_selection = runpod_launch.add_mutually_exclusive_group()
     task_selection.add_argument("--task-limit", type=int)
     task_selection.add_argument("--task-id", dest="task_ids", action="append")
+    runpod_launch.add_argument("--retry-count", type=int, default=0)
 
     subcommands.add_parser("runpod-pods")
 
@@ -119,6 +120,7 @@ def main() -> None:
             startup_timeout_min=args.startup_timeout_min,
             task_limit=args.task_limit,
             task_ids=tuple(args.task_ids or ()),
+            retry_count=args.retry_count,
         )
         min_balance_usd = parse_min_balance_usd(
             args.min_balance_usd if args.min_balance_usd is not None else os.environ.get("RUNPOD_MIN_BALANCE_USD")

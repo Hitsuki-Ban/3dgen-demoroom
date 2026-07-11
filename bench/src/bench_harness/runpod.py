@@ -151,6 +151,7 @@ class RunPodLaunchConfig:
     startup_timeout_min: int
     task_limit: int | None = None
     task_ids: tuple[str, ...] = ()
+    retry_count: int = 0
     startup_poll_seconds: float = 15.0
     container_registry_auth_id: str | None = None
     container_disk_gb: int = 80
@@ -339,6 +340,7 @@ def build_cloud_run_command(
     *,
     task_limit: int | None = None,
     task_ids: tuple[str, ...] = (),
+    retry_count: int = 0,
 ) -> str:
     try:
         runner_path = MODEL_RUNNER_PATHS[model_id]
@@ -356,6 +358,12 @@ def build_cloud_run_command(
         raise ValueError("RunPod cloud run task_ids must not contain duplicates")
     if task_ids and model_id not in TASK_ID_MODEL_IDS:
         raise ValueError(f"RunPod cloud run task_ids are not supported for model: {model_id}")
+    if retry_count < 0:
+        raise ValueError("RunPod cloud run retry_count must not be negative")
+    if retry_count > 0 and not task_ids:
+        raise ValueError("RunPod cloud run retry_count requires exact task_ids")
+    if retry_count > 0 and model_id != "pixal3d":
+        raise ValueError(f"RunPod cloud run retry_count is not supported for model: {model_id}")
     quoted_output_root = quote(output_root)
     quoted_s3_target = quote(s3_target)
     quoted_model_id = quote(model_id)
@@ -368,6 +376,8 @@ def build_cloud_run_command(
         run_command = f"{run_command} --task-limit {task_limit}"
     for task_id in task_ids:
         run_command = f"{run_command} --task-id {quote(task_id)}"
+    if retry_count > 0:
+        run_command = f"{run_command} --retry-count {retry_count}"
     ssh_command = (
         "mkdir -p /run/sshd\n"
         "if [ -n \"${PUBLIC_KEY:-}\" ]; then\n"
@@ -536,6 +546,7 @@ def build_pod_payload(config: RunPodLaunchConfig, *, runpod_api_key: str) -> dic
         config.s3_target,
         task_limit=config.task_limit,
         task_ids=config.task_ids,
+        retry_count=config.retry_count,
     )
     payload: dict[str, Any] = {
         "name": config.name,
