@@ -99,5 +99,6 @@ export function isRunResult(entry: SiteDataEntry): entry is RunResult {
 /** bench-harness site-data-snapshot が出力する公開 manifest */
 export interface SiteManifest {
   generatedAt: string;
+  partial: boolean;
   entries: SiteDataEntry[];
 }

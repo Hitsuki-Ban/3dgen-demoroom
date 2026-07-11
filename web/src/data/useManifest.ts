@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { SiteManifest } from './types';
 
-const EMPTY: SiteManifest = { generatedAt: '', entries: [] };
+const EMPTY: SiteManifest = { generatedAt: '', partial: false, entries: [] };
 let cache: SiteManifest | null = null;
 
 /** Python site-data snapshot が生成した /manifest.json を一度だけ読み込む */

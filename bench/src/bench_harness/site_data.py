@@ -40,6 +40,7 @@ def build_site_manifest(
     output_path: Path,
     expected_failures: frozenset[tuple[str, str]],
     generated_at: str,
+    allow_partial: bool,
 ) -> dict[str, Any]:
     if not runs_root.is_dir():
         raise FileNotFoundError(f"site-data root does not exist: {runs_root}")
@@ -55,26 +56,36 @@ def build_site_manifest(
 
     _validate_directory_members(runs_root, known_models, "model")
     entries: list[dict[str, Any]] = []
+    present_cells: set[tuple[str, str]] = set()
     actual_failures: set[tuple[str, str]] = set()
 
     for model_id in model_ids:
         model_dir = runs_root / model_id
         if not model_dir.is_dir():
+            if allow_partial:
+                continue
             raise ValueError(f"missing site-data model directory: {model_id}")
         _validate_directory_members(model_dir, known_tasks, f"task under {model_id}")
 
         for task_id in task_ids:
             task_dir = model_dir / task_id
             if not task_dir.is_dir():
+                if allow_partial:
+                    continue
                 raise ValueError(f"missing site-data cell: {model_id}/{task_id}")
+            present_cells.add((model_id, task_id))
             entries.append(_load_cell(task_dir, model_id, task_id, actual_failures))
 
-    if actual_failures != set(expected_failures):
-        expected = _format_cells(expected_failures)
+    if not entries:
+        raise ValueError("site-data snapshot contains no cells")
+
+    expected_present_failures = set(expected_failures) & present_cells
+    if actual_failures != expected_present_failures:
+        expected = _format_cells(expected_present_failures)
         actual = _format_cells(actual_failures)
         raise ValueError(f"failure matrix mismatch: expected [{expected}], received [{actual}]")
 
-    manifest = {"generatedAt": generated_at, "entries": entries}
+    manifest = {"generatedAt": generated_at, "partial": allow_partial, "entries": entries}
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(
         json.dumps(manifest, indent=2, ensure_ascii=False, allow_nan=False) + "\n",

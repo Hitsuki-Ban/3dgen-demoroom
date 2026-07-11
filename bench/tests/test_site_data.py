@@ -107,12 +107,14 @@ def _build(tmp_path: Path) -> dict[str, object]:
         output_path=output_path,
         expected_failures=frozenset({FAILED_CELL}),
         generated_at="2026-07-11T00:00:00Z",
+        allow_partial=False,
     )
 
 
 def test_build_site_manifest_emits_complete_stable_union(tmp_path: Path) -> None:
     manifest = _build(tmp_path)
 
+    assert manifest["partial"] is False
     entries = manifest["entries"]
     assert [(entry["modelId"], entry["taskId"]) for entry in entries] == [
         ("model-a", "task-a"),
@@ -141,6 +143,60 @@ def test_build_site_manifest_rejects_missing_cell(tmp_path: Path) -> None:
             output_path=output_path,
             expected_failures=frozenset({FAILED_CELL}),
             generated_at="2026-07-11T00:00:00Z",
+            allow_partial=False,
+        )
+
+
+def test_build_site_manifest_allows_explicit_valid_partial_snapshot(tmp_path: Path) -> None:
+    runs_root, tasks_json, model_registry, output_path = _fixture(tmp_path)
+    shutil.rmtree(runs_root / "model-a" / "task-a")
+    shutil.rmtree(runs_root / "model-b")
+
+    manifest = build_site_manifest(
+        runs_root=runs_root,
+        tasks_json=tasks_json,
+        model_registry=model_registry,
+        output_path=output_path,
+        expected_failures=frozenset({FAILED_CELL}),
+        generated_at="2026-07-11T00:00:00Z",
+        allow_partial=True,
+    )
+
+    assert manifest["partial"] is True
+    assert [(entry["modelId"], entry["taskId"]) for entry in manifest["entries"]] == [
+        ("model-a", "task-b")
+    ]
+
+
+def test_build_site_manifest_partial_mode_rejects_empty_snapshot(tmp_path: Path) -> None:
+    runs_root, tasks_json, model_registry, output_path = _fixture(tmp_path)
+    shutil.rmtree(runs_root)
+    runs_root.mkdir()
+
+    with pytest.raises(ValueError, match="contains no cells"):
+        build_site_manifest(
+            runs_root=runs_root,
+            tasks_json=tasks_json,
+            model_registry=model_registry,
+            output_path=output_path,
+            expected_failures=frozenset({FAILED_CELL}),
+            generated_at="2026-07-11T00:00:00Z",
+            allow_partial=True,
+        )
+
+
+def test_build_site_manifest_partial_mode_rejects_present_failure_mismatch(tmp_path: Path) -> None:
+    runs_root, tasks_json, model_registry, output_path = _fixture(tmp_path)
+
+    with pytest.raises(ValueError, match="failure matrix mismatch"):
+        build_site_manifest(
+            runs_root=runs_root,
+            tasks_json=tasks_json,
+            model_registry=model_registry,
+            output_path=output_path,
+            expected_failures=frozenset(),
+            generated_at="2026-07-11T00:00:00Z",
+            allow_partial=True,
         )
 
 
@@ -156,6 +212,7 @@ def test_build_site_manifest_rejects_unknown_model(tmp_path: Path) -> None:
             output_path=output_path,
             expected_failures=frozenset({FAILED_CELL}),
             generated_at="2026-07-11T00:00:00Z",
+            allow_partial=False,
         )
 
 
@@ -176,6 +233,7 @@ def test_build_site_manifest_rejects_success_and_failure_in_same_cell(tmp_path: 
             output_path=output_path,
             expected_failures=frozenset({FAILED_CELL}),
             generated_at="2026-07-11T00:00:00Z",
+            allow_partial=False,
         )
 
 
@@ -194,6 +252,7 @@ def test_build_site_manifest_rejects_payload_id_mismatch(tmp_path: Path) -> None
             output_path=output_path,
             expected_failures=frozenset({FAILED_CELL}),
             generated_at="2026-07-11T00:00:00Z",
+            allow_partial=False,
         )
 
 
@@ -208,6 +267,7 @@ def test_build_site_manifest_rejects_failure_matrix_mismatch(tmp_path: Path) -> 
             output_path=output_path,
             expected_failures=frozenset(),
             generated_at="2026-07-11T00:00:00Z",
+            allow_partial=False,
         )
 
 
@@ -245,6 +305,7 @@ def test_repository_snapshot_contract_is_274_successes_and_one_failure(tmp_path:
         output_path=tmp_path / "manifest.json",
         expected_failures=frozenset({failure_cell}),
         generated_at="2026-07-11T00:00:00Z",
+        allow_partial=False,
     )
 
     assert len(manifest["entries"]) == 275

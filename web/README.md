@@ -12,25 +12,19 @@ uv run --project ../bench bench-harness site-data-snapshot `
   ../tasks/tasks.json `
   src/data/model-registry.json `
   public/manifest.json `
-  --expected-failure partcrafter/chrome-espresso-machine
+  --expected-failure partcrafter/chrome-espresso-machine `
+  --allow-partial
 
 pnpm install
 pnpm dev
 ```
 
-`site-data-snapshot` は 11 モデル x 25 課題の全セルを検証し、成功または失敗のどちらか一方が
-揃わない限り manifest を生成しない。`pnpm dev` / `pnpm build` は生成済み manifest だけを消費する。
+`--allow-partial` はフロントエンド開発専用。存在する全セルを本番と同じ契約で検証し、
+`partial: true` の manifest を生成する。省略時は 11 モデル x 25 課題の全セルを要求する。
+`pnpm dev` は partial manifest を警告付きで許可するが、`pnpm build` は拒否する。
 
 ## 構成
 
 - `src/viewer/ViewerCore.ts` — **React 非依存**のビューアコア。単一 canvas + scissor viewport で全ペインを 1 つの WebGL コンテキストに描画。カメラ同期、表示モード(PBR / wireframe / matcap / normal / UV checker)、バウンディングボックス正規化、画面外ペインのスキップ
 - `src/viewer/ViewerContext.tsx` / `ViewerPane.tsx` — React 側の薄いラッパー
 - `src/viewer/loadModel.ts` — GLB ローダー(meshopt 配線済み。KTX2 / Draco はアセットパイプライン導入時に追加)
-- `src/demo/dummyModels.ts` — ベンチ成果物が届くまでの開発用ダミー(細分化と材質の違うトーラスノット)
-
-## 未実装(今後の PR)
-
-- ベンチ manifest(JSON)からの課題/モデル一覧ロード(bench 側 meta.json スキーマ確定後)
-- テクスチャ solo view、統計テーブル、ライセンスバッジの実データ化
-- KTX2/Draco デコーダ配置、R2 からのアセットフェッチ、geo 制限ペインのプレースホルダ
-- Cloudflare Workers デプロイ(`wrangler.jsonc`)、i18n 構造

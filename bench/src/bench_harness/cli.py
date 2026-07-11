@@ -64,6 +64,7 @@ def main() -> None:
     site_data_snapshot.add_argument("model_registry", type=Path)
     site_data_snapshot.add_argument("output_path", type=Path)
     site_data_snapshot.add_argument("--expected-failure", action="append", required=True)
+    site_data_snapshot.add_argument("--allow-partial", action="store_true")
 
     upload_local = subcommands.add_parser("upload-local")
     upload_local.add_argument("source_dir", type=Path)
@@ -113,13 +114,15 @@ def main() -> None:
             output_path=args.output_path,
             expected_failures=expected_failures,
             generated_at=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+            allow_partial=args.allow_partial,
         )
         failure_entries = [entry for entry in manifest["entries"] if entry["status"] == "failed"]
         success_count = len(manifest["entries"]) - len(failure_entries)
         model_count = len({entry["modelId"] for entry in manifest["entries"]})
         task_count = len({entry["taskId"] for entry in manifest["entries"]})
         print(
-            f"site-data snapshot: models={model_count} tasks={task_count} cells={len(manifest['entries'])} "
+            f"site-data snapshot: partial={manifest['partial']} models={model_count} tasks={task_count} "
+            f"cells={len(manifest['entries'])} "
             f"successes={success_count} failures={len(failure_entries)}"
         )
         for entry in failure_entries:
