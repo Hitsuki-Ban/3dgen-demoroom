@@ -99,7 +99,13 @@ export function TaskDetail({ taskId, onBack }: { taskId: string; onBack: () => v
     .map((id) => MODELS.find((m) => m.id === id))
     .filter((m): m is ModelInfo => !!m && resultByModel.has(m.id));
 
-  const focusModel = view.type === 'focus' ? MODELS.find((m) => m.id === view.modelId) : undefined;
+  // hash での課題切替直後は reset effect より先に旧 view のまま再描画される。
+  // 新課題にフォーカス対象の result が無い(部分 manifest・failure セル)場合は
+  // グリッド表示へフォールバックする(compare 側の resultByModel.has フィルタと同等の guard)
+  const focusModel =
+    view.type === 'focus' && resultByModel.has(view.modelId)
+      ? MODELS.find((m) => m.id === view.modelId)
+      : undefined;
 
   // 大画面モード(比較 / フォーカス)はリファレンス列を畳んでフル幅を使う
   if ((view.type === 'compare' && compareModels.length === 2) || (view.type === 'focus' && focusModel)) {
