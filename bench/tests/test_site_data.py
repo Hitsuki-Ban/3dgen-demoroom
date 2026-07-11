@@ -1,16 +1,29 @@
+import base64
+import hashlib
 import json
 import shutil
 import struct
 from pathlib import Path
 
 import pytest
+from PIL import Image
 
-from bench_harness.site_data import build_site_manifest, load_model_ids, parse_expected_failures
+from bench_harness.site_data import (
+    build_site_manifest,
+    load_model_ids,
+    parse_expected_failures,
+)
 
 
 MODELS = ("model-a", "model-b")
 TASKS = ("task-a", "task-b")
 FAILED_CELL = ("model-b", "task-b")
+VALID_WEBP_320 = base64.b64decode(
+    "UklGRioAAABXRUJQVlA4TB4AAAAvP8FPAAdQs840s/8BBWkbMPUvfzei/8n9v//3XwE="
+)
+VALID_WEBP_256 = base64.b64decode(
+    "UklGRiQAAABXRUJQVlA4TBgAAAAv/8A/AAdQs840s/8BAEX6/58i+p/6338="
+)
 
 
 def _valid_meta(model_id: str, task_id: str) -> dict[str, object]:
@@ -63,7 +76,9 @@ def _write_success(cell_dir: Path, model_id: str, task_id: str) -> None:
         + json_chunk
     )
     (cell_dir / "LICENSE").write_text("license\n", encoding="utf-8")
-    (cell_dir / "meta.json").write_text(json.dumps(_valid_meta(model_id, task_id)), encoding="utf-8")
+    (cell_dir / "meta.json").write_text(
+        json.dumps(_valid_meta(model_id, task_id)), encoding="utf-8"
+    )
 
 
 def _write_failure(cell_dir: Path, model_id: str, task_id: str) -> None:
@@ -71,6 +86,10 @@ def _write_failure(cell_dir: Path, model_id: str, task_id: str) -> None:
     (cell_dir / "failure.json").write_text(
         json.dumps(_valid_failure(model_id, task_id)), encoding="utf-8"
     )
+
+
+def _write_thumb(cell_dir: Path, payload: bytes = VALID_WEBP_320) -> None:
+    (cell_dir / "thumb.webp").write_bytes(payload)
 
 
 def _fixture(tmp_path: Path) -> tuple[Path, Path, Path, Path]:
@@ -81,7 +100,12 @@ def _fixture(tmp_path: Path) -> tuple[Path, Path, Path, Path]:
     tasks_json.write_text(
         json.dumps(
             [
-                {"id": task_id, "prompt": task_id, "image": f"references/{task_id}.png", "seed": 1}
+                {
+                    "id": task_id,
+                    "prompt": task_id,
+                    "image": f"references/{task_id}.png",
+                    "seed": 1,
+                }
                 for task_id in TASKS
             ]
         ),
@@ -122,13 +146,152 @@ def test_build_site_manifest_emits_complete_stable_union(tmp_path: Path) -> None
         ("model-b", "task-a"),
         ("model-b", "task-b"),
     ]
-    assert [entry["status"] for entry in entries] == ["success", "success", "success", "failed"]
+    assert [entry["status"] for entry in entries] == [
+        "success",
+        "success",
+        "success",
+        "failed",
+    ]
+    assert all("thumbUrl" not in entry for entry in entries)
     assert entries[-1]["failure"] == {
         "errorType": "RuntimeError",
         "retryCount": 1,
         "startedAt": "2026-07-08T00:00:00Z",
         "finishedAt": "2026-07-08T00:00:02Z",
     }
+
+
+def test_build_site_manifest_emits_valid_thumbnail_with_content_digest(
+    tmp_path: Path,
+) -> None:
+    runs_root, tasks_json, model_registry, output_path = _fixture(tmp_path)
+    _write_thumb(runs_root / "model-a" / "task-a")
+
+    manifest = build_site_manifest(
+        runs_root=runs_root,
+        tasks_json=tasks_json,
+        model_registry=model_registry,
+        output_path=output_path,
+        expected_failures=frozenset({FAILED_CELL}),
+        generated_at="2026-07-11T00:00:00Z",
+        allow_partial=False,
+    )
+
+    entry = manifest["entries"][0]
+    digest = hashlib.sha256(VALID_WEBP_320).hexdigest()
+    assert entry["thumbUrl"] == f"/run-assets/model-a/task-a/thumb.webp?v={digest}"
+
+
+def test_build_site_manifest_rejects_non_webp_thumbnail(tmp_path: Path) -> None:
+    runs_root, tasks_json, model_registry, output_path = _fixture(tmp_path)
+    _write_thumb(runs_root / "model-a" / "task-a", b"not an image")
+
+    with pytest.raises(ValueError, match="must be a decodable WebP image"):
+        build_site_manifest(
+            runs_root=runs_root,
+            tasks_json=tasks_json,
+            model_registry=model_registry,
+            output_path=output_path,
+            expected_failures=frozenset({FAILED_CELL}),
+            generated_at="2026-07-11T00:00:00Z",
+            allow_partial=False,
+        )
+
+
+def test_build_site_manifest_rejects_png_with_webp_extension(tmp_path: Path) -> None:
+    runs_root, tasks_json, model_registry, output_path = _fixture(tmp_path)
+    thumb_path = runs_root / "model-a" / "task-a" / "thumb.webp"
+    Image.new("RGBA", (320, 320), (255, 0, 0, 255)).save(thumb_path, format="PNG")
+
+    with pytest.raises(ValueError, match="must use WebP format, received PNG"):
+        build_site_manifest(
+            runs_root=runs_root,
+            tasks_json=tasks_json,
+            model_registry=model_registry,
+            output_path=output_path,
+            expected_failures=frozenset({FAILED_CELL}),
+            generated_at="2026-07-11T00:00:00Z",
+            allow_partial=False,
+        )
+
+
+def test_build_site_manifest_rejects_animated_webp_thumbnail(tmp_path: Path) -> None:
+    runs_root, tasks_json, model_registry, output_path = _fixture(tmp_path)
+    thumb_path = runs_root / "model-a" / "task-a" / "thumb.webp"
+    first = Image.new("RGBA", (320, 320), (255, 0, 0, 255))
+    second = Image.new("RGBA", (320, 320), (0, 0, 255, 255))
+    first.save(
+        thumb_path,
+        format="WEBP",
+        save_all=True,
+        append_images=[second],
+        duration=100,
+        loop=0,
+        method=0,
+    )
+
+    with pytest.raises(ValueError, match="must be a static WebP image"):
+        build_site_manifest(
+            runs_root=runs_root,
+            tasks_json=tasks_json,
+            model_registry=model_registry,
+            output_path=output_path,
+            expected_failures=frozenset({FAILED_CELL}),
+            generated_at="2026-07-11T00:00:00Z",
+            allow_partial=False,
+        )
+
+
+def test_build_site_manifest_rejects_thumbnail_with_wrong_dimensions(
+    tmp_path: Path,
+) -> None:
+    runs_root, tasks_json, model_registry, output_path = _fixture(tmp_path)
+    _write_thumb(runs_root / "model-a" / "task-a", VALID_WEBP_256)
+
+    with pytest.raises(ValueError, match="must be 320x320 pixels, received 256x256"):
+        build_site_manifest(
+            runs_root=runs_root,
+            tasks_json=tasks_json,
+            model_registry=model_registry,
+            output_path=output_path,
+            expected_failures=frozenset({FAILED_CELL}),
+            generated_at="2026-07-11T00:00:00Z",
+            allow_partial=False,
+        )
+
+
+def test_build_site_manifest_rejects_truncated_webp_thumbnail(tmp_path: Path) -> None:
+    runs_root, tasks_json, model_registry, output_path = _fixture(tmp_path)
+    _write_thumb(runs_root / "model-a" / "task-a", VALID_WEBP_320[:-4])
+
+    with pytest.raises(ValueError, match="must be a decodable WebP image"):
+        build_site_manifest(
+            runs_root=runs_root,
+            tasks_json=tasks_json,
+            model_registry=model_registry,
+            output_path=output_path,
+            expected_failures=frozenset({FAILED_CELL}),
+            generated_at="2026-07-11T00:00:00Z",
+            allow_partial=False,
+        )
+
+
+def test_build_site_manifest_rejects_thumbnail_in_failure_cell(tmp_path: Path) -> None:
+    runs_root, tasks_json, model_registry, output_path = _fixture(tmp_path)
+    _write_thumb(runs_root / "model-b" / "task-b")
+
+    with pytest.raises(
+        ValueError, match="failed site-data cell contains stale thumb.webp"
+    ):
+        build_site_manifest(
+            runs_root=runs_root,
+            tasks_json=tasks_json,
+            model_registry=model_registry,
+            output_path=output_path,
+            expected_failures=frozenset({FAILED_CELL}),
+            generated_at="2026-07-11T00:00:00Z",
+            allow_partial=False,
+        )
 
 
 def test_build_site_manifest_rejects_missing_cell(tmp_path: Path) -> None:
@@ -147,7 +310,9 @@ def test_build_site_manifest_rejects_missing_cell(tmp_path: Path) -> None:
         )
 
 
-def test_build_site_manifest_allows_explicit_valid_partial_snapshot(tmp_path: Path) -> None:
+def test_build_site_manifest_allows_explicit_valid_partial_snapshot(
+    tmp_path: Path,
+) -> None:
     runs_root, tasks_json, model_registry, output_path = _fixture(tmp_path)
     shutil.rmtree(runs_root / "model-a" / "task-a")
     shutil.rmtree(runs_root / "model-b")
@@ -168,7 +333,9 @@ def test_build_site_manifest_allows_explicit_valid_partial_snapshot(tmp_path: Pa
     ]
 
 
-def test_build_site_manifest_partial_mode_rejects_empty_snapshot(tmp_path: Path) -> None:
+def test_build_site_manifest_partial_mode_rejects_empty_snapshot(
+    tmp_path: Path,
+) -> None:
     runs_root, tasks_json, model_registry, output_path = _fixture(tmp_path)
     shutil.rmtree(runs_root)
     runs_root.mkdir()
@@ -185,7 +352,9 @@ def test_build_site_manifest_partial_mode_rejects_empty_snapshot(tmp_path: Path)
         )
 
 
-def test_build_site_manifest_partial_mode_rejects_present_failure_mismatch(tmp_path: Path) -> None:
+def test_build_site_manifest_partial_mode_rejects_present_failure_mismatch(
+    tmp_path: Path,
+) -> None:
     runs_root, tasks_json, model_registry, output_path = _fixture(tmp_path)
 
     with pytest.raises(ValueError, match="failure matrix mismatch"):
@@ -216,7 +385,9 @@ def test_build_site_manifest_rejects_unknown_model(tmp_path: Path) -> None:
         )
 
 
-def test_build_site_manifest_rejects_success_and_failure_in_same_cell(tmp_path: Path) -> None:
+def test_build_site_manifest_rejects_success_and_failure_in_same_cell(
+    tmp_path: Path,
+) -> None:
     runs_root, tasks_json, model_registry, output_path = _fixture(tmp_path)
     failure_cell = runs_root / "model-b" / "task-b"
     _write_success(tmp_path / "success-copy", "model-b", "task-b")
@@ -273,20 +444,32 @@ def test_build_site_manifest_rejects_failure_matrix_mismatch(tmp_path: Path) -> 
 
 def test_repository_registry_defines_275_unique_cells() -> None:
     repo_root = Path(__file__).resolve().parents[2]
-    model_ids = load_model_ids(repo_root / "web" / "src" / "data" / "model-registry.json")
-    task_ids = tuple(item["id"] for item in json.loads((repo_root / "tasks" / "tasks.json").read_text()))
+    model_ids = load_model_ids(
+        repo_root / "web" / "src" / "data" / "model-registry.json"
+    )
+    task_ids = tuple(
+        item["id"]
+        for item in json.loads((repo_root / "tasks" / "tasks.json").read_text())
+    )
 
     assert len(model_ids) == len(set(model_ids)) == 11
     assert len(task_ids) == len(set(task_ids)) == 25
-    assert len({(model_id, task_id) for model_id in model_ids for task_id in task_ids}) == 275
+    assert (
+        len({(model_id, task_id) for model_id in model_ids for task_id in task_ids})
+        == 275
+    )
 
 
-def test_repository_snapshot_contract_is_274_successes_and_one_failure(tmp_path: Path) -> None:
+def test_repository_snapshot_contract_is_274_successes_and_one_failure(
+    tmp_path: Path,
+) -> None:
     repo_root = Path(__file__).resolve().parents[2]
     tasks_json = repo_root / "tasks" / "tasks.json"
     model_registry = repo_root / "web" / "src" / "data" / "model-registry.json"
     model_ids = load_model_ids(model_registry)
-    task_ids = tuple(item["id"] for item in json.loads(tasks_json.read_text(encoding="utf-8")))
+    task_ids = tuple(
+        item["id"] for item in json.loads(tasks_json.read_text(encoding="utf-8"))
+    )
     failure_cell = ("partcrafter", "chrome-espresso-machine")
     runs_root = tmp_path / "site-data"
 
@@ -318,7 +501,9 @@ def test_repository_snapshot_contract_is_274_successes_and_one_failure(tmp_path:
 
 
 def test_parse_expected_failures_rejects_invalid_or_duplicate_cells() -> None:
-    assert parse_expected_failures(["model-a/task-a"]) == frozenset({("model-a", "task-a")})
+    assert parse_expected_failures(["model-a/task-a"]) == frozenset(
+        {("model-a", "task-a")}
+    )
     with pytest.raises(ValueError, match="MODEL_ID/TASK_ID"):
         parse_expected_failures(["model-a"])
     with pytest.raises(ValueError, match="duplicate expected failure"):
