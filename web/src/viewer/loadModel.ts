@@ -46,16 +46,17 @@ export async function loadModel(
       const { done, value } = await reader.read();
       if (done) break;
       if (received + value.byteLength > data.length) {
-        // Content-Length が実体より小さい異常系: 2 倍に伸長して続行
-        const grown = new Uint8Array(Math.max(data.length * 2, received + value.byteLength));
-        grown.set(data.subarray(0, received));
-        data = grown;
+        await reader.cancel();
+        throw new Error(`Content-Length mismatch: expected ${total} bytes, received more than declared`);
       }
       data.set(value, received);
       received += value.byteLength;
       onProgress(Math.min(received / total, 1));
     }
-    buffer = data.buffer.slice(0, received) as ArrayBuffer;
+    if (received !== total) {
+      throw new Error(`Content-Length mismatch: expected ${total} bytes, received ${received}`);
+    }
+    buffer = data.buffer as ArrayBuffer;
   } else {
     buffer = await res.arrayBuffer();
   }
