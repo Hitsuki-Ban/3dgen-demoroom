@@ -20,8 +20,8 @@ function paneBadge(m: ModelInfo): string | undefined {
 }
 
 function makeLoadObject(m: ModelInfo, result: RunResult) {
-  return async (onProgress?: (fraction: number) => void) => {
-    const object = await loadModel(result.glbUrl, onProgress);
+  return async (onProgress?: (fraction: number) => void, signal?: AbortSignal) => {
+    const object = await loadModel(result.glbUrl, onProgress, signal);
     const fix = m.orientationFix;
     if (fix) {
       const d = Math.PI / 180;

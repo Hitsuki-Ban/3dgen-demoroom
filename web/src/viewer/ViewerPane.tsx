@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import type * as THREE from 'three';
-import { RegionBlockedError } from './loadModel';
+import { disposeObject, RegionBlockedError } from './loadModel';
 import { useViewer } from './ViewerContext';
 import type { PaneStats } from './ViewerCore';
 
@@ -9,8 +9,12 @@ const CLICK_TO_LOAD_BYTES = 75 * 2 ** 20;
 
 interface Props {
   title: string;
-  /** ペインのロード開始時に一度呼ばれ、表示するモデルを返す(GLB ロードやダミー生成) */
-  loadObject: (onProgress?: (fraction: number) => void) => Promise<THREE.Object3D> | THREE.Object3D;
+  /** ペインのロード開始時に一度呼ばれ、表示するモデルを返す(GLB ロードやダミー生成)。
+   *  signal が abort されたら取得を中断してよい */
+  loadObject: (
+    onProgress?: (fraction: number) => void,
+    signal?: AbortSignal,
+  ) => Promise<THREE.Object3D> | THREE.Object3D;
   badge?: string;
   /** 生成時間・VRAM 等の追加表示(フッター2行目) */
   extraInfo?: string;
@@ -46,9 +50,19 @@ export function ViewerPane({
   /** 巨大ファイルのクリックロード承諾 */
   const [accepted, setAccepted] = useState(false);
 
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const metaTitleId = useId();
+
   const needsClick = (sizeBytes ?? 0) > CLICK_TO_LOAD_BYTES;
   const shouldLoad = visible && (!needsClick || accepted);
   const loaded = stats !== null;
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    if (showMeta && !dialog.open) dialog.showModal();
+    else if (!showMeta && dialog.open) dialog.close();
+  }, [showMeta]);
 
   useEffect(() => {
     if (!ref.current || visible) return;
@@ -77,21 +91,28 @@ export function ViewerPane({
     if (!viewer || !ref.current || !shouldLoad) return;
     let paneId: number | null = null;
     let cancelled = false;
+    const controller = new AbortController();
     (async () => {
       try {
         const object = await loadObject((f) => {
           if (!cancelled) setProgress(f);
-        });
-        if (cancelled) return;
+        }, controller.signal);
+        if (cancelled) {
+          // ダウンロード完了と unmount の race: 表示しない scene のリソースを解放する(#52)
+          disposeObject(object);
+          return;
+        }
         paneId = viewer.addPane(ref.current!, object);
         setStats(viewer.getStats(paneId));
       } catch (e) {
+        if (cancelled || (e instanceof DOMException && e.name === 'AbortError')) return;
         if (e instanceof RegionBlockedError) setRegionBlocked(true);
         else setError(e instanceof Error ? e.message : String(e));
       }
     })();
     return () => {
       cancelled = true;
+      controller.abort(); // 進行中のダウンロードを止める(戻った後の帯域浪費防止 #52)
       if (paneId !== null) viewer.removePane(paneId);
     };
     // loadObject は初回のみ使う(ペインの同一性は key で管理)
@@ -166,24 +187,25 @@ export function ViewerPane({
         </div>
         {extraInfo && !regionBlocked && <div className="text-slate-500 mt-0.5">{extraInfo}</div>}
       </div>
-      {showMeta && metaJson && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
-          onClick={() => setShowMeta(false)}
+      {metaJson && (
+        // native <dialog>.showModal() で Escape・フォーカストラップ・背景 inert を得る(#60)
+        <dialog
+          ref={dialogRef}
+          onClose={() => setShowMeta(false)}
+          onClick={(e) => {
+            if (e.target === dialogRef.current) setShowMeta(false); // backdrop クリックで閉じる
+          }}
+          aria-labelledby={metaTitleId}
+          className="m-auto max-w-lg w-full max-h-[80vh] overflow-auto rounded-lg border border-slate-600 bg-slate-900 p-4 text-slate-300 backdrop:bg-black/70"
         >
-          <div
-            className="max-w-lg w-full max-h-[80vh] overflow-auto rounded-lg border border-slate-600 bg-slate-900 p-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between pb-2">
-              <span className="text-sm font-medium">{title} — meta.json</span>
-              <button onClick={() => setShowMeta(false)} className="text-slate-400 hover:text-white text-sm">
-                閉じる ✕
-              </button>
-            </div>
-            <pre className="text-xs text-slate-300 whitespace-pre-wrap break-all">{metaJson}</pre>
+          <div className="flex items-center justify-between pb-2">
+            <span id={metaTitleId} className="text-sm font-medium">{title} — meta.json</span>
+            <button onClick={() => setShowMeta(false)} className="text-slate-400 hover:text-white text-sm">
+              閉じる ✕
+            </button>
           </div>
-        </div>
+          <pre className="text-xs text-slate-300 whitespace-pre-wrap break-all">{metaJson}</pre>
+        </dialog>
       )}
     </div>
   );

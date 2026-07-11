@@ -31,20 +31,26 @@ export function ViewerToolbar() {
   }, [viewer]);
 
   return (
-    <div className="flex flex-wrap items-center gap-2 py-3">
-      <div className="flex rounded-md overflow-hidden border border-slate-600">
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 py-3">
+      {/* 結合ボタン群だと狭幅でラベルが 1 文字ずつ縦折れ・右端裁切になる(#50)。
+          個別チップにして折り返しはボタン単位、ラベルは nowrap で守る */}
+      <div className="flex flex-wrap gap-1" role="group" aria-label="表示モード">
         {MODES.map((m) => (
           <button
             key={m.key}
             title={m.hint}
             onClick={() => { setMode(m.key); viewer?.setDisplayMode(m.key); }}
-            className={`px-3 py-1.5 text-sm ${mode === m.key ? 'bg-sky-700 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+            className={`px-2.5 py-1.5 text-xs sm:text-sm whitespace-nowrap rounded-md border ${
+              mode === m.key
+                ? 'bg-sky-700 border-sky-600 text-white'
+                : 'bg-slate-800 border-slate-600 text-slate-300 hover:bg-slate-700'
+            }`}
           >
             {m.label}
           </button>
         ))}
       </div>
-      <label className="flex items-center gap-1.5 text-sm text-slate-300 ml-2">
+      <label className="flex items-center gap-1.5 text-xs sm:text-sm text-slate-300 whitespace-nowrap">
         <input
           type="checkbox"
           checked={sync}
@@ -54,7 +60,7 @@ export function ViewerToolbar() {
       </label>
       <button
         onClick={() => viewer?.resetCameras()}
-        className="px-3 py-1.5 text-sm rounded-md border border-slate-600 bg-slate-800 text-slate-300 hover:bg-slate-700"
+        className="px-2.5 py-1.5 text-xs sm:text-sm whitespace-nowrap rounded-md border border-slate-600 bg-slate-800 text-slate-300 hover:bg-slate-700"
       >
         視点リセット
       </button>

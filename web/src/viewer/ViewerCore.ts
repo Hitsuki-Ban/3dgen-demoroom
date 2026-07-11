@@ -313,6 +313,12 @@ export class ViewerCore {
     if (!this.resizeToDisplaySize()) return;
     const canvasHeight = this.renderer.domElement.clientHeight;
     this.renderer.setClearColor(0x000000, 0);
+    // まず scissor を外して canvas 全体を透明クリアする。
+    // ペインの scissor 領域しか消去しないと、スクロールやペインの unmount で
+    // 移動・消滅した位置に前フレームの絵が残像として残る(#49)
+    this.renderer.setScissorTest(false);
+    this.renderer.clear(true, true, false);
+    this.renderer.setScissorTest(true);
     for (const pane of this.panes.values()) {
       pane.controls.update();
       const rect = pane.element.getBoundingClientRect();
