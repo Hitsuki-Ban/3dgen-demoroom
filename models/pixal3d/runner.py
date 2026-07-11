@@ -389,7 +389,10 @@ def validate_staged_dependencies(weights_path: Path, hf_home: Path, torch_home: 
             torch_home / "hub" / "valeoai_NAF_main" / "hubconf.py",
             torch_home / "hub" / "valeoai_NAF_main" / "LICENSE",
             torch_home / "hub" / "valeoai_NAF_main" / "src" / "model" / "naf.py",
+            torch_home / "hub" / "valeoai_NAF_main" / "src" / "layers" / "__init__.py",
             torch_home / "hub" / "valeoai_NAF_main" / "src" / "layers" / "attentions.py",
+            torch_home / "hub" / "valeoai_NAF_main" / "src" / "layers" / "convolutions.py",
+            torch_home / "hub" / "valeoai_NAF_main" / "src" / "layers" / "rope.py",
             torch_home / "hub" / "checkpoints" / "naf_release.pth",
         )
     )

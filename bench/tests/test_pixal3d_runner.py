@@ -261,7 +261,10 @@ def test_validate_staged_pixal3d_dependencies_requires_pinned_refs(tmp_path, mon
         "hub/valeoai_NAF_main/hubconf.py": b"fixture",
         "hub/valeoai_NAF_main/LICENSE": b"fixture",
         "hub/valeoai_NAF_main/src/model/naf.py": b"fixture",
+        "hub/valeoai_NAF_main/src/layers/__init__.py": b"fixture",
         "hub/valeoai_NAF_main/src/layers/attentions.py": b"fixture",
+        "hub/valeoai_NAF_main/src/layers/convolutions.py": b"fixture",
+        "hub/valeoai_NAF_main/src/layers/rope.py": b"fixture",
         "hub/valeoai_NAF_main/.git-revision": runner.NAF_REVISION.encode(),
         "hub/checkpoints/naf_release.pth": naf_checkpoint_bytes,
     }
