@@ -20,8 +20,8 @@ function paneBadge(m: ModelInfo): string | undefined {
 }
 
 function makeLoadObject(m: ModelInfo, result: RunResult) {
-  return async () => {
-    const object = await loadModel(result.glbUrl);
+  return async (onProgress?: (fraction: number) => void) => {
+    const object = await loadModel(result.glbUrl, onProgress);
     const fix = m.orientationFix;
     if (fix) {
       const d = Math.PI / 180;
@@ -104,6 +104,9 @@ export function TaskDetail({ taskId, onBack }: { taskId: string; onBack: () => v
                       key={`cmp:${taskId}:${m.id}`}
                       title={m.name}
                       badge={paneBadge(m)}
+                      sizeBytes={result.glbSizeBytes}
+                      downloadUrl={result.glbUrl}
+                      metaJson={JSON.stringify(result.meta, null, 2)}
                       loadObject={makeLoadObject(m, result)}
                       extraInfo={formatResultInfo(
                         result.meta.wall_clock_seconds,
@@ -153,6 +156,9 @@ export function TaskDetail({ taskId, onBack }: { taskId: string; onBack: () => v
                           比較
                         </label>
                       }
+                      sizeBytes={result.glbSizeBytes}
+                      downloadUrl={result.glbUrl}
+                      metaJson={JSON.stringify(result.meta, null, 2)}
                       loadObject={makeLoadObject(m, result)}
                       extraInfo={formatResultInfo(
                         result.meta.wall_clock_seconds,

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ViewerProvider } from './viewer/ViewerContext';
 import { MODELS } from './data/models';
 import { TASKS } from './data/tasks';
@@ -54,18 +54,38 @@ function Footer() {
   );
 }
 
+/** URL ハッシュ(#t=<taskId>)から選択課題を読む。課題の共有リンクを可能にする */
+function taskFromHash(): string | null {
+  const id = new URLSearchParams(window.location.hash.slice(1)).get('t');
+  return id && TASKS.some((t) => t.id === id) ? id : null;
+}
+
 export default function App() {
-  const [selectedTask, setSelectedTask] = useState<string | null>(null);
+  const [selectedTask, setSelectedTask] = useState<string | null>(() => taskFromHash());
+
+  useEffect(() => {
+    const onHashChange = () => {
+      setSelectedTask(taskFromHash());
+      window.scrollTo(0, 0);
+    };
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, []);
+
+  // 選択は URL ハッシュ経由で一元化(hashchange → state 同期。ブラウザの戻る/進むも効く)
+  const selectTask = (id: string | null) => {
+    window.location.hash = id ? `t=${id}` : '';
+  };
 
   return (
     <ViewerProvider>
       <div id="app-content" className="max-w-6xl mx-auto px-4">
         <Hero />
         {selectedTask ? (
-          <TaskDetail taskId={selectedTask} onBack={() => setSelectedTask(null)} />
+          <TaskDetail taskId={selectedTask} onBack={() => selectTask(null)} />
         ) : (
           <>
-            <TaskGallery onSelect={setSelectedTask} />
+            <TaskGallery onSelect={selectTask} />
             <ModelsOverview />
             <MethodNote />
           </>

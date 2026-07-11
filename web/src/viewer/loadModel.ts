@@ -23,12 +23,38 @@ export class RegionBlockedError extends Error {
   }
 }
 
-/** ベンチ成果物の GLB を読み込む。ViewerCore.addPane にそのまま渡せる Object3D を返す */
-export async function loadModel(url: string): Promise<THREE.Object3D> {
+/** ベンチ成果物の GLB を読み込む。ViewerCore.addPane にそのまま渡せる Object3D を返す。
+ * onProgress にはダウンロード進捗(0..1)を通知する(Content-Length 不明時は呼ばれない) */
+export async function loadModel(
+  url: string,
+  onProgress?: (fraction: number) => void,
+): Promise<THREE.Object3D> {
   const res = await fetch(url);
   if (res.status === 451) throw new RegionBlockedError();
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const buffer = await res.arrayBuffer();
+  const total = Number(res.headers.get('Content-Length')) || 0;
+  let buffer: ArrayBuffer;
+  if (res.body && total > 0 && onProgress) {
+    const reader = res.body.getReader();
+    const chunks: Uint8Array[] = [];
+    let received = 0;
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+      received += value.byteLength;
+      onProgress(Math.min(received / total, 1));
+    }
+    const merged = new Uint8Array(received);
+    let offset = 0;
+    for (const chunk of chunks) {
+      merged.set(chunk, offset);
+      offset += chunk.byteLength;
+    }
+    buffer = merged.buffer;
+  } else {
+    buffer = await res.arrayBuffer();
+  }
   const gltf = await getLoader().parseAsync(buffer, '');
   return gltf.scene;
 }
