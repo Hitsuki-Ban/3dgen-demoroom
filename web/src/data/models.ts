@@ -1,4 +1,5 @@
 import type { ModelInfo } from './types';
+import modelRegistry from './model-registry.json';
 
 /**
  * ベンチ対象モデルレジストリ v1(11 モデル)。
@@ -123,6 +124,12 @@ export const MODELS: ModelInfo[] = [
       vramNote: '512³: ~10GB / 1024³: ~24GB',
     },
 ];
+
+const registeredIds = modelRegistry.join(',');
+const modelIds = MODELS.map((model) => model.id).join(',');
+if (modelIds !== registeredIds) {
+  throw new Error(`MODELS must match model-registry.json order: expected ${registeredIds}, received ${modelIds}`);
+}
 
 export const BADGE_LABELS: Record<string, { label: string; className: string }> = {
   'geometry-only': { label: 'geometry-only', className: 'bg-slate-700 text-slate-200' },

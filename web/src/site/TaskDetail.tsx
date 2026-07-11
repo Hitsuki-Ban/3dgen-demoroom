@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { MODELS } from '../data/models';
 import { TASKS } from '../data/tasks';
 import { useManifest } from '../data/useManifest';
-import type { ModelInfo, RunResult } from '../data/types';
+import { isRunResult, type ModelInfo, type RunResult } from '../data/types';
 import { loadModel } from '../viewer/loadModel';
 import { useViewer } from '../viewer/ViewerContext';
 import { ViewerPane } from '../viewer/ViewerPane';
@@ -33,7 +33,7 @@ function makeLoadObject(m: ModelInfo, result: RunResult) {
 
 export function TaskDetail({ taskId, onBack }: { taskId: string; onBack: () => void }) {
   const task = TASKS.find((t) => t.id === taskId);
-  const { results } = useManifest();
+  const results = useManifest().entries.filter(isRunResult);
   const viewer = useViewer();
   /** 大画面比較に選択中のモデル id(最大 2 つ。3 つ目を選ぶと古い方から入れ替え) */
   const [compareSel, setCompareSel] = useState<string[]>([]);
@@ -109,10 +109,10 @@ export function TaskDetail({ taskId, onBack }: { taskId: string; onBack: () => v
                       metaJson={JSON.stringify(result.meta, null, 2)}
                       loadObject={makeLoadObject(m, result)}
                       extraInfo={formatResultInfo(
-                        result.meta.wall_clock_seconds,
-                        result.meta.peak_vram_bytes,
+                        result.metrics.wallClockSeconds,
+                        result.metrics.peakVramBytes,
                         result.glbSizeBytes,
-                        result.meta.gpu_name,
+                        result.metrics.gpuName,
                       )}
                     />
                   );
@@ -161,10 +161,10 @@ export function TaskDetail({ taskId, onBack }: { taskId: string; onBack: () => v
                       metaJson={JSON.stringify(result.meta, null, 2)}
                       loadObject={makeLoadObject(m, result)}
                       extraInfo={formatResultInfo(
-                        result.meta.wall_clock_seconds,
-                        result.meta.peak_vram_bytes,
+                        result.metrics.wallClockSeconds,
+                        result.metrics.peakVramBytes,
                         result.glbSizeBytes,
-                        result.meta.gpu_name,
+                        result.metrics.gpuName,
                       )}
                     />
                   );

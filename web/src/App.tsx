@@ -3,6 +3,7 @@ import { ViewerProvider } from './viewer/ViewerContext';
 import { MODELS } from './data/models';
 import { TASKS } from './data/tasks';
 import { useManifest } from './data/useManifest';
+import { isRunResult } from './data/types';
 import { TaskGallery } from './site/TaskGallery';
 import { TaskDetail } from './site/TaskDetail';
 import { ModelsOverview } from './site/ModelsOverview';
@@ -11,7 +12,7 @@ import { MethodNote } from './site/MethodNote';
 const REPO_URL = 'https://github.com/Hitsuki-Ban/3dgen-demoroom';
 
 function Hero() {
-  const { results } = useManifest();
+  const results = useManifest().entries.filter(isRunResult);
   const doneModels = new Set(results.map((r) => r.modelId)).size;
 
   return (

@@ -1,7 +1,7 @@
 import { MODELS } from '../data/models';
 import { TASKS } from '../data/tasks';
 import { useManifest } from '../data/useManifest';
-import type { TaskInfo } from '../data/types';
+import { isRunResult, type TaskInfo } from '../data/types';
 
 function Stars({ n }: { n: number }) {
   return <span className="text-amber-400">{'★'.repeat(n)}</span>;
@@ -41,7 +41,7 @@ function TaskCard({
 }
 
 export function TaskGallery({ onSelect }: { onSelect: (id: string) => void }) {
-  const { results } = useManifest();
+  const results = useManifest().entries.filter(isRunResult);
   const countByTask = new Map<string, number>();
   for (const r of results) countByTask.set(r.taskId, (countByTask.get(r.taskId) ?? 0) + 1);
 
