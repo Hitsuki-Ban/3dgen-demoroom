@@ -1,10 +1,11 @@
 import { MODELS } from '../data/models';
 import { useManifest } from '../data/useManifest';
+import { isRunResult } from '../data/types';
 import { ModelCard } from './ModelCard';
 
 /** 収録モデル一覧。manifest に結果があるモデルは status を 'done' に昇格して表示する */
 export function ModelsOverview() {
-  const { results } = useManifest();
+  const results = useManifest().entries.filter(isRunResult);
   const doneModels = new Set(results.map((r) => r.modelId));
 
   return (

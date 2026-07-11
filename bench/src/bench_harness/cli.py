@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+from datetime import datetime, timezone
 from pathlib import Path
 
 from bench_harness.meta import validate_task_output
@@ -15,6 +16,7 @@ from bench_harness.runpod import (
     RunPodClient,
     RunPodLaunchConfig,
 )
+from bench_harness.site_data import build_site_manifest, parse_expected_failures
 from bench_harness.tasks import load_tasks
 from bench_harness.uploader import create_uploader
 
@@ -56,6 +58,13 @@ def main() -> None:
     output_validate = subcommands.add_parser("output-validate")
     output_validate.add_argument("task_output_dir", type=Path)
 
+    site_data_snapshot = subcommands.add_parser("site-data-snapshot")
+    site_data_snapshot.add_argument("runs_root", type=Path)
+    site_data_snapshot.add_argument("tasks_json", type=Path)
+    site_data_snapshot.add_argument("model_registry", type=Path)
+    site_data_snapshot.add_argument("output_path", type=Path)
+    site_data_snapshot.add_argument("--expected-failure", action="append", required=True)
+
     upload_local = subcommands.add_parser("upload-local")
     upload_local.add_argument("source_dir", type=Path)
     upload_local.add_argument("target_root")
@@ -95,6 +104,26 @@ def main() -> None:
     elif args.command == "output-validate":
         meta = validate_task_output(args.task_output_dir)
         print(f"valid output: {meta['model_id']} / {meta['task_id']}")
+    elif args.command == "site-data-snapshot":
+        expected_failures = parse_expected_failures(args.expected_failure)
+        manifest = build_site_manifest(
+            runs_root=args.runs_root,
+            tasks_json=args.tasks_json,
+            model_registry=args.model_registry,
+            output_path=args.output_path,
+            expected_failures=expected_failures,
+            generated_at=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        )
+        failure_entries = [entry for entry in manifest["entries"] if entry["status"] == "failed"]
+        success_count = len(manifest["entries"]) - len(failure_entries)
+        model_count = len({entry["modelId"] for entry in manifest["entries"]})
+        task_count = len({entry["taskId"] for entry in manifest["entries"]})
+        print(
+            f"site-data snapshot: models={model_count} tasks={task_count} cells={len(manifest['entries'])} "
+            f"successes={success_count} failures={len(failure_entries)}"
+        )
+        for entry in failure_entries:
+            print(f"failure: {entry['modelId']}/{entry['taskId']}")
     elif args.command == "upload-local":
         uploader = create_uploader("local", args.target_root)
         uploaded = uploader.upload_run(args.source_dir, args.relative_name)

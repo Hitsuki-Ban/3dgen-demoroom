@@ -12,6 +12,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: bench/uv.lock
+
       - uses: pnpm/action-setup@v4
         with:
           version: 11
@@ -31,7 +36,6 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: auto
-          SITE_DATA_MIN_RESULTS: "74"
         run: |
           mkdir -p outputs/site-data
           aws s3 sync "s3://3dgen-runs/site-data/" outputs/site-data/ --endpoint-url "${{ secrets.R2_ENDPOINT }}" --only-show-errors
@@ -41,13 +45,18 @@ jobs:
           echo "synced top-level meta.json: ${meta_count}"
           echo "synced top-level output.glb: ${glb_count}"
           echo "synced top-level failure.json: ${failure_count}"
-          test "${meta_count}" -ge "${SITE_DATA_MIN_RESULTS}"
-          test "${meta_count}" -eq "${glb_count}"
+
+      - name: Validate complete site-data snapshot
+        run: >-
+          uv run --frozen --project bench bench-harness site-data-snapshot
+          outputs/site-data
+          tasks/tasks.json
+          web/src/data/model-registry.json
+          web/public/manifest.json
+          --expected-failure partcrafter/chrome-espresso-machine
 
       - name: Build
         working-directory: web
-        env:
-          SITE_DATA_MIN_RESULTS: "74"
         run: pnpm build
 
       - name: Deploy to Cloudflare Workers

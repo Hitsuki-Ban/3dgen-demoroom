@@ -6,9 +6,20 @@ Vite 8 + React 19 + Three.js (WebGLRenderer)。設計根拠は `docs/research/vi
 
 ```powershell
 cd web
+
+uv run --project ../bench bench-harness site-data-snapshot `
+  ../outputs/site-data `
+  ../tasks/tasks.json `
+  src/data/model-registry.json `
+  public/manifest.json `
+  --expected-failure partcrafter/chrome-espresso-machine
+
 pnpm install
 pnpm dev
 ```
+
+`site-data-snapshot` は 11 モデル x 25 課題の全セルを検証し、成功または失敗のどちらか一方が
+揃わない限り manifest を生成しない。`pnpm dev` / `pnpm build` は生成済み manifest だけを消費する。
 
 ## 構成
 

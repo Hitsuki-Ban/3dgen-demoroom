@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 import type { SiteManifest } from './types';
 
-const EMPTY: SiteManifest = { generatedAt: '', results: [] };
+const EMPTY: SiteManifest = { generatedAt: '', entries: [] };
 let cache: SiteManifest | null = null;
 
-/** /manifest.json(build-manifest.mjs 生成)を一度だけ読み込む */
+/** Python site-data snapshot が生成した /manifest.json を一度だけ読み込む */
 export function useManifest(): SiteManifest {
   const [manifest, setManifest] = useState<SiteManifest>(cache ?? EMPTY);
 

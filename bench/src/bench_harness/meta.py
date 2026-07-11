@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import json
+import math
+import struct
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -32,6 +35,23 @@ OPTIONAL_META_KEYS = frozenset(
         "external_code_revisions",
     }
 )
+REQUIRED_FAILURE_KEYS = frozenset(
+    {
+        "status",
+        "task_id",
+        "model_id",
+        "model_git_commit",
+        "weights_revision",
+        "seed",
+        "parameters",
+        "retry_count",
+        "error_type",
+        "error_message",
+        "started_at",
+        "finished_at",
+    }
+)
+OPTIONAL_FAILURE_KEYS = frozenset({"error_output_tail", "error_returncode"})
 
 
 def load_run_metadata(path: Path) -> dict[str, Any]:
@@ -60,14 +80,53 @@ def load_run_metadata(path: Path) -> dict[str, Any]:
     _require_int(raw, "retry_count")
     _require_string(raw, "torch_version")
     _require_string(raw, "torch_cuda_version")
-    if not isinstance(raw["torch_cuda_arch_list"], list) or not all(
+    if not isinstance(raw["torch_cuda_arch_list"], list) or not raw["torch_cuda_arch_list"] or not all(
         isinstance(item, str) and item for item in raw["torch_cuda_arch_list"]
     ):
         raise ValueError("torch_cuda_arch_list must be a non-empty string array")
     _require_string(raw, "attention_backend")
-    _require_string(raw, "started_at")
-    _require_string(raw, "finished_at")
+    started_at = _require_timestamp(raw, "started_at")
+    finished_at = _require_timestamp(raw, "finished_at")
+    if finished_at < started_at:
+        raise ValueError("finished_at must not be earlier than started_at")
     _require_relative_file(raw["license_file"], "license_file")
+    for field in OPTIONAL_META_KEYS:
+        if field in raw:
+            _require_string_map(raw[field], field)
+    return raw
+
+
+def load_run_failure(path: Path) -> dict[str, Any]:
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(raw, dict):
+        raise ValueError(f"{path} must contain a JSON object")
+
+    keys = set(raw)
+    missing = REQUIRED_FAILURE_KEYS - keys
+    unknown = keys - REQUIRED_FAILURE_KEYS - OPTIONAL_FAILURE_KEYS
+    if missing:
+        raise ValueError(f"{path} missing required field(s): {', '.join(sorted(missing))}")
+    if unknown:
+        raise ValueError(f"{path} contains unknown field(s): {', '.join(sorted(unknown))}")
+    if raw["status"] != "failed":
+        raise ValueError("status must be 'failed'")
+
+    for field in ("task_id", "model_id", "model_git_commit", "weights_revision", "error_type", "error_message"):
+        _require_string(raw, field)
+    _require_int(raw, "seed")
+    if not isinstance(raw["parameters"], dict):
+        raise ValueError("parameters must be an object")
+    _require_int(raw, "retry_count")
+    started_at = _require_timestamp(raw, "started_at")
+    finished_at = _require_timestamp(raw, "finished_at")
+    if finished_at < started_at:
+        raise ValueError("finished_at must not be earlier than started_at")
+    if "error_output_tail" in raw:
+        _require_string(raw, "error_output_tail")
+    if "error_returncode" in raw and (
+        isinstance(raw["error_returncode"], bool) or not isinstance(raw["error_returncode"], int)
+    ):
+        raise ValueError("error_returncode must be an integer")
     return raw
 
 
@@ -77,11 +136,86 @@ def validate_task_output(output_dir: Path) -> dict[str, Any]:
     output_glb = output_dir / "output.glb"
     if not output_glb.is_file():
         raise FileNotFoundError(f"missing canonical GLB: {output_glb}")
+    validate_glb(output_glb)
     meta = load_run_metadata(output_dir / "meta.json")
     license_file = output_dir / str(meta["license_file"])
     if not license_file.is_file():
         raise FileNotFoundError(f"missing license file declared by meta.json: {license_file}")
+    resolved_output_dir = output_dir.resolve()
+    resolved_license = license_file.resolve()
+    if not resolved_license.is_relative_to(resolved_output_dir):
+        raise ValueError(f"license file must resolve inside the task output directory: {license_file}")
+    canonical_files = {
+        output_glb.resolve(),
+        (output_dir / "meta.json").resolve(),
+        (output_dir / "failure.json").resolve(),
+    }
+    if resolved_license in canonical_files:
+        raise ValueError(f"license file must be an independent text artifact: {license_file}")
+    try:
+        license_text = license_file.read_text(encoding="utf-8")
+    except UnicodeDecodeError as exc:
+        raise ValueError(f"license file must be UTF-8 text: {license_file}") from exc
+    if not license_text.strip():
+        raise ValueError(f"license file declared by meta.json is empty: {license_file}")
     return meta
+
+
+def validate_failed_task_output(output_dir: Path) -> dict[str, Any]:
+    if not output_dir.is_dir():
+        raise FileNotFoundError(f"output directory does not exist: {output_dir}")
+    return load_run_failure(output_dir / "failure.json")
+
+
+def validate_glb(path: Path) -> None:
+    size = path.stat().st_size
+    if size < 12:
+        raise ValueError(f"{path} is too small to be a GLB")
+    with path.open("rb") as stream:
+        magic, version, declared_size = struct.unpack("<4sII", stream.read(12))
+        if magic != b"glTF":
+            raise ValueError(f"{path} has invalid GLB magic")
+        if version != 2:
+            raise ValueError(f"{path} uses unsupported GLB version {version}")
+        if declared_size != size:
+            raise ValueError(f"{path} declares {declared_size} bytes but file size is {size}")
+
+        offset = 12
+        chunk_index = 0
+        gltf_json: Any = None
+        while offset < size:
+            chunk_header = stream.read(8)
+            if len(chunk_header) != 8:
+                raise ValueError(f"{path} has a truncated GLB chunk header")
+            chunk_length, chunk_type = struct.unpack("<II", chunk_header)
+            offset += 8
+            if chunk_length == 0 or chunk_length % 4 != 0:
+                raise ValueError(f"{path} has an invalid GLB chunk length {chunk_length}")
+            chunk_end = offset + chunk_length
+            if chunk_end > size:
+                raise ValueError(f"{path} has a GLB chunk outside the declared file length")
+            if chunk_index == 0:
+                if chunk_type != 0x4E4F534A:
+                    raise ValueError(f"{path} first GLB chunk must be JSON")
+                try:
+                    gltf_json = json.loads(
+                        stream.read(chunk_length).decode("utf-8"),
+                        parse_constant=_reject_json_constant,
+                    )
+                except (UnicodeDecodeError, ValueError) as exc:
+                    raise ValueError(f"{path} contains invalid GLB JSON") from exc
+            else:
+                if chunk_type == 0x4E4F534A:
+                    raise ValueError(f"{path} contains more than one GLB JSON chunk")
+                stream.seek(chunk_length, 1)
+            offset = chunk_end
+            chunk_index += 1
+
+    if chunk_index == 0 or not isinstance(gltf_json, dict):
+        raise ValueError(f"{path} is missing a GLB JSON chunk")
+    asset = gltf_json.get("asset")
+    if not isinstance(asset, dict) or asset.get("version") != "2.0":
+        raise ValueError(f"{path} GLB JSON must declare asset.version 2.0")
 
 
 def _require_string(raw: dict[str, Any], field: str) -> None:
@@ -92,6 +226,8 @@ def _require_string(raw: dict[str, Any], field: str) -> None:
 def _require_number(raw: dict[str, Any], field: str) -> None:
     if isinstance(raw[field], bool) or not isinstance(raw[field], int | float):
         raise ValueError(f"{field} must be a number")
+    if not math.isfinite(raw[field]):
+        raise ValueError(f"{field} must be finite")
     if raw[field] < 0:
         raise ValueError(f"{field} must be non-negative")
 
@@ -101,6 +237,28 @@ def _require_int(raw: dict[str, Any], field: str) -> None:
         raise ValueError(f"{field} must be an integer")
     if raw[field] < 0:
         raise ValueError(f"{field} must be non-negative")
+
+
+def _require_timestamp(raw: dict[str, Any], field: str) -> datetime:
+    _require_string(raw, field)
+    try:
+        parsed = datetime.fromisoformat(raw[field].replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise ValueError(f"{field} must be an ISO 8601 timestamp") from exc
+    if parsed.tzinfo is None:
+        raise ValueError(f"{field} must include a timezone")
+    return parsed
+
+
+def _require_string_map(value: Any, field: str) -> None:
+    if not isinstance(value, dict) or not all(
+        isinstance(key, str) and key and isinstance(item, str) and item for key, item in value.items()
+    ):
+        raise ValueError(f"{field} must be an object with non-empty string keys and values")
+
+
+def _reject_json_constant(value: str) -> None:
+    raise ValueError(f"non-standard JSON constant: {value}")
 
 
 def _require_relative_file(value: Any, field: str) -> None:
