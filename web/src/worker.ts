@@ -30,10 +30,12 @@ const RUN_OUTPUT_RE = /^[a-z0-9-]+\/[a-z0-9-]+\/output\.glb$/;
 // Output の表示・配信が禁止されるため、当該地域からの取得をエッジで遮断する。
 // docs/research/models-merged.md「Hunyuan3D 2.1 の扱い」参照。
 const GEO_RESTRICTED_MODELS = new Set(['hunyuan3d-21']);
-// EU27 + GB + KR(ISO 3166-1 alpha-2)
+// Cloudflare が ip.src.is_in_european_union=true とする 34 コード + GB + KR。
+// EU 加盟国 27 コードに加え、EU 領域として別 ISO code を持つ AX/GF/GP/MF/MQ/RE/YT を含む。
 const GEO_BLOCKED_COUNTRIES = new Set([
-  'AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR', 'DE', 'GR', 'HU',
-  'IE', 'IT', 'LV', 'LT', 'LU', 'MT', 'NL', 'PL', 'PT', 'RO', 'SK', 'SI', 'ES', 'SE',
+  'AT', 'AX', 'BE', 'BG', 'CY', 'CZ', 'DE', 'DK', 'EE', 'ES', 'FI', 'FR', 'GF',
+  'GP', 'GR', 'HR', 'HU', 'IE', 'IT', 'LT', 'LU', 'LV', 'MF', 'MQ', 'MT', 'NL',
+  'PL', 'PT', 'RE', 'RO', 'SE', 'SI', 'SK', 'YT',
   'GB', 'KR',
 ]);
 
