@@ -61,4 +61,4 @@ COPY models/common/runner_utils.py /opt/3dgen-runner/runner_utils.py
 COPY models/pixal3d/runner.py /opt/3dgen-runner/pixal3d_runner.py
 
 WORKDIR /work
-ENTRYPOINT ["python3", "/opt/3dgen-runner/pixal3d_runner.py"]
+ENTRYPOINT ["python3", "-m", "bench_harness.container_entrypoint", "--model-id", "pixal3d", "--runner-path", "/opt/3dgen-runner/pixal3d_runner.py"]

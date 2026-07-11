@@ -105,4 +105,4 @@ COPY models/common/runner_utils.py /opt/3dgen-runner/runner_utils.py
 COPY models/direct3d-s2/runner.py /opt/3dgen-runner/direct3d_s2_runner.py
 
 WORKDIR /work
-ENTRYPOINT ["python3", "/opt/3dgen-runner/direct3d_s2_runner.py"]
+ENTRYPOINT ["python3", "-m", "bench_harness.container_entrypoint", "--model-id", "direct3d-s2", "--runner-path", "/opt/3dgen-runner/direct3d_s2_runner.py"]

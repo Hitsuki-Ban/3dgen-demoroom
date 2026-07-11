@@ -82,7 +82,11 @@ def test_3dtopia_xl_dockerfile_uses_runtime_only_volume_paths() -> None:
     assert "numpy==1.26.4" in dockerfile
     assert "COPY models/common/runner_utils.py /opt/3dgen-runner/runner_utils.py" in dockerfile
     assert "COPY models/3dtopia-xl/runner.py /opt/3dgen-runner/3dtopia_xl_runner.py" in dockerfile
-    assert 'ENTRYPOINT ["python", "/opt/3dgen-runner/3dtopia_xl_runner.py"]' in dockerfile
+    assert (
+        'ENTRYPOINT ["python", "-m", "bench_harness.container_entrypoint", "--model-id", '
+        '"3dtopia-xl", "--runner-path", "/opt/3dgen-runner/3dtopia_xl_runner.py"]'
+        in dockerfile
+    )
 
 
 def test_build_3dtopia_xl_command_uses_volume_pinned_weights(monkeypatch, tmp_path: Path) -> None:

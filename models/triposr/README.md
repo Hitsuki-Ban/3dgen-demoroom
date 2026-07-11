@@ -36,7 +36,7 @@ docker run --rm --gpus all `
   -e MAX_RUNTIME_MIN=60 `
   -v ${PWD}\tasks:/work/input:ro `
   -v ${PWD}\outputs\triposr-smoke:/work/output `
-  3dgen/triposr:local --task-limit 2
+  3dgen/triposr:local runner --task-limit 2
 ```
 
 Expected output per task:

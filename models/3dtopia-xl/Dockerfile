@@ -62,7 +62,7 @@ RUN uv pip install --python /opt/venv/bin/python \
         --index-url https://download.pytorch.org/whl/cu118 \
     && uv pip install --python /opt/venv/bin/python xformers==0.0.23.post1 --index-url https://download.pytorch.org/whl/cu118 \
     && uv pip install --python /opt/venv/bin/python \
-        boto3 \
+        boto3==1.42.97 \
         diffusers==0.19.3 \
         einops \
         gradio \
@@ -115,4 +115,4 @@ COPY models/common/runner_utils.py /opt/3dgen-runner/runner_utils.py
 COPY models/3dtopia-xl/runner.py /opt/3dgen-runner/3dtopia_xl_runner.py
 
 WORKDIR /work
-ENTRYPOINT ["python", "/opt/3dgen-runner/3dtopia_xl_runner.py"]
+ENTRYPOINT ["python", "-m", "bench_harness.container_entrypoint", "--model-id", "3dtopia-xl", "--runner-path", "/opt/3dgen-runner/3dtopia_xl_runner.py"]

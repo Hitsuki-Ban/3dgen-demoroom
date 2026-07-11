@@ -4,14 +4,20 @@ import os
 import sys
 from pathlib import Path
 
+import pytest
+
 from bench_harness.meta import REQUIRED_META_KEYS
 from bench_harness.tasks import TaskDefinition
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+COMMON_PATH = REPO_ROOT / "models" / "common"
 RUNNER_PATH = REPO_ROOT / "models" / "partcrafter" / "runner.py"
 MODEL_SPEC_PATH = REPO_ROOT / "models" / "partcrafter" / "model.json"
 DOCKERFILE_PATH = REPO_ROOT / "models" / "partcrafter" / "Dockerfile"
+sys.path.insert(0, str(COMMON_PATH))
+
+import runner_utils  # noqa: E402
 
 
 def _load_runner(monkeypatch):
@@ -83,6 +89,7 @@ def test_partcrafter_dockerfile_uses_required_cuda_base_and_pins() -> None:
     assert "PYTHONPATH=/opt/bench/src" in dockerfile
     assert "COPY bench/src /opt/bench/src" in dockerfile
     assert "COPY tasks /opt/3dgen-tasks" in dockerfile
+    assert "COPY models/common/runner_utils.py /opt/3dgen-runner/runner_utils.py" in dockerfile
     assert "COPY models/partcrafter/runner.py /opt/3dgen-runner/partcrafter_runner.py" in dockerfile
 
 
@@ -241,7 +248,13 @@ def test_run_task_retries_once_and_records_retry_count(monkeypatch, tmp_path: Pa
     license_sources.rmbg_license.write_text("RMBG\n", encoding="utf-8")
     calls: list[list[str]] = []
 
-    def fake_run_with_peak_vram(command: list[str], timeout_seconds: float) -> int:
+    def fake_run_with_peak_vram(
+        command: list[str],
+        timeout_seconds: float,
+        timeout_label: str,
+        *,
+        log_path: Path | None = None,
+    ) -> int:
         calls.append(command)
         if len(calls) == 1:
             raise RuntimeError("transient decoder failure")
@@ -257,7 +270,7 @@ def test_run_task_retries_once_and_records_retry_count(monkeypatch, tmp_path: Pa
     monkeypatch.setattr(
         runner,
         "collect_runtime_snapshot",
-        lambda peak: runner.RuntimeSnapshot(
+        lambda peak, attention_backend: runner.RuntimeSnapshot(
             gpu_name="NVIDIA GeForce RTX 5090",
             peak_vram_bytes=peak,
             torch_version="2.7.0+cu128",
@@ -296,7 +309,13 @@ def test_run_task_upload_failure_does_not_retry_successful_partcrafter_task(monk
     license_sources.rmbg_license.write_text("RMBG\n", encoding="utf-8")
     calls: list[list[str]] = []
 
-    def fake_run_with_peak_vram(command: list[str], timeout_seconds: float) -> int:
+    def fake_run_with_peak_vram(
+        command: list[str],
+        timeout_seconds: float,
+        timeout_label: str,
+        *,
+        log_path: Path | None = None,
+    ) -> int:
         calls.append(command)
         raw_output_dir = Path(command[command.index("--infer-output-dir") + 1])
         (raw_output_dir / "object.glb").write_bytes(b"glTF")
@@ -310,7 +329,7 @@ def test_run_task_upload_failure_does_not_retry_successful_partcrafter_task(monk
     monkeypatch.setattr(
         runner,
         "collect_runtime_snapshot",
-        lambda peak: runner.RuntimeSnapshot(
+        lambda peak, attention_backend: runner.RuntimeSnapshot(
             gpu_name="NVIDIA GeForce RTX 5090",
             peak_vram_bytes=peak,
             torch_version="2.7.0+cu128",
@@ -355,7 +374,13 @@ def test_run_task_writes_failure_record_after_retry(monkeypatch, tmp_path: Path)
     )
     calls: list[list[str]] = []
 
-    def fake_run_with_peak_vram(command: list[str], timeout_seconds: float) -> int:
+    def fake_run_with_peak_vram(
+        command: list[str],
+        timeout_seconds: float,
+        timeout_label: str,
+        *,
+        log_path: Path | None = None,
+    ) -> int:
         calls.append(command)
         raise RuntimeError("persistent decoder failure")
 
@@ -379,25 +404,56 @@ def test_run_task_writes_failure_record_after_retry(monkeypatch, tmp_path: Path)
     assert "persistent decoder failure" in failure["error_message"]
 
 
-def test_terminate_runpod_if_needed_sends_harness_user_agent(monkeypatch) -> None:
+def test_run_task_timeout_writes_and_uploads_failure_before_reraising(monkeypatch, tmp_path: Path) -> None:
     runner = _load_runner(monkeypatch)
-    captured = {}
+    input_root = tmp_path / "input"
+    output_root = tmp_path / "output"
+    input_root.mkdir()
+    output_root.mkdir()
+    (input_root / "input.png").write_bytes(b"png")
+    license_sources = runner.LicenseSources(
+        root_license=tmp_path / "LICENSE",
+        rmbg_license=tmp_path / "RMBG_LICENSE",
+    )
+    calls: list[list[str]] = []
+    uploads: list[str] = []
 
-    class FakeResponse:
-        status = 200
+    def fake_run_with_peak_vram(
+        command: list[str],
+        timeout_seconds: float,
+        timeout_label: str,
+        *,
+        log_path: Path | None = None,
+    ) -> int:
+        calls.append(command)
+        raise runner_utils.RunnerTimeoutError(
+            command=command,
+            timeout_label=timeout_label,
+            output_tail="diffusion step timed out",
+        )
 
-        def __enter__(self):
-            return self
+    def fake_upload(task_output_dir: Path, task_id: str, env: dict[str, str]) -> list[str]:
+        failure = json.loads((task_output_dir / "failure.json").read_text(encoding="utf-8"))
+        assert failure["error_output_tail"] == "diffusion step timed out"
+        assert (task_output_dir / "infer.log").read_text(encoding="utf-8") == "diffusion step timed out\n"
+        uploads.append(task_id)
+        return [f"{task_id}/failure.json", f"{task_id}/infer.log"]
 
-        def __exit__(self, exc_type, exc_value, traceback) -> None:
-            pass
+    monkeypatch.setattr(runner, "run_with_peak_vram", fake_run_with_peak_vram)
+    monkeypatch.setattr(runner, "upload_task_increment_if_configured", fake_upload)
 
-    def fake_urlopen(request, timeout: int):
-        captured["user_agent"] = request.get_header("User-agent")
-        return FakeResponse()
+    with pytest.raises(runner_utils.RunnerTimeoutError):
+        runner.run_task(
+            runner.TaskDefinition(id="cartoon-apple", prompt="apple", image="input.png", seed=20260708),
+            input_root,
+            output_root,
+            license_sources,
+            timeout_seconds=10,
+        )
 
-    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
-
-    runner.terminate_runpod_if_needed({"RUNPOD_POD_ID": "pod-123", "RUNPOD_API_KEY": "token"})
-
-    assert captured["user_agent"] == "3dgen-demoroom-bench-harness/0.1"
+    failure = json.loads((output_root / "cartoon-apple" / "failure.json").read_text(encoding="utf-8"))
+    assert len(calls) == 1
+    assert uploads == ["cartoon-apple"]
+    assert failure["retry_count"] == 0
+    assert failure["error_type"] == "RunnerTimeoutError"
+    assert (output_root / "cartoon-apple" / "infer.log").is_file()

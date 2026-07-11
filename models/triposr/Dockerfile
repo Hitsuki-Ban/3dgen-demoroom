@@ -7,6 +7,7 @@ ARG UV_VERSION=0.11.19
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
     HF_HOME=/opt/hf-cache \
+    PYTHONPATH=/opt/bench/src \
     TORCH_CUDA_ARCH_LIST="8.9;12.0"
 
 RUN apt-get update \
@@ -18,6 +19,7 @@ RUN apt-get update \
         libegl1 \
         libglib2.0-0 \
         libgl1 \
+        openssh-server \
         python3 \
         python3-dev \
         python3-venv \
@@ -37,7 +39,7 @@ RUN uv pip install --system \
     && uv pip install --system scikit-build-core cmake ninja pybind11 \
     && export CMAKE_PREFIX_PATH="$(python3 -c 'import torch; print(torch.utils.cmake_prefix_path)')" \
     && uv pip install --system --no-build-isolation-package torchmcubes -r /opt/TripoSR/requirements.txt \
-    && uv pip install --system onnxruntime
+    && uv pip install --system onnxruntime boto3
 
 RUN python3 - <<'PY'
 import rembg
@@ -58,7 +60,9 @@ snapshot_download(
 )
 PY
 
+COPY bench/src /opt/bench/src
+COPY models/common/runner_utils.py /opt/3dgen-runner/runner_utils.py
 COPY models/triposr/runner.py /opt/3dgen-runner/triposr_runner.py
 
 WORKDIR /work
-ENTRYPOINT ["python3", "/opt/3dgen-runner/triposr_runner.py"]
+ENTRYPOINT ["python3", "-m", "bench_harness.container_entrypoint", "--model-id", "triposr", "--runner-path", "/opt/3dgen-runner/triposr_runner.py"]

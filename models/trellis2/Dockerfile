@@ -118,4 +118,4 @@ COPY models/common/runner_utils.py /opt/3dgen-runner/runner_utils.py
 COPY models/trellis2/runner.py /opt/3dgen-runner/trellis2_runner.py
 
 WORKDIR /work
-ENTRYPOINT ["python3", "/opt/3dgen-runner/trellis2_runner.py"]
+ENTRYPOINT ["python3", "-m", "bench_harness.container_entrypoint", "--model-id", "trellis2", "--runner-path", "/opt/3dgen-runner/trellis2_runner.py"]
