@@ -11,6 +11,7 @@ from bench_harness.runpod import (
     DEFAULT_MIN_BALANCE_USD,
     MODEL_RUNNER_PATHS,
     MODEL_WEIGHT_ENVS,
+    RUNPOD_TELEMETRY_ROOT,
     R2Credentials,
     RunPodApiError,
     RunPodClient,
@@ -100,7 +101,55 @@ def test_build_cloud_run_command_runs_model_then_uploads_to_s3() -> None:
     assert "--input-root /opt/3dgen-tasks" in command
     assert "--output-root /work/output" in command
     assert "python3 -m bench_harness.cli upload-s3" in command
+    assert "upload-s3 /work/output" not in command
+    assert command.count(f"upload-s3 {RUNPOD_TELEMETRY_ROOT} ") == 2
+    assert command.count("/work/output") == 1
     assert "s3://3dgen-runs/runs/triposg/rtx-5090/20260708T000000Z" in command
+
+
+@pytest.mark.parametrize(
+    "output_root",
+    [RUNPOD_TELEMETRY_ROOT, "/work", f"{RUNPOD_TELEMETRY_ROOT}/tasks"],
+)
+def test_build_cloud_run_command_rejects_output_and_telemetry_root_overlap(
+    output_root: str,
+) -> None:
+    with pytest.raises(ValueError, match="must not equal, contain, or be contained"):
+        build_cloud_run_command(
+            model_id="triposg",
+            output_root=output_root,
+            s3_target="s3://3dgen-runs/runs/triposg/rtx-5090/20260708T000000Z",
+        )
+
+
+@pytest.mark.parametrize(
+    "output_root",
+    [
+        "/work/output/.",
+        "/work/output/../runpod-telemetry",
+        "//work/runpod-telemetry",
+        "/work/output//task",
+        "/work/output/",
+    ],
+)
+def test_build_cloud_run_command_rejects_noncanonical_output_root(
+    output_root: str,
+) -> None:
+    with pytest.raises(ValueError, match="canonical absolute POSIX path"):
+        build_cloud_run_command(
+            model_id="triposg",
+            output_root=output_root,
+            s3_target="s3://3dgen-runs/runs/triposg/rtx-5090/20260708T000000Z",
+        )
+
+
+def test_build_cloud_run_command_rejects_relative_output_root() -> None:
+    with pytest.raises(ValueError, match="absolute POSIX path"):
+        build_cloud_run_command(
+            model_id="triposg",
+            output_root="outputs",
+            s3_target="s3://3dgen-runs/runs/triposg/rtx-5090/20260708T000000Z",
+        )
 
 
 def test_build_cloud_run_command_passes_task_limit_to_runner() -> None:
@@ -219,6 +268,12 @@ def test_build_cloud_run_command_uploads_status_even_when_runner_fails() -> None
     assert "service ssh start" in command
     assert "ssh_exit_code=$?" in command
     assert "runpod-startup.json" in command
+    assert "telemetry_root = Path(sys.argv[1])" in command
+    assert "(telemetry_root / 'runpod-startup.json')" in command
+    assert "(telemetry_root / 'runpod-status.json')" in command
+    assert f"upload-s3 {RUNPOD_TELEMETRY_ROOT} " in command
+    assert "upload-s3 /work/output" not in command
+    assert "--output-root /work/output" in command
     assert "startup_status_exit_code=$?" in command
     assert "startup_upload_exit_code=$?" in command
     assert command.index("service ssh start") < command.index("python3 /opt/3dgen-runner/triposg_runner.py")
@@ -283,8 +338,8 @@ def test_wave2_models_have_cloud_runner_paths(model_id: str, expected: dict[str,
 
     assert MODEL_RUNNER_PATHS[model_id] == expected["runner"]
     assert f"python3 {expected['runner']}" in command
-    assert f"--input-root /opt/3dgen-tasks" in command
-    assert f"--output-root /work/output" in command
+    assert "--input-root /opt/3dgen-tasks" in command
+    assert "--output-root /work/output" in command
 
 
 @pytest.mark.parametrize("model_id,expected", WAVE2_MODELS.items())

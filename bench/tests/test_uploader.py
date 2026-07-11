@@ -8,6 +8,7 @@ import pytest
 
 from bench_harness.uploader import (
     LocalUploader,
+    PublishRecoveryRequiredError,
     S3UploadConfig,
     S3Uploader,
     create_uploader,
@@ -18,6 +19,7 @@ MODEL_ID = "model-a"
 TASK_ID = "task-a"
 RUN_PREFIX = "runs/model-a/retry-run"
 CANONICAL_PREFIX = f"{RUN_PREFIX}/{TASK_ID}/"
+LOCK_KEY = f"{RUN_PREFIX}/.publish-locks/{TASK_ID}.json"
 
 
 def _valid_meta(
@@ -103,7 +105,10 @@ class FakeS3Client:
         self.fail_upload_number: int | None = None
         self.strip_upload_metadata = False
         self.fail_copy_destination_once: str | None = None
+        self.fail_copy_error_once: BaseException | None = None
         self.fail_delete_key_contains: str | None = None
+        self.fail_lock_put_state_once: str | None = None
+        self.fail_lock_put_after_write = False
 
     def put(
         self, key: str, body: bytes, metadata: dict[str, str] | None = None
@@ -125,6 +130,36 @@ class FakeS3Client:
             metadata = {}
         self.put(key, Path(filename).read_bytes(), metadata)
         self.operations.append(("upload", key, None))
+
+    def put_object(
+        self,
+        *,
+        Bucket: str,
+        Key: str,
+        Body: bytes,
+        ContentType: str,
+        Metadata: dict[str, str],
+        IfNoneMatch: str | None = None,
+        IfMatch: str | None = None,
+    ) -> dict[str, object]:
+        assert (IfNoneMatch is None) != (IfMatch is None)
+        if IfNoneMatch is not None:
+            assert IfNoneMatch == "*"
+            if Key in self.objects:
+                raise RuntimeError("PreconditionFailed")
+        elif Key not in self.objects or self.objects[Key].etag != IfMatch:
+            raise RuntimeError("PreconditionFailed")
+        state = Metadata.get("publish-state")
+        fail_this_write = state == self.fail_lock_put_state_once
+        if fail_this_write:
+            self.fail_lock_put_state_once = None
+            if not self.fail_lock_put_after_write:
+                raise OSError("injected conditional lock write failure")
+        self.put(Key, bytes(Body), Metadata)
+        self.operations.append(("put", Key, None))
+        if fail_this_write:
+            raise OSError("injected conditional lock response failure")
+        return {"ETag": self.objects[Key].etag}
 
     def head_object(self, *, Bucket: str, Key: str) -> dict[str, object]:
         item = self.objects[Key]
@@ -148,7 +183,9 @@ class FakeS3Client:
             raise RuntimeError("copy source ETag mismatch")
         if Key == self.fail_copy_destination_once:
             self.fail_copy_destination_once = None
-            raise OSError("injected copy failure")
+            error = self.fail_copy_error_once or OSError("injected copy failure")
+            self.fail_copy_error_once = None
+            raise error
         self.objects[Key] = FakeObject(body=source.body, metadata=dict(source.metadata))
         self.operations.append(("copy", Key, source_key))
         return {"CopyObjectResult": {"ETag": source.etag}}
@@ -192,6 +229,15 @@ def _canonical_bodies(client: FakeS3Client) -> dict[str, bytes]:
         for key, item in client.objects.items()
         if key.startswith(CANONICAL_PREFIX)
     }
+
+
+def _assert_lock_state(
+    client: FakeS3Client, state: str, *, publish_id: str | None = None
+) -> None:
+    metadata = client.objects[LOCK_KEY].metadata
+    assert metadata["publish-state"] == state
+    if publish_id is not None:
+        assert metadata["publish-id"] == publish_id
 
 
 def test_local_uploader_copies_run_directory(tmp_path: Path) -> None:
@@ -259,6 +305,27 @@ def test_s3_uploader_direct_mode_omits_dot_segment(tmp_path: Path) -> None:
     )
 
 
+@pytest.mark.parametrize("task_at_root", [False, True])
+def test_s3_uploader_direct_mode_rejects_task_artifacts(
+    tmp_path: Path,
+    task_at_root: bool,
+) -> None:
+    source = tmp_path / "source"
+    if not task_at_root:
+        source.mkdir()
+    task_source = source if task_at_root else source / TASK_ID
+    _write_success(task_source)
+    client = FakeS3Client()
+    uploader = S3Uploader(_config(), client=client)
+
+    with pytest.raises(
+        ValueError, match="explicit publish protocol|explicit relative task ID"
+    ):
+        uploader.upload_run(source)
+
+    assert client.operations == []
+
+
 def test_s3_uploader_replaces_success_via_staging_and_marker_last(
     tmp_path: Path,
 ) -> None:
@@ -285,13 +352,35 @@ def test_s3_uploader_replaces_success_via_staging_and_marker_last(
         CANONICAL_PREFIX + "output.glb": (source / "output.glb").read_bytes(),
     }
     assert client.objects[f"{RUN_PREFIX}/other-task/meta.json"].body == b"other"
-    assert not any("/.publish-" in key for key in client.objects)
+    _assert_lock_state(client, "released")
+    assert not any("/.publish-staging/" in key for key in client.objects)
+    assert not any("/.publish-backup/" in key for key in client.objects)
     canonical_copies = [
         key
         for operation, key, _ in client.operations
         if operation == "copy" and key.startswith(CANONICAL_PREFIX)
     ]
     assert canonical_copies[-1] == CANONICAL_PREFIX + "meta.json"
+    marker_delete_index = client.operations.index(
+        ("delete", CANONICAL_PREFIX + "meta.json", None)
+    )
+    non_marker_copy_indexes = [
+        index
+        for index, (operation, key, _) in enumerate(client.operations)
+        if operation == "copy"
+        and key.startswith(CANONICAL_PREFIX)
+        and key != CANONICAL_PREFIX + "meta.json"
+    ]
+    stale_delete_index = client.operations.index(
+        ("delete", CANONICAL_PREFIX + "raw/old.bin", None)
+    )
+    marker_copy_index = next(
+        index
+        for index, (operation, key, _) in enumerate(client.operations)
+        if operation == "copy" and key == CANONICAL_PREFIX + "meta.json"
+    )
+    assert marker_delete_index < min(non_marker_copy_indexes)
+    assert max(non_marker_copy_indexes) < stale_delete_index < marker_copy_index
 
 
 def test_s3_uploader_upload_failure_leaves_previous_canonical_untouched(
@@ -359,6 +448,7 @@ def test_s3_uploader_remote_validation_failure_leaves_canonical_untouched(
     ("model_id", "task_id", "message"),
     [
         ("wrong-model", TASK_ID, "model upload ID mismatch"),
+        ("runs", TASK_ID, "model upload ID mismatch"),
         (MODEL_ID, "wrong-task", "task upload ID mismatch"),
     ],
 )
@@ -379,7 +469,166 @@ def test_s3_uploader_rejects_payload_target_id_mismatch_before_upload(
     assert client.operations == []
 
 
+def test_s3_uploader_rejects_missing_declared_license_before_lock_or_upload(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source"
+    _write_success(source)
+    (source / "LICENSE").unlink()
+    client = FakeS3Client()
+    uploader = S3Uploader(_config(), client=client)
+
+    with pytest.raises(FileNotFoundError, match="missing license file"):
+        uploader.upload_run(source, TASK_ID)
+
+    assert client.operations == []
+
+
+@pytest.mark.parametrize(
+    ("prefix", "relative_name", "message"),
+    [
+        ("archive/model-a/retry-run", TASK_ID, "runs/<model-id>"),
+        (RUN_PREFIX, f"nested/{TASK_ID}", "exactly one task ID"),
+    ],
+)
+def test_s3_uploader_rejects_ambiguous_task_target_layout_before_lock(
+    tmp_path: Path,
+    prefix: str,
+    relative_name: str,
+    message: str,
+) -> None:
+    source = tmp_path / "source"
+    _write_success(source)
+    client = FakeS3Client()
+    uploader = S3Uploader(_config(prefix), client=client)
+
+    with pytest.raises(ValueError, match=message):
+        uploader.upload_run(source, relative_name)
+
+    assert client.operations == []
+
+
 def test_s3_uploader_copy_failure_rolls_back_previous_canonical(tmp_path: Path) -> None:
+    client = FakeS3Client()
+    uploader = S3Uploader(_config(), client=client)
+    previous = tmp_path / "previous"
+    _write_success(previous)
+    uploader.upload_run(previous, TASK_ID)
+    before = _canonical_bodies(client)
+    before_objects = {
+        key: item
+        for key, item in client.objects.items()
+        if key.startswith(CANONICAL_PREFIX)
+    }
+
+    source = tmp_path / "source"
+    _write_success(source)
+    (source / "LICENSE").write_text("new license\n", encoding="utf-8")
+    client.fail_copy_destination_once = CANONICAL_PREFIX + "output.glb"
+
+    with pytest.raises(RuntimeError, match="previous canonical restored"):
+        uploader.upload_run(source, TASK_ID)
+
+    assert _canonical_bodies(client) == before
+    assert {
+        key: item
+        for key, item in client.objects.items()
+        if key.startswith(CANONICAL_PREFIX)
+    } == before_objects
+    assert all(item.metadata.get("sha256") for item in before_objects.values())
+    assert any("/.publish-staging/" in key for key in client.objects)
+    assert any("/.publish-backup/" in key for key in client.objects)
+
+
+def test_s3_uploader_rejects_concurrent_writer_before_canonical_read_or_mutation(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source"
+    _write_success(source)
+    client = FakeS3Client()
+    client.put(CANONICAL_PREFIX + "failure.json", b"old failure")
+    before = _canonical_bodies(client)
+    uploader = S3Uploader(_config(), client=client)
+    uploader._acquire_publish_lock(client, LOCK_KEY, "writer-a")
+
+    with pytest.raises(RuntimeError, match="already owned"):
+        uploader.upload_run(source, TASK_ID)
+
+    assert _canonical_bodies(client) == before
+    _assert_lock_state(client, "owned", publish_id="writer-a")
+    assert not any("/.publish-staging/" in key for key in client.objects)
+    assert not any("/.publish-backup/" in key for key in client.objects)
+
+
+def test_stale_lock_release_cannot_overwrite_or_delete_new_owner() -> None:
+    client = FakeS3Client()
+    uploader = S3Uploader(_config(), client=client)
+    writer_a_etag = uploader._acquire_publish_lock(client, LOCK_KEY, "writer-a")
+    uploader._release_publish_lock(
+        client,
+        LOCK_KEY,
+        "writer-a",
+        owned_etag=writer_a_etag,
+    )
+    released_a_etag = client.objects[LOCK_KEY].etag
+    writer_b_etag = uploader._acquire_publish_lock(client, LOCK_KEY, "writer-b")
+
+    uploader._release_publish_lock(
+        client,
+        LOCK_KEY,
+        "writer-a",
+        owned_etag=writer_a_etag,
+    )
+
+    _assert_lock_state(client, "owned", publish_id="writer-b")
+    assert client.objects[LOCK_KEY].etag == writer_b_etag
+    assert len({writer_a_etag, released_a_etag, writer_b_etag}) == 3
+    assert ("delete", LOCK_KEY, None) not in client.operations
+
+
+def test_lock_release_accepts_applied_write_with_lost_response() -> None:
+    client = FakeS3Client()
+    uploader = S3Uploader(_config(), client=client)
+    owned_etag = uploader._acquire_publish_lock(client, LOCK_KEY, "writer-a")
+    client.fail_lock_put_state_once = "released"
+    client.fail_lock_put_after_write = True
+
+    uploader._release_publish_lock(
+        client,
+        LOCK_KEY,
+        "writer-a",
+        owned_etag=owned_etag,
+    )
+
+    _assert_lock_state(client, "released", publish_id="writer-a")
+
+
+def test_publish_and_lock_release_errors_surface_manual_recovery_at_top_level(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source"
+    _write_success(source)
+    client = FakeS3Client()
+    client.fail_upload_number = 1
+    client.fail_lock_put_state_once = "released"
+    uploader = S3Uploader(_config(), client=client)
+
+    with pytest.raises(PublishRecoveryRequiredError) as error_info:
+        uploader.upload_run(source, TASK_ID)
+
+    message = str(error_info.value)
+    assert "primary error" in message
+    assert "staging upload or validation failed" in message
+    assert LOCK_KEY in message
+    assert "publish-id" in message
+    assert isinstance(error_info.value.primary_error, RuntimeError)
+    assert isinstance(error_info.value.lock_error, PublishRecoveryRequiredError)
+    _assert_lock_state(client, "owned")
+
+
+def test_s3_uploader_keyboard_interrupt_rolls_back_and_releases_lock(
+    tmp_path: Path,
+) -> None:
     source = tmp_path / "source"
     _write_success(source)
     client = FakeS3Client()
@@ -387,13 +636,30 @@ def test_s3_uploader_copy_failure_rolls_back_previous_canonical(tmp_path: Path) 
     client.put(CANONICAL_PREFIX + "raw/evidence.txt", b"old evidence")
     before = _canonical_bodies(client)
     client.fail_copy_destination_once = CANONICAL_PREFIX + "output.glb"
+    client.fail_copy_error_once = KeyboardInterrupt("operator interrupted publish")
     uploader = S3Uploader(_config(), client=client)
 
-    with pytest.raises(RuntimeError, match="previous canonical restored"):
+    with pytest.raises(KeyboardInterrupt, match="operator interrupted publish"):
         uploader.upload_run(source, TASK_ID)
 
     assert _canonical_bodies(client) == before
-    assert any("/.publish-staging/" in key for key in client.objects)
+    _assert_lock_state(client, "released")
+
+
+def test_s3_uploader_rollback_failure_retains_lock_for_manual_recovery(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source"
+    _write_success(source)
+    client = FakeS3Client()
+    client.put(CANONICAL_PREFIX + "failure.json", b"old failure")
+    client.fail_delete_key_contains = CANONICAL_PREFIX
+    uploader = S3Uploader(_config(), client=client)
+
+    with pytest.raises(RuntimeError, match="task lock retained"):
+        uploader.upload_run(source, TASK_ID)
+
+    _assert_lock_state(client, "owned")
     assert any("/.publish-backup/" in key for key in client.objects)
 
 
@@ -436,7 +702,12 @@ def test_s3_uploader_rejects_extreme_retry_glb_shrink_before_staging(
         uploader.upload_run(source, TASK_ID)
 
     assert _canonical_bodies(client) == before
-    assert client.operations == []
+    assert not any(
+        operation in {"upload", "copy"} for operation, _, _ in client.operations
+    )
+    _assert_lock_state(client, "released")
+    assert not any("/.publish-staging/" in key for key in client.objects)
+    assert not any("/.publish-backup/" in key for key in client.objects)
 
 
 def test_create_uploader_builds_s3_uploader_from_env() -> None:

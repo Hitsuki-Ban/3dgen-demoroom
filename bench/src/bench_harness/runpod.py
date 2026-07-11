@@ -4,6 +4,7 @@ import json
 import socket
 import time
 from dataclasses import dataclass
+from pathlib import PurePosixPath
 from shlex import quote
 from typing import Any, Callable, Mapping
 from urllib.error import HTTPError
@@ -22,6 +23,7 @@ RUNPOD_WEIGHT_ROOT = f"{RUNPOD_VOLUME_MOUNT_PATH}/weights"
 RUNPOD_HF_HOME = f"{RUNPOD_VOLUME_MOUNT_PATH}/hf"
 RUNPOD_TORCH_HOME = f"{RUNPOD_VOLUME_MOUNT_PATH}/torch"
 RUNPOD_U2NET_HOME = f"{RUNPOD_WEIGHT_ROOT}/rembg"
+RUNPOD_TELEMETRY_ROOT = "/work/runpod-telemetry"
 REQUIRED_R2_ENV_VARS = ("R2_ENDPOINT", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY")
 MODEL_RUNNER_PATHS = {
     "triposg": "/opt/3dgen-runner/triposg_runner.py",
@@ -364,7 +366,28 @@ def build_cloud_run_command(
         raise ValueError("RunPod cloud run retry_count requires exact task_ids")
     if retry_count > 0 and model_id != "pixal3d":
         raise ValueError(f"RunPod cloud run retry_count is not supported for model: {model_id}")
+    output_path = PurePosixPath(output_root)
+    telemetry_path = PurePosixPath(RUNPOD_TELEMETRY_ROOT)
+    if not output_path.is_absolute():
+        raise ValueError("RunPod cloud run output_root must be an absolute POSIX path")
+    raw_path_parts = output_root.split("/")
+    if output_root.startswith("//") or any(
+        part in {"", ".", ".."} for part in raw_path_parts[1:]
+    ):
+        raise ValueError(
+            "RunPod cloud run output_root must be a canonical absolute POSIX path "
+            "without '.', '..', or repeated/trailing slashes"
+        )
+    if (
+        output_path == telemetry_path
+        or output_path in telemetry_path.parents
+        or telemetry_path in output_path.parents
+    ):
+        raise ValueError(
+            "RunPod cloud run output_root must not equal, contain, or be contained by the telemetry root"
+        )
     quoted_output_root = quote(output_root)
+    quoted_telemetry_root = quote(RUNPOD_TELEMETRY_ROOT)
     quoted_s3_target = quote(s3_target)
     quoted_model_id = quote(model_id)
     run_command = (
@@ -391,7 +414,7 @@ def build_cloud_run_command(
     )
     startup_status_command = (
         "python3 - "
-        f"{quoted_output_root} {quoted_model_id} {quoted_s3_target} "
+        f"{quoted_telemetry_root} {quoted_model_id} {quoted_s3_target} "
         '"$ssh_exit_code" <<\'PY_RUNPOD_STARTUP\'\n'
         "from __future__ import annotations\n"
         "import json\n"
@@ -400,11 +423,11 @@ def build_cloud_run_command(
         "from datetime import datetime, timezone\n"
         "from pathlib import Path\n"
         "\n"
-        "output_root = Path(sys.argv[1])\n"
+        "telemetry_root = Path(sys.argv[1])\n"
         "model_id = sys.argv[2]\n"
         "s3_target = sys.argv[3]\n"
         "ssh_exit_code = int(sys.argv[4])\n"
-        "output_root.mkdir(parents=True, exist_ok=True)\n"
+        "telemetry_root.mkdir(parents=True, exist_ok=True)\n"
         "status = {\n"
         "    'model_id': model_id,\n"
         "    'pod_id': os.environ.get('RUNPOD_POD_ID'),\n"
@@ -413,16 +436,16 @@ def build_cloud_run_command(
         "    'started_at': datetime.now(timezone.utc).isoformat(),\n"
         "    'status': 'started',\n"
         "}\n"
-        "(output_root / 'runpod-startup.json').write_text(json.dumps(status, indent=2, sort_keys=True) + '\\n', encoding='utf-8')\n"
+        "(telemetry_root / 'runpod-startup.json').write_text(json.dumps(status, indent=2, sort_keys=True) + '\\n', encoding='utf-8')\n"
         "PY_RUNPOD_STARTUP"
     )
     startup_upload_command = (
         "PYTHONPATH=/opt/bench/src "
-        f"python3 -m bench_harness.cli upload-s3 {quoted_output_root} {quoted_s3_target}"
+        f"python3 -m bench_harness.cli upload-s3 {quoted_telemetry_root} {quoted_s3_target}"
     )
     status_command = (
         "python3 - "
-        f"{quoted_output_root} {quoted_model_id} {quoted_s3_target} "
+        f"{quoted_telemetry_root} {quoted_model_id} {quoted_s3_target} "
         '"$runner_exit_code" <<\'PY_RUNPOD_STATUS\'\n'
         "from __future__ import annotations\n"
         "import json\n"
@@ -431,11 +454,11 @@ def build_cloud_run_command(
         "from datetime import datetime, timezone\n"
         "from pathlib import Path\n"
         "\n"
-        "output_root = Path(sys.argv[1])\n"
+        "telemetry_root = Path(sys.argv[1])\n"
         "model_id = sys.argv[2]\n"
         "s3_target = sys.argv[3]\n"
         "runner_exit_code = int(sys.argv[4])\n"
-        "output_root.mkdir(parents=True, exist_ok=True)\n"
+        "telemetry_root.mkdir(parents=True, exist_ok=True)\n"
         "status = {\n"
         "    'finished_at': datetime.now(timezone.utc).isoformat(),\n"
         "    'model_id': model_id,\n"
@@ -445,12 +468,12 @@ def build_cloud_run_command(
         "    's3_target': s3_target,\n"
         "    'status': 'ok' if runner_exit_code == 0 else 'failed',\n"
         "}\n"
-        "(output_root / 'runpod-status.json').write_text(json.dumps(status, indent=2, sort_keys=True) + '\\n', encoding='utf-8')\n"
+        "(telemetry_root / 'runpod-status.json').write_text(json.dumps(status, indent=2, sort_keys=True) + '\\n', encoding='utf-8')\n"
         "PY_RUNPOD_STATUS"
     )
     upload_command = (
         "PYTHONPATH=/opt/bench/src "
-        f"python3 -m bench_harness.cli upload-s3 {quoted_output_root} {quoted_s3_target}"
+        f"python3 -m bench_harness.cli upload-s3 {quoted_telemetry_root} {quoted_s3_target}"
     )
     terminate_command = (
         "python3 - <<'PY_RUNPOD_TERMINATE'\n"
