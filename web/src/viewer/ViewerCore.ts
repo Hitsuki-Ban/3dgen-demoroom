@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 
-export type DisplayMode = 'pbr' | 'wireframe' | 'matcap' | 'normal' | 'uv';
+export type DisplayMode = 'pbr' | 'toon' | 'wireframe' | 'matcap' | 'normal' | 'uv';
 
 export interface PaneStats {
   triangles: number;
@@ -17,6 +17,10 @@ interface Pane {
   camera: THREE.PerspectiveCamera;
   controls: OrbitControls;
   modelRoot: THREE.Group;
+  /** toon モード用ライト(環境マップは MeshToonMaterial に効かないため) */
+  toonLights: THREE.Group;
+  /** 正規化前のモデル最大径。輪郭線の太さをワールド基準に揃えるのに使う */
+  maxDim: number;
 }
 
 const CAMERA_HOME = new THREE.Vector3(1.2, 0.9, 1.6);
@@ -63,9 +67,16 @@ export class ViewerCore {
     scene.environment = this.envMap;
 
     const modelRoot = new THREE.Group();
-    normalizeIntoUnitBox(object);
+    const maxDim = normalizeIntoUnitBox(object);
     modelRoot.add(object);
     scene.add(modelRoot);
+
+    const toonLights = new THREE.Group();
+    const keyLight = new THREE.DirectionalLight(0xffffff, 2.4);
+    keyLight.position.set(2, 3, 2.5);
+    toonLights.add(keyLight, new THREE.AmbientLight(0xffffff, 0.6));
+    toonLights.visible = false;
+    scene.add(toonLights);
 
     const camera = new THREE.PerspectiveCamera(40, 1, 0.01, 50);
     camera.position.copy(CAMERA_HOME);
@@ -74,7 +85,7 @@ export class ViewerCore {
     controls.enableDamping = true;
     controls.addEventListener('change', () => this.broadcastCamera(id));
 
-    const pane: Pane = { id, element, scene, camera, controls, modelRoot };
+    const pane: Pane = { id, element, scene, camera, controls, modelRoot, toonLights, maxDim };
     this.panes.set(id, pane);
     this.applyMode(pane, this.mode);
     return id;
@@ -99,7 +110,7 @@ export class ViewerCore {
     const pane = this.panes.get(id);
     const stats: PaneStats = { triangles: 0, vertices: 0, meshes: 0 };
     pane?.modelRoot.traverse((o) => {
-      if (o instanceof THREE.Mesh) {
+      if (o instanceof THREE.Mesh && !o.userData.isOutline) {
         stats.meshes += 1;
         const g = o.geometry as THREE.BufferGeometry;
         stats.vertices += g.attributes.position?.count ?? 0;
@@ -149,14 +160,44 @@ export class ViewerCore {
   }
 
   private applyMode(pane: Pane, mode: DisplayMode) {
+    pane.toonLights.visible = mode === 'toon';
+    // traverse 中に子(輪郭線メッシュ)を追加すると走査が乱れるので、先にメッシュを収集する
+    const meshes: THREE.Mesh[] = [];
     pane.modelRoot.traverse((o) => {
-      if (!(o instanceof THREE.Mesh)) return;
+      if (o instanceof THREE.Mesh && !o.userData.isOutline) meshes.push(o);
+    });
+    for (const o of meshes) {
       if (!o.userData.originalMaterial) o.userData.originalMaterial = o.material;
       const original = o.userData.originalMaterial as THREE.Material;
+      // 法線を持たない GLB(glTF 的には flat shading 想定)があるため、
+      // ライティング/法線系の表示モードでは表示用にスムーズ法線を遅延計算する。
+      // 一度計算すれば attribute が付くので再計算されない。生成物ファイルは不変。
+      if ((mode === 'toon' || mode === 'matcap' || mode === 'normal') && !o.geometry.attributes.normal) {
+        o.geometry.computeVertexNormals();
+      }
+      // 前のモードの輪郭線メッシュを外す(ジオメトリは本体と共有なので dispose しない)
+      for (const child of [...o.children]) {
+        if (child.userData.isOutline) {
+          o.remove(child);
+          disposeMaterial((child as THREE.Mesh).material);
+        }
+      }
+      // モード用に生成した差し替えマテリアルはここで破棄する(共有テクスチャは dispose されない)
+      if (o.material !== original) disposeMaterial(o.material);
       switch (mode) {
         case 'pbr':
           o.material = original;
           break;
+        case 'toon': {
+          o.material = new THREE.MeshToonMaterial({ color: 0xe8e4dc, gradientMap: this.getToonGradient() });
+          if (o.geometry.attributes.normal) {
+            const outline = new THREE.Mesh(o.geometry, createOutlineMaterial(pane.maxDim * 0.004));
+            outline.userData.isOutline = true;
+            outline.raycast = () => {};
+            o.add(outline);
+          }
+          break;
+        }
         case 'wireframe':
           o.material = new THREE.MeshBasicMaterial({ color: 0x7dd3fc, wireframe: true });
           break;
@@ -170,7 +211,21 @@ export class ViewerCore {
           o.material = new THREE.MeshBasicMaterial({ map: this.getUvTexture() });
           break;
       }
-    });
+    }
+  }
+
+  private toonGradient: THREE.Texture | null = null;
+
+  /** 3 段のセルシェーディング用グラデーション */
+  private getToonGradient(): THREE.Texture {
+    if (!this.toonGradient) {
+      const tex = new THREE.DataTexture(new Uint8Array([80, 170, 255]), 3, 1, THREE.RedFormat);
+      tex.minFilter = THREE.NearestFilter;
+      tex.magFilter = THREE.NearestFilter;
+      tex.needsUpdate = true;
+      this.toonGradient = tex;
+    }
+    return this.toonGradient;
   }
 
   private getMatcapTexture(): THREE.Texture {
@@ -256,8 +311,8 @@ export class ViewerCore {
   };
 }
 
-/** モデルを原点中心・最大径 1 に正規化する(framing 差で比較が濁るのを防ぐ) */
-function normalizeIntoUnitBox(object: THREE.Object3D) {
+/** モデルを原点中心・最大径 1 に正規化する(framing 差で比較が濁るのを防ぐ)。正規化前の最大径を返す */
+function normalizeIntoUnitBox(object: THREE.Object3D): number {
   const box = new THREE.Box3().setFromObject(object);
   const size = box.getSize(new THREE.Vector3());
   const center = box.getCenter(new THREE.Vector3());
@@ -265,6 +320,24 @@ function normalizeIntoUnitBox(object: THREE.Object3D) {
   object.position.sub(center);
   object.position.multiplyScalar(1 / maxDim);
   object.scale.multiplyScalar(1 / maxDim);
+  return maxDim;
+}
+
+/**
+ * インバーテッドハル方式の輪郭線マテリアル。
+ * 背面を法線方向に押し出して描く古典的なトゥーン輪郭。EdgesGeometry と違い
+ * 数百万ポリゴンのメッシュでも追加ジオメトリ生成なしで動く。
+ * thickness はメッシュのローカル空間単位(正規化前の最大径 × 係数を渡す)。
+ */
+function createOutlineMaterial(thickness: number): THREE.Material {
+  const material = new THREE.MeshBasicMaterial({ color: 0x0b0d10, side: THREE.BackSide });
+  material.onBeforeCompile = (shader) => {
+    shader.vertexShader = shader.vertexShader.replace(
+      '#include <begin_vertex>',
+      `#include <begin_vertex>\n\ttransformed += normalize(normal) * ${thickness.toExponential(6)};`,
+    );
+  };
+  return material;
 }
 
 function disposeMaterial(material: THREE.Material | THREE.Material[]) {

@@ -48,9 +48,6 @@ export function TaskGallery({ onSelect }: { onSelect: (id: string) => void }) {
   return (
     <section>
       <h2 className="text-lg font-semibold pt-8 pb-1">ベンチマーク課題({TASKS.length})</h2>
-      <p className="text-sm text-slate-400 pb-3">
-        リファレンス画像をクリックすると、モデルごとの生成メッシュを 3D ビューアで検分できます(バッジは実測済みモデル数)。
-      </p>
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         {TASKS.map((t) => (
           <TaskCard key={t.id} task={t} resultCount={countByTask.get(t.id) ?? 0} onSelect={onSelect} />

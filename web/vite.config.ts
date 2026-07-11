@@ -50,6 +50,37 @@ function serveRunOutputs(): Plugin {
   };
 }
 
+/**
+ * dev 専用: ビューア表示の目視検証用サムネイル置き場。
+ * ページ側スクリプトが canvas を JPEG data URL にして POST し、
+ * outputs/.thumbs/(gitignore 済み)へ保存する。視点正規化などの検証に使う。
+ */
+function devThumbSink(): Plugin {
+  return {
+    name: 'dev-thumb-sink',
+    apply: 'serve',
+    configureServer(server) {
+      server.middlewares.use('/__thumb', (req, res, next) => {
+        if (req.method !== 'POST') return next();
+        const name = decodeURIComponent((req.url ?? '').split('?')[0].replace(/^\//, ''));
+        if (!/^[a-zA-Z0-9._ -]+\.jpg$/.test(name)) {
+          res.statusCode = 400;
+          return res.end('bad name');
+        }
+        const chunks: Buffer[] = [];
+        req.on('data', (c) => chunks.push(c));
+        req.on('end', () => {
+          const base64 = Buffer.concat(chunks).toString().split(',')[1] ?? '';
+          const dir = path.join(repoRoot, 'outputs', '.thumbs');
+          fs.mkdirSync(dir, { recursive: true });
+          fs.writeFileSync(path.join(dir, name), Buffer.from(base64, 'base64'));
+          res.end('ok');
+        });
+      });
+    },
+  };
+}
+
 export default defineConfig({
-  plugins: [react(), tailwindcss(), serveTaskReferences(), serveRunOutputs()],
+  plugins: [react(), tailwindcss(), serveTaskReferences(), serveRunOutputs(), devThumbSink()],
 });

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type * as THREE from 'three';
 import { RegionBlockedError } from './loadModel';
 import { useViewer } from './ViewerContext';
@@ -11,9 +11,11 @@ interface Props {
   badge?: string;
   /** 生成時間・VRAM 等の追加表示(フッター2行目) */
   extraInfo?: string;
+  /** ヘッダ右端に置く任意 UI(比較チェックボックス等) */
+  headerExtra?: ReactNode;
 }
 
-export function ViewerPane({ title, loadObject, badge, extraInfo }: Props) {
+export function ViewerPane({ title, loadObject, badge, extraInfo, headerExtra }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const viewer = useViewer();
   const [stats, setStats] = useState<PaneStats | null>(null);
@@ -45,9 +47,12 @@ export function ViewerPane({ title, loadObject, badge, extraInfo }: Props) {
 
   return (
     <div className="flex flex-col rounded-lg border border-slate-700 overflow-hidden bg-slate-900/40">
-      <div className="flex items-center justify-between px-3 py-2 text-sm bg-slate-800/80">
-        <span className="font-medium">{title}</span>
-        {badge && <span className="text-xs px-2 py-0.5 rounded bg-amber-900/60 text-amber-200">{badge}</span>}
+      <div className="flex items-center justify-between gap-2 px-3 py-2 text-sm bg-slate-800/80">
+        <span className="font-medium truncate">{title}</span>
+        <span className="flex items-center gap-2 shrink-0">
+          {badge && <span className="text-xs px-2 py-0.5 rounded bg-amber-900/60 text-amber-200">{badge}</span>}
+          {headerExtra}
+        </span>
       </div>
       {regionBlocked ? (
         <div className="aspect-square w-full flex flex-col items-center justify-center gap-2 px-6 text-center">

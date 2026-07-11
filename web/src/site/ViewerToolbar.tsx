@@ -2,12 +2,13 @@ import { useState } from 'react';
 import { useViewer } from '../viewer/ViewerContext';
 import type { DisplayMode } from '../viewer/ViewerCore';
 
-const MODES: { key: DisplayMode; label: string }[] = [
-  { key: 'pbr', label: 'PBR' },
-  { key: 'wireframe', label: 'Wireframe' },
-  { key: 'matcap', label: 'Matcap' },
-  { key: 'normal', label: 'Normal' },
-  { key: 'uv', label: 'UV Checker' },
+const MODES: { key: DisplayMode; label: string; hint: string }[] = [
+  { key: 'pbr', label: 'PBR', hint: 'モデルが出力したマテリアルそのまま' },
+  { key: 'toon', label: 'トゥーン+輪郭', hint: 'セルシェーディング+輪郭線でシルエットと面の流れを見る' },
+  { key: 'matcap', label: 'Matcap', hint: 'クレイ調で形状のみを見る' },
+  { key: 'wireframe', label: 'Wireframe', hint: 'ポリゴン割りを見る' },
+  { key: 'normal', label: 'Normal', hint: '法線の乱れを色で見る' },
+  { key: 'uv', label: 'UV', hint: 'UV 展開の歪みをチェッカーで見る' },
 ];
 
 export function ViewerToolbar() {
@@ -21,6 +22,7 @@ export function ViewerToolbar() {
         {MODES.map((m) => (
           <button
             key={m.key}
+            title={m.hint}
             onClick={() => { setMode(m.key); viewer?.setDisplayMode(m.key); }}
             className={`px-3 py-1.5 text-sm ${mode === m.key ? 'bg-sky-700 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
           >

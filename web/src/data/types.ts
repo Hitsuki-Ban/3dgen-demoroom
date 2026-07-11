@@ -40,6 +40,13 @@ export interface ModelInfo {
   /** ベンチ実行状況。results が manifest に載るまでは 'planned' */
   status: 'planned' | 'running' | 'done' | 'excluded';
   vramNote?: string;
+  /**
+   * ビューア表示時の向き補正(度、XYZ の順で適用)。生成物は書き換えず表示時のみ回転する。
+   * **複数課題で一貫した軸慣習が実測確認できたモデルにだけ**設定する(2026-07-11 検証)。
+   * TripoSR / Pixal3D のように出力の向きが課題(リファレンス画像のカメラ)に依存する
+   * モデルは定数補正が不可能なので設定しない — その挙動自体を展示情報として扱う。
+   */
+  orientationFix?: { x?: number; y?: number; z?: number };
 }
 
 /** bench の meta.json(REQUIRED_META_KEYS + OPTIONAL_META_KEYS)と対応 */
