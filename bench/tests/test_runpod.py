@@ -137,6 +137,44 @@ def test_build_cloud_run_command_passes_exact_task_ids_to_runner() -> None:
     assert "--task-id 'cartoon apple'" in command
 
 
+def test_build_cloud_run_command_passes_explicit_pixal3d_retry_count() -> None:
+    command = build_cloud_run_command(
+        model_id="pixal3d",
+        output_root="/work/output",
+        s3_target="s3://3dgen-runs/runs/pixal3d/wave2-retry/20260711T000000Z",
+        task_ids=("ornate-treasure-chest", "old-oak-tree"),
+        retry_count=1,
+    )
+
+    assert "--task-id ornate-treasure-chest" in command
+    assert "--task-id old-oak-tree" in command
+    assert "--retry-count 1" in command
+
+
+@pytest.mark.parametrize(
+    ("model_id", "task_ids", "retry_count", "message"),
+    [
+        ("pixal3d", ("old-oak-tree",), -1, "must not be negative"),
+        ("pixal3d", (), 1, "requires exact task_ids"),
+        ("trellis2", ("fluffy-monster-plush",), 1, "not supported for model"),
+    ],
+)
+def test_build_cloud_run_command_rejects_invalid_retry_count(
+    model_id: str,
+    task_ids: tuple[str, ...],
+    retry_count: int,
+    message: str,
+) -> None:
+    with pytest.raises(ValueError, match=message):
+        build_cloud_run_command(
+            model_id=model_id,
+            output_root="/work/output",
+            s3_target=f"s3://3dgen-runs/runs/{model_id}/retry/20260711T000000Z",
+            task_ids=task_ids,
+            retry_count=retry_count,
+        )
+
+
 @pytest.mark.parametrize(
     ("task_limit", "task_ids", "message"),
     [

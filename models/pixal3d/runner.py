@@ -117,6 +117,7 @@ def main() -> None:
     parser.add_argument("--output-root", type=Path, default=Path("/work/output"))
     parser.add_argument("--task-limit", type=int)
     parser.add_argument("--task-id", dest="task_ids", action="append")
+    parser.add_argument("--retry-count", type=int, default=0)
     parser.add_argument("--infer-image", type=Path, help=argparse.SUPPRESS)
     parser.add_argument("--infer-output-dir", type=Path, help=argparse.SUPPRESS)
     parser.add_argument("--infer-seed", type=int, help=argparse.SUPPRESS)
@@ -127,6 +128,8 @@ def main() -> None:
     if args.infer_image is not None:
         run_pixal3d_infer(args)
         return
+    if args.retry_count < 0:
+        raise ValueError("--retry-count must not be negative")
 
     max_runtime_seconds = parse_max_runtime_seconds(os.environ)
     started_at = time.monotonic()
@@ -161,7 +164,7 @@ def main() -> None:
         if remaining <= 0:
             terminate_runpod_if_needed(os.environ)
             raise TimeoutError("MAX_RUNTIME_MIN exceeded before starting next task")
-        run_task(task, args.input_root, args.output_root, license_sources, remaining)
+        run_task(task, args.input_root, args.output_root, license_sources, remaining, args.retry_count)
 
 
 def run_task(
@@ -170,6 +173,7 @@ def run_task(
     output_root: Path,
     license_sources: list[LicenseSource],
     timeout_seconds: float,
+    retry_count: int,
 ) -> None:
     image_path = input_root / task.image
     if not image_path.is_file():
@@ -210,7 +214,7 @@ def run_task(
                 license_sources=license_sources,
                 runtime=runtime,
                 wall_clock_seconds=wall_clock_seconds,
-                retry_count=attempt_index,
+                retry_count=retry_count + attempt_index,
                 started_at=started_iso,
                 finished_at=finished_iso,
             )
@@ -230,7 +234,7 @@ def run_task(
                 weights_revision=WEIGHTS_REVISION,
                 parameters=DEFAULT_PARAMETERS,
                 error=exc,
-                retry_count=attempt_index,
+                retry_count=retry_count + attempt_index,
                 started_at=first_started_iso,
                 finished_at=utc_now(),
             )

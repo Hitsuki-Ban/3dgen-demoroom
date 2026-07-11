@@ -110,6 +110,58 @@ def test_prepare_pixal3d_task_output_writes_meta_with_standard_protocol(tmp_path
     assert (tmp_path / "task-output" / "raw" / "pixal3d" / "output.glb").read_bytes() == b"glb"
 
 
+def test_run_task_records_explicit_protocol_retry_count(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("PIXAL3D_WEIGHTS_PATH", "/workspace/weights/Pixal3D")
+    monkeypatch.setenv("HF_HOME", "/workspace/hf")
+    monkeypatch.setenv("TORCH_HOME", "/workspace/torch")
+    runner = load_pixal3d_runner()
+    input_root = tmp_path / "input"
+    output_root = tmp_path / "output"
+    image_path = input_root / "references" / "old-oak-tree.png"
+    image_path.parent.mkdir(parents=True)
+    image_path.write_bytes(b"png")
+    license_path = tmp_path / "LICENSE"
+    license_path.write_text("license\n", encoding="utf-8")
+    task = runner.TaskDefinition(
+        id="old-oak-tree",
+        prompt="old oak tree",
+        image="references/old-oak-tree.png",
+        seed=20260708,
+    )
+    runtime = runner.RuntimeSnapshot(
+        gpu_name="NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
+        peak_vram_bytes=64 * 1024**3,
+        torch_version="2.7.1+cu128",
+        torch_cuda_version="12.8",
+        torch_cuda_arch_list=["sm_120"],
+        attention_backend="flash_attn",
+    )
+
+    def fake_run_with_peak_vram(command, timeout_seconds, label, *, log_path):
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        (log_path.parent / "output.glb").write_bytes(b"glb")
+        return runtime.peak_vram_bytes
+
+    monkeypatch.setattr(runner, "run_with_peak_vram", fake_run_with_peak_vram)
+    monkeypatch.setattr(runner, "collect_runtime_snapshot", lambda *_: runtime)
+    monkeypatch.setattr(runner, "upload_task_increment_if_configured", lambda *_: None)
+
+    runner.run_task(
+        task,
+        input_root,
+        output_root,
+        [runner.LicenseSource("license", license_path)],
+        timeout_seconds=60,
+        retry_count=1,
+    )
+
+    meta = json.loads((output_root / task.id / "meta.json").read_text(encoding="utf-8"))
+    assert meta["retry_count"] == 1
+    assert meta["seed"] == 20260708
+    assert meta["parameters"]["resolution"] == 1536
+    assert meta["parameters"]["low_vram"] is False
+
+
 def test_pixal3d_model_spec_records_current_pins_and_standard_protocol() -> None:
     spec = json.loads(MODEL_SPEC_PATH.read_text(encoding="utf-8"))
 
