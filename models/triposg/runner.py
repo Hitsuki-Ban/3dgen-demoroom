@@ -17,7 +17,6 @@ from runner_utils import (
     load_tasks,
     parse_max_runtime_seconds,
     require_infer_arg,
-    require_int,
     required_env,
     run_with_peak_vram,
     should_retry_task_error,

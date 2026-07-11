@@ -27,9 +27,13 @@ class RunnerExecCalled(Exception):
     pass
 
 
-def test_runner_mode_execs_baked_runner_with_current_python(monkeypatch, tmp_path: Path) -> None:
+def test_runner_mode_execs_baked_runner_with_current_python(
+    monkeypatch, tmp_path: Path
+) -> None:
     runner_path = tmp_path / "model_runner.py"
-    runner_path.write_text("raise AssertionError('exec should replace the entrypoint')\n", encoding="utf-8")
+    runner_path.write_text(
+        "raise AssertionError('exec should replace the entrypoint')\n", encoding="utf-8"
+    )
     captured = {}
 
     def fake_execv(executable: str, command: list[str]) -> None:
@@ -58,7 +62,9 @@ def test_runner_mode_execs_baked_runner_with_current_python(monkeypatch, tmp_pat
     }
 
 
-def test_runpod_mode_builds_runtime_config_from_baked_runner(monkeypatch, tmp_path: Path) -> None:
+def test_runpod_mode_builds_runtime_config_from_baked_runner(
+    monkeypatch, tmp_path: Path
+) -> None:
     runner_path = tmp_path / "model_runner.py"
     runner_path.write_text("pass\n", encoding="utf-8")
     captured: list[CloudRuntimeConfig] = []
@@ -67,7 +73,9 @@ def test_runpod_mode_builds_runtime_config_from_baked_runner(monkeypatch, tmp_pa
         captured.append(config)
         return 17
 
-    monkeypatch.setattr(container_entrypoint, "run_cloud_runtime", fake_run_cloud_runtime)
+    monkeypatch.setattr(
+        container_entrypoint, "run_cloud_runtime", fake_run_cloud_runtime
+    )
 
     with pytest.raises(SystemExit) as exc_info:
         container_entrypoint.main(
@@ -79,6 +87,8 @@ def test_runpod_mode_builds_runtime_config_from_baked_runner(monkeypatch, tmp_pa
                 "runpod",
                 "--output-root",
                 str(tmp_path / "output"),
+                "--telemetry-root",
+                str(tmp_path / "telemetry"),
                 "--s3-target",
                 "s3://bucket/runs/triposg/test",
                 "--",
@@ -92,6 +102,7 @@ def test_runpod_mode_builds_runtime_config_from_baked_runner(monkeypatch, tmp_pa
         CloudRuntimeConfig(
             model_id="triposg",
             output_root=tmp_path / "output",
+            telemetry_root=tmp_path / "telemetry",
             s3_target="s3://bucket/runs/triposg/test",
             runner_command=(sys.executable, str(runner_path), "--task-limit", "2"),
         )
@@ -125,6 +136,8 @@ def test_runpod_mode_requires_runner_argument_separator(tmp_path: Path, capsys) 
                 "runpod",
                 "--output-root",
                 str(tmp_path / "output"),
+                "--telemetry-root",
+                str(tmp_path / "telemetry"),
                 "--s3-target",
                 "s3://bucket/run",
             ]
@@ -134,13 +147,17 @@ def test_runpod_mode_requires_runner_argument_separator(tmp_path: Path, capsys) 
     assert "runner arguments must follow --" in capsys.readouterr().err
 
 
-@pytest.mark.parametrize(("model_id", "python_command", "runner_path"), MODEL_ENTRYPOINTS)
+@pytest.mark.parametrize(
+    ("model_id", "python_command", "runner_path"), MODEL_ENTRYPOINTS
+)
 def test_model_dockerfile_bakes_single_explicit_container_entrypoint(
     model_id: str,
     python_command: str,
     runner_path: str,
 ) -> None:
-    dockerfile = (REPO_ROOT / "models" / model_id / "Dockerfile").read_text(encoding="utf-8")
+    dockerfile = (REPO_ROOT / "models" / model_id / "Dockerfile").read_text(
+        encoding="utf-8"
+    )
     expected_entrypoint = (
         f'ENTRYPOINT ["{python_command}", "-m", "bench_harness.container_entrypoint", '
         f'"--model-id", "{model_id}", "--runner-path", "{runner_path}"]'
@@ -154,9 +171,15 @@ def test_model_dockerfile_bakes_single_explicit_container_entrypoint(
 
 
 def test_runpod_entrypoint_dependencies_are_explicit() -> None:
-    topia = (REPO_ROOT / "models" / "3dtopia-xl" / "Dockerfile").read_text(encoding="utf-8")
-    triposr = (REPO_ROOT / "models" / "triposr" / "Dockerfile").read_text(encoding="utf-8")
-    step1x = (REPO_ROOT / "models" / "step1x-3d" / "Dockerfile").read_text(encoding="utf-8")
+    topia = (REPO_ROOT / "models" / "3dtopia-xl" / "Dockerfile").read_text(
+        encoding="utf-8"
+    )
+    triposr = (REPO_ROOT / "models" / "triposr" / "Dockerfile").read_text(
+        encoding="utf-8"
+    )
+    step1x = (REPO_ROOT / "models" / "step1x-3d" / "Dockerfile").read_text(
+        encoding="utf-8"
+    )
 
     assert "boto3==1.42.97" in topia
     assert "openssh-server" in triposr

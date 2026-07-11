@@ -385,6 +385,8 @@ def test_build_cloud_run_command_is_valid_container_entrypoint_arguments() -> No
         "runpod",
         "--output-root",
         "/work/output",
+        "--telemetry-root",
+        RUNPOD_TELEMETRY_ROOT,
         "--s3-target",
         "s3://3dgen-runs/runs/triposg/wave1/20260708T000000Z",
         "--",

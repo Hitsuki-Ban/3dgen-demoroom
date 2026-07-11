@@ -10,7 +10,9 @@ from bench_harness.runpod_runtime import CloudRuntimeConfig, run_cloud_runtime
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="python -m bench_harness.container_entrypoint")
+    parser = argparse.ArgumentParser(
+        prog="python -m bench_harness.container_entrypoint"
+    )
     parser.add_argument("--model-id", required=True)
     parser.add_argument("--runner-path", type=Path, required=True)
     parser.add_argument("mode", choices=("runner", "runpod"))
@@ -19,8 +21,11 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def build_runpod_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="python -m bench_harness.container_entrypoint ... runpod")
+    parser = argparse.ArgumentParser(
+        prog="python -m bench_harness.container_entrypoint ... runpod"
+    )
     parser.add_argument("--output-root", type=Path, required=True)
+    parser.add_argument("--telemetry-root", type=Path, required=True)
     parser.add_argument("--s3-target", required=True)
     parser.add_argument("runner_args", nargs=argparse.REMAINDER)
     return parser
@@ -50,6 +55,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         CloudRuntimeConfig(
             model_id=model_id,
             output_root=runpod_args.output_root,
+            telemetry_root=runpod_args.telemetry_root,
             s3_target=runpod_args.s3_target,
             runner_command=runner_command,
         )

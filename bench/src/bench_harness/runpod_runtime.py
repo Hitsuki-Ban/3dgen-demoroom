@@ -16,7 +16,7 @@ from bench_harness.uploader import S3UploadConfig, create_s3_client, create_uplo
 
 StartSsh = Callable[[], int]
 RunModel = Callable[[Sequence[str], Path], int]
-UploadOutput = Callable[[Path, str, Mapping[str, str]], None]
+UploadTelemetry = Callable[[Path, str, Mapping[str, str]], None]
 UploadStatus = Callable[[Path, str, Mapping[str, str]], None]
 WaitForHandoff = Callable[[str, str, str, Mapping[str, str], float, float], bool]
 ClaimCleanup = Callable[[str, str, str, Mapping[str, str]], bool]
@@ -29,12 +29,27 @@ HANDOFF_POLL_SECONDS = 1.0
 class CloudRuntimeConfig:
     model_id: str
     output_root: Path
+    telemetry_root: Path
     s3_target: str
     runner_command: tuple[str, ...]
 
     def __post_init__(self) -> None:
         if not self.model_id.strip():
             raise ValueError("RunPod runtime model_id is required")
+        if not self.output_root.is_absolute():
+            raise ValueError("RunPod runtime output_root must be absolute")
+        if not self.telemetry_root.is_absolute():
+            raise ValueError("RunPod runtime telemetry_root must be absolute")
+        output_root = self.output_root.resolve()
+        telemetry_root = self.telemetry_root.resolve()
+        if (
+            output_root == telemetry_root
+            or output_root in telemetry_root.parents
+            or telemetry_root in output_root.parents
+        ):
+            raise ValueError(
+                "RunPod runtime output_root and telemetry_root must not overlap"
+            )
         if not self.s3_target.startswith("s3://"):
             raise ValueError("RunPod runtime S3 target must use s3://")
         if not self.runner_command:
@@ -47,7 +62,7 @@ def run_cloud_runtime(
     env: Mapping[str, str] | None = None,
     start_ssh: StartSsh | None = None,
     run_model: RunModel | None = None,
-    upload_output: UploadOutput | None = None,
+    upload_telemetry: UploadTelemetry | None = None,
     upload_status: UploadStatus | None = None,
     wait_for_handoff: WaitForHandoff | None = None,
     claim_cleanup: ClaimCleanup | None = None,
@@ -61,7 +76,7 @@ def run_cloud_runtime(
     api_key = runtime_env.get("RUNPOD_API_KEY")
     start_ssh_fn = start_ssh or start_ssh_service
     run_model_fn = run_model or run_model_subprocess
-    upload_output_fn = upload_output or upload_runtime_output
+    upload_telemetry_fn = upload_telemetry or upload_runtime_telemetry
     upload_status_fn = upload_status or upload_runtime_status
     wait_for_handoff_fn = wait_for_handoff or wait_for_lifecycle_handoff
     claim_cleanup_fn = claim_cleanup or claim_runtime_cleanup
@@ -78,7 +93,8 @@ def run_cloud_runtime(
     runner_output_tail: str | None = None
     lifecycle_token: str | None = None
     handoff_timeout_seconds: float | None = None
-    runner_log_path = config.output_root / "runpod-runner.log"
+    started_at: str | None = None
+    runner_log_path = config.telemetry_root / "runpod-runner.log"
 
     def record_error(error: BaseException) -> None:
         nonlocal primary_error
@@ -92,8 +108,30 @@ def run_cloud_runtime(
             record_error(ValueError("RUNPOD_API_KEY is required"))
         try:
             lifecycle_token = require_env(runtime_env, "RUNPOD_LIFECYCLE_TOKEN")
-            handoff_timeout_seconds = require_positive_float_env(runtime_env, "RUNPOD_HANDOFF_TIMEOUT_SECONDS")
+            handoff_timeout_seconds = require_positive_float_env(
+                runtime_env, "RUNPOD_HANDOFF_TIMEOUT_SECONDS"
+            )
             S3UploadConfig.from_target(config.s3_target, runtime_env)
+        except BaseException as error:
+            record_error(error)
+
+        try:
+            initialize_runner_log(runner_log_path)
+        except BaseException as error:
+            record_error(error)
+
+        try:
+            started_at = now_fn()
+            write_starting_status(
+                config,
+                pod_id=pod_id,
+                started_at=started_at,
+            )
+            upload_status_fn(
+                config.telemetry_root / "runpod-status.json",
+                config.s3_target,
+                runtime_env,
+            )
         except BaseException as error:
             record_error(error)
 
@@ -106,22 +144,27 @@ def run_cloud_runtime(
                 if ssh_exit_code != 0:
                     process_exit_code = ssh_exit_code
 
+        if started_at is not None:
+            try:
+                write_startup_status(
+                    config,
+                    pod_id=pod_id,
+                    ssh_exit_code=ssh_exit_code,
+                    started_at=started_at,
+                )
+            except BaseException as error:
+                record_error(error)
+
         try:
-            write_startup_status(
-                config,
-                pod_id=pod_id,
-                ssh_exit_code=ssh_exit_code,
-                started_at=now_fn(),
-            )
+            upload_telemetry_fn(config.telemetry_root, config.s3_target, runtime_env)
         except BaseException as error:
             record_error(error)
 
-        try:
-            upload_output_fn(config.output_root, config.s3_target, runtime_env)
-        except BaseException as error:
-            record_error(error)
-
-        if ssh_exit_code == 0 and lifecycle_token is not None and handoff_timeout_seconds is not None:
+        if (
+            ssh_exit_code == 0
+            and lifecycle_token is not None
+            and handoff_timeout_seconds is not None
+        ):
             try:
                 run_model_allowed = wait_for_handoff_fn(
                     config.s3_target,
@@ -142,7 +185,12 @@ def run_cloud_runtime(
                         )
                     )
 
-        if runtime_owns_pod and run_model_allowed and primary_error is None and process_exit_code == 0:
+        if (
+            runtime_owns_pod
+            and run_model_allowed
+            and primary_error is None
+            and process_exit_code == 0
+        ):
             try:
                 runner_exit_code = run_model_fn(config.runner_command, runner_log_path)
             except BaseException as error:
@@ -172,7 +220,7 @@ def run_cloud_runtime(
 
         evidence_sweep_succeeded = False
         try:
-            upload_output_fn(config.output_root, config.s3_target, runtime_env)
+            upload_telemetry_fn(config.telemetry_root, config.s3_target, runtime_env)
         except BaseException as error:
             record_error(error)
         else:
@@ -192,7 +240,11 @@ def run_cloud_runtime(
                     finished_at=now_fn(),
                     final=True,
                 )
-                upload_status_fn(config.output_root / "runpod-status.json", config.s3_target, runtime_env)
+                upload_status_fn(
+                    config.telemetry_root / "runpod-status.json",
+                    config.s3_target,
+                    runtime_env,
+                )
             except BaseException as error:
                 record_error(error)
             else:
@@ -211,14 +263,26 @@ def run_cloud_runtime(
                     finished_at=now_fn(),
                     final=False,
                 )
-                upload_status_fn(config.output_root / "runpod-status.json", config.s3_target, runtime_env)
+                upload_status_fn(
+                    config.telemetry_root / "runpod-status.json",
+                    config.s3_target,
+                    runtime_env,
+                )
             except BaseException as error:
                 record_error(error)
     finally:
         if primary_error is not None:
-            print(format_runtime_failure(pod_id, primary_error), file=stderr_stream, flush=True)
+            print(
+                format_runtime_failure(pod_id, primary_error),
+                file=stderr_stream,
+                flush=True,
+            )
         elif process_exit_code != 0:
-            print(format_runtime_exit_failure(pod_id, process_exit_code), file=stderr_stream, flush=True)
+            print(
+                format_runtime_exit_failure(pod_id, process_exit_code),
+                file=stderr_stream,
+                flush=True,
+            )
         for error in secondary_errors:
             print(format_secondary_failure(error), file=stderr_stream, flush=True)
         if runtime_owns_pod and lifecycle_token is not None:
@@ -272,7 +336,7 @@ def write_startup_status(
     started_at: str,
 ) -> None:
     write_json(
-        config.output_root / "runpod-startup.json",
+        config.telemetry_root / "runpod-startup.json",
         {
             "model_id": config.model_id,
             "pod_id": pod_id,
@@ -280,6 +344,25 @@ def write_startup_status(
             "ssh_exit_code": ssh_exit_code,
             "started_at": started_at,
             "status": "started" if ssh_exit_code == 0 else "failed",
+        },
+    )
+
+
+def write_starting_status(
+    config: CloudRuntimeConfig,
+    *,
+    pod_id: str,
+    started_at: str,
+) -> None:
+    write_json(
+        config.telemetry_root / "runpod-status.json",
+        {
+            "model_id": config.model_id,
+            "outcome": "pending",
+            "pod_id": pod_id,
+            "s3_target": config.s3_target,
+            "started_at": started_at,
+            "status": "starting",
         },
     )
 
@@ -313,12 +396,14 @@ def write_final_status(
         status["runtime_error_message"] = str(primary_error)
     if runner_output_tail:
         status["runner_output_tail"] = runner_output_tail
-    write_json(config.output_root / "runpod-status.json", status)
+    write_json(config.telemetry_root / "runpod-status.json", status)
 
 
 def write_json(path: Path, value: dict[str, object]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    path.write_text(
+        json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
 
 
 def start_ssh_service() -> int:
@@ -327,7 +412,9 @@ def start_ssh_service() -> int:
     return subprocess.run(["service", "ssh", "start"], check=False).returncode
 
 
-def configure_ssh_public_key(public_key: str | None, *, ssh_dir: Path = Path("/root/.ssh")) -> None:
+def configure_ssh_public_key(
+    public_key: str | None, *, ssh_dir: Path = Path("/root/.ssh")
+) -> None:
     if not public_key:
         return
     ssh_dir.mkdir(parents=True, exist_ok=True)
@@ -351,11 +438,20 @@ def run_model_subprocess(command: Sequence[str], log_path: Path) -> int:
         ).returncode
 
 
-def upload_runtime_output(source_dir: Path, target: str, env: Mapping[str, str]) -> None:
-    create_uploader("s3", target, env=env).upload_run(source_dir)
+def initialize_runner_log(log_path: Path) -> None:
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    log_path.write_text("", encoding="utf-8")
 
 
-def upload_runtime_status(status_path: Path, target: str, env: Mapping[str, str]) -> None:
+def upload_runtime_telemetry(
+    telemetry_dir: Path, target: str, env: Mapping[str, str]
+) -> None:
+    create_uploader("s3", target, env=env).upload_run(telemetry_dir)
+
+
+def upload_runtime_status(
+    status_path: Path, target: str, env: Mapping[str, str]
+) -> None:
     if not status_path.is_file():
         raise FileNotFoundError(f"RunPod status file does not exist: {status_path}")
     config = S3UploadConfig.from_target(target, env)
@@ -406,7 +502,9 @@ def format_secondary_failure(error: BaseException) -> str:
 
 
 def format_runtime_failure(pod_id: str, error: BaseException) -> str:
-    return f"RUNPOD_RUNTIME_FAILED pod_id={pod_id} error={type(error).__name__}: {error}"
+    return (
+        f"RUNPOD_RUNTIME_FAILED pod_id={pod_id} error={type(error).__name__}: {error}"
+    )
 
 
 def format_runtime_exit_failure(pod_id: str, exit_code: int) -> str:
@@ -447,6 +545,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(prog="python -m bench_harness.runpod_runtime")
     parser.add_argument("--model-id", required=True)
     parser.add_argument("--output-root", type=Path, required=True)
+    parser.add_argument("--telemetry-root", type=Path, required=True)
     parser.add_argument("--s3-target", required=True)
     parser.add_argument("runner_command", nargs=argparse.REMAINDER)
     args = parser.parse_args()
@@ -459,6 +558,7 @@ def main() -> None:
         CloudRuntimeConfig(
             model_id=args.model_id,
             output_root=args.output_root,
+            telemetry_root=args.telemetry_root,
             s3_target=args.s3_target,
             runner_command=runner_command,
         )
