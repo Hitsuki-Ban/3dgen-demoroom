@@ -12,6 +12,29 @@ RUNNER_PATH = REPO_ROOT / "models" / "trellis1" / "runner.py"
 COMMON_PATH = REPO_ROOT / "models" / "common"
 MODEL_SPEC_PATH = REPO_ROOT / "models" / "trellis1" / "model.json"
 DOCKERFILE_PATH = REPO_ROOT / "models" / "trellis1" / "Dockerfile"
+sys.path.insert(0, str(COMMON_PATH))
+
+import runner_utils  # noqa: E402
+
+
+def _vram_measurement(gpu_name: str, peak_vram_bytes: int) -> runner_utils.VramMeasurement:
+    return runner_utils.VramMeasurement(
+        device=runner_utils.GpuDeviceIdentity(
+            index=0,
+            uuid="GPU-11111111-2222-3333-4444-555555555555",
+            name=gpu_name,
+            driver_model="N/A",
+            mig_mode="N/A",
+        ),
+        peak_vram_bytes=peak_vram_bytes,
+        device_baseline_bytes=0,
+        mode=runner_utils.PROCESS_GROUP_VRAM_MODE,
+        root_pid=1234,
+        sample_interval_ms=500,
+        sample_count=3,
+        max_matched_process_count=1,
+        pid_namespace_verified=True,
+    )
 
 
 def _load_runner(monkeypatch):
@@ -152,8 +175,7 @@ def test_prepare_task_output_writes_trellis1_contract_files(monkeypatch, tmp_pat
             runner.LicenseSource("TRELLIS-image-large model card and license metadata", weights_readme),
         ],
         runtime=runner.RuntimeSnapshot(
-            gpu_name="NVIDIA GeForce RTX 4090",
-            peak_vram_bytes=1234,
+            vram=_vram_measurement("NVIDIA GeForce RTX 4090", 1234),
             torch_version="2.4.0+cu121",
             torch_cuda_version="12.1",
             torch_cuda_arch_list=["sm_89"],
@@ -166,8 +188,10 @@ def test_prepare_task_output_writes_trellis1_contract_files(monkeypatch, tmp_pat
     )
 
     meta = json.loads((task_output_dir / "meta.json").read_text(encoding="utf-8"))
-    assert set(meta) == REQUIRED_META_KEYS
+    assert set(meta) == REQUIRED_META_KEYS | {"vram_measurement"}
     assert meta["model_id"] == "trellis1"
+    assert meta["vram_measurement"]["scope"] == "inference_process_group"
+    assert meta["vram_measurement"]["gpu_uuid"] == "GPU-11111111-2222-3333-4444-555555555555"
     assert meta["model_git_commit"] == "442aa1e1afb9014e80681d3bf604e8d728a86ee7"
     assert meta["weights_revision"] == "25e0d31ffbebe4b5a97464dd851910efc3002d96"
     assert meta["parameters"] == runner.DEFAULT_PARAMETERS

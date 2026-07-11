@@ -20,6 +20,25 @@ If a TripoSG or PartCrafter task fails twice, the runner writes `/work/output/<t
 
 The canonical `meta.json` schema is enforced by `bench_harness.meta.REQUIRED_META_KEYS`.
 
+## VRAM Measurement Contract
+
+Every new runner result must include the optional-for-history `vram_measurement` object. Its absence is accepted only for already-published legacy metadata. The runner resolves one `GpuDeviceIdentity` before inference and uses that same identity for `gpu_name`, `peak_vram_bytes`, the full GPU UUID, and the diagnostic NVIDIA index. If `nvidia-smi` exposes more than one GPU, `BENCH_GPU_UUID` must contain one exact full `GPU-...` UUID. The child receives that UUID as its sole `CUDA_VISIBLE_DEVICES` entry, so its CUDA ordinal is always `0`.
+
+`BENCH_VRAM_MEASUREMENT_MODE` is required; there is no automatic fallback between modes:
+
+- `process_group` is the canonical process-scoped mode for Linux bare metal or a Linux container launched with the host PID namespace. The caller must set `BENCH_PID_NAMESPACE=host`; this explicit contract marker is required in addition to Docker's `--pid=host`. Every 500 ms it queries `nvidia-smi -i <UUID> --query-compute-apps=gpu_uuid,pid,process_name,used_gpu_memory`, sums only inference process-group rows at that instant, and then takes the maximum across samples. Device baseline and co-resident processes are excluded. A successful result sets `pid_namespace_verified=true` only after at least one NVIDIA PID is observed in that `/proc` process group. If no target PID is ever matched, an unavailable value, an MPS server, or any query failure occurs, the task aborts and the process group is killed; unrelated GPU PIDs are ignored rather than charged to the model.
+- `runpod_exclusive_device` is injected only by this repository's one-GPU RunPod launcher. It samples `memory.used` for the selected UUID because RunPod contractually reserves that physical GPU exclusively while the Pod runs. This scope includes the recorded pre-inference device baseline and would include any device allocation if the provider exclusivity contract were violated; the metadata flags both facts instead of pretending this is process-scoped.
+
+Both modes record a 500 ms **sampled peak**, not a hardware-event high-water mark. Each `nvidia-smi` query has a 10-second watchdog. MIG, active CUDA MPS control/server state, WSL, Windows WDDM, abbreviated UUIDs, and implicit multi-GPU selection are rejected. MPS detection checks its configured or default `/tmp/nvidia-mps` control PID file before launch and the NVIDIA process name during sampling. NVIDIA documents that process memory is unavailable under WDDM and that WSL does not support active-compute-process queries; a 2026-07-11 RTX 4070 Ti / Docker Desktop probe likewise found that a running CUDA `nbody` workload was absent from the container query while device memory increased. The Windows WSL2 gate can therefore validate images, commands, fixtures, and non-telemetry behavior, but canonical VRAM E2E evidence requires native Linux host-PID mode or RunPod.
+
+Historical policy:
+
+- Metadata without `vram_measurement` is `legacy_device_total`: the old runner sampled the maximum `memory.used` across all visible devices and queried the first GPU name separately.
+- Published RunPod wave 1/2 values are not arithmetically rewritten. They ran with one provider-exclusive GPU, but still include device baseline and cannot be converted exactly after the fact.
+- Published TripoSR results are the explicit remeasurement candidate if the comparison table must use one process-scoped definition: all 25 were produced on the shared local RTX 4070 Ti, not on RunPod. Remeasure rather than subtracting a guessed desktop baseline.
+
+Primary references checked 2026-07-11: [NVIDIA `nvidia-smi`](https://docs.nvidia.com/deploy/nvidia-smi/index.html), [CUDA device enumeration](https://docs.nvidia.com/cuda/cuda-programming-guide/05-appendices/environment-variables.html), [NVML process memory](https://docs.nvidia.com/deploy/nvml-api/structnvmlProcessInfo__t.html), [CUDA on WSL limitations](https://docs.nvidia.com/cuda/wsl-user-guide/index.html#features-not-yet-supported), [CUDA MPS tools](https://docs.nvidia.com/deploy/mps/appendix-tools-and-interface-reference.html), [NVIDIA Container Toolkit GPU enumeration](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/docker-specialized.html), [Docker PID namespaces](https://docs.docker.com/reference/cli/docker/container/run/#pid-settings---pid), and [RunPod GPU exclusivity](https://docs.runpod.io/pods/troubleshooting/pod-migration).
+
 ## Local Commands
 
 ```powershell
@@ -149,7 +168,7 @@ Implemented runner containers:
 
 ## Local Validation Scope
 
-The local 12GB RTX 4070 Ti validation gate is for lightweight runners first. TripoSR has already passed the two-task local E2E path. TripoSG's official decoder configuration (`num_tokens=2048`, `flash_octree_depth=9`) proved too heavy for local validation: diffusion finished, but geometry extraction did not complete after more than 10 minutes. A reduced diagnostic run (`num_inference_steps=5`, `num_tokens=1024`, `flash_octree_depth=8`) completed and exported a GLB, so TripoSG full generation is deferred to the cloud GPU phase. Apply the same rule to PartCrafter if local generation blocks progress: keep pins, buildability, runner contract, and unit tests local; move full generation evidence to the cloud run issue.
+The local 12GB RTX 4070 Ti validation gate is for lightweight runners first. TripoSR previously passed the two-task local generation path, but those published measurements used the legacy device-total scope; WDDM cannot produce the new canonical process metric. TripoSG's official decoder configuration (`num_tokens=2048`, `flash_octree_depth=9`) proved too heavy for local validation: diffusion finished, but geometry extraction did not complete after more than 10 minutes. A reduced diagnostic run (`num_inference_steps=5`, `num_tokens=1024`, `flash_octree_depth=8`) completed and exported a GLB, so TripoSG full generation is deferred to the cloud GPU phase. Apply the same rule to PartCrafter if local generation blocks progress: keep pins, buildability, runner contract, and unit tests local; move full generation and canonical VRAM evidence to a Linux GPU/RunPod run.
 
 ## Cost Guardrails
 

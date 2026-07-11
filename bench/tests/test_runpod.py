@@ -488,6 +488,7 @@ def test_build_pod_payload_uses_on_demand_gpu_priority_and_runtime_env() -> None
     assert env["RUNPOD_API_KEY"] == "token"
     assert env["RUNPOD_LIFECYCLE_TOKEN"] == "handoff-token"
     assert env["RUNPOD_HANDOFF_TIMEOUT_SECONDS"] == "600"
+    assert env["BENCH_VRAM_MEASUREMENT_MODE"] == "runpod_exclusive_device"
     assert env["HF_HOME"] == "/workspace/hf"
     assert env["HF_HUB_OFFLINE"] == "1"
     assert env["TRANSFORMERS_OFFLINE"] == "1"

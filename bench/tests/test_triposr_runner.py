@@ -19,6 +19,26 @@ sys.path.insert(0, str(COMMON_PATH))
 import runner_utils  # noqa: E402
 
 
+def _vram_measurement(gpu_name: str, peak_vram_bytes: int) -> runner_utils.VramMeasurement:
+    return runner_utils.VramMeasurement(
+        device=runner_utils.GpuDeviceIdentity(
+            index=0,
+            uuid="GPU-11111111-2222-3333-4444-555555555555",
+            name=gpu_name,
+            driver_model="N/A",
+            mig_mode="N/A",
+        ),
+        peak_vram_bytes=peak_vram_bytes,
+        device_baseline_bytes=0,
+        mode=runner_utils.PROCESS_GROUP_VRAM_MODE,
+        root_pid=1234,
+        sample_interval_ms=500,
+        sample_count=3,
+        max_matched_process_count=1,
+        pid_namespace_verified=True,
+    )
+
+
 def _load_runner():
     spec = importlib.util.spec_from_file_location("triposr_runner", RUNNER_PATH)
     assert spec is not None
@@ -127,8 +147,7 @@ def test_prepare_task_output_writes_contract_files(tmp_path: Path) -> None:
         raw_output_dir=raw_output_dir,
         license_path=license_path,
         runtime=runner.RuntimeSnapshot(
-            gpu_name="NVIDIA GeForce RTX 4070 Ti",
-            peak_vram_bytes=1234,
+            vram=_vram_measurement("NVIDIA GeForce RTX 4070 Ti", 1234),
             torch_version="2.7.1+cu128",
             torch_cuda_version="12.8",
             torch_cuda_arch_list=["sm_89", "sm_120"],
@@ -141,8 +160,10 @@ def test_prepare_task_output_writes_contract_files(tmp_path: Path) -> None:
     )
 
     meta = json.loads((task_output_dir / "meta.json").read_text(encoding="utf-8"))
-    assert set(meta) == REQUIRED_META_KEYS
+    assert set(meta) == REQUIRED_META_KEYS | {"vram_measurement"}
     assert meta["model_id"] == "triposr"
+    assert meta["vram_measurement"]["scope"] == "inference_process_group"
+    assert meta["vram_measurement"]["gpu_uuid"] == "GPU-11111111-2222-3333-4444-555555555555"
     assert meta["model_git_commit"] == "107cefdc244c39106fa830359024f6a2f1c78871"
     assert meta["weights_revision"] == "5b521936b01fbe1890f6f9baed0254ab6351c04a"
     assert meta["parameters"] == runner.DEFAULT_PARAMETERS

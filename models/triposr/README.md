@@ -24,16 +24,18 @@ TripoSR's official model config references `facebook/dino-vitb16` for the image 
 Timing and VRAM notes:
 
 - `wall_clock_seconds` includes the runner's per-task subprocess startup, Python/torch import, and model loading time because this wrapper invokes official `run.py` once per task. It is consistent within TripoSR runs but should not be treated as a pure model-generation duration when comparing across different wrappers.
-- `peak_vram_bytes` is sampled from `nvidia-smi memory.used`. On a shared local workstation it can include other GPU processes; on a dedicated rental GPU or pod it should be close to the container's usage.
+- New `peak_vram_bytes` results follow the explicit UUID/scope contract in [`bench/README.md`](../../bench/README.md): Linux host-PID process-group sampling or the RunPod-exclusive target-device mode. Historical TripoSR values are legacy shared-workstation device totals and are not process-scoped.
 
 ## Run Two-Task Smoke
 
-Prepare an input directory that contains `tasks.json` and `references/`.
+Prepare an input directory that contains `tasks.json` and `references/`. The complete local contract run below requires a Linux/TCC host with host PID visibility; Windows WDDM can still validate the image and command path but cannot emit canonical per-process VRAM metadata.
 
 ```powershell
 New-Item -ItemType Directory -Force outputs\triposr-smoke | Out-Null
-docker run --rm --gpus all `
+docker run --rm --gpus all --pid=host `
   -e MAX_RUNTIME_MIN=60 `
+  -e BENCH_VRAM_MEASUREMENT_MODE=process_group `
+  -e BENCH_PID_NAMESPACE=host `
   -v ${PWD}\tasks:/work/input:ro `
   -v ${PWD}\outputs\triposr-smoke:/work/output `
   3dgen/triposr:local runner --task-limit 2

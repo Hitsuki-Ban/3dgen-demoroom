@@ -20,6 +20,26 @@ sys.path.insert(0, str(COMMON_PATH))
 import runner_utils  # noqa: E402
 
 
+def _vram_measurement(gpu_name: str, peak_vram_bytes: int) -> runner_utils.VramMeasurement:
+    return runner_utils.VramMeasurement(
+        device=runner_utils.GpuDeviceIdentity(
+            index=0,
+            uuid="GPU-11111111-2222-3333-4444-555555555555",
+            name=gpu_name,
+            driver_model="N/A",
+            mig_mode="N/A",
+        ),
+        peak_vram_bytes=peak_vram_bytes,
+        device_baseline_bytes=0,
+        mode=runner_utils.PROCESS_GROUP_VRAM_MODE,
+        root_pid=1234,
+        sample_interval_ms=500,
+        sample_count=3,
+        max_matched_process_count=1,
+        pid_namespace_verified=True,
+    )
+
+
 def _load_runner(monkeypatch):
     monkeypatch.setenv("TRIPOSG_WEIGHTS_PATH", "/workspace/weights/TripoSG")
     monkeypatch.setenv("RMBG_WEIGHTS_PATH", "/workspace/weights/RMBG-1.4")
@@ -203,8 +223,7 @@ def test_prepare_task_output_writes_triposg_contract_files(monkeypatch, tmp_path
         raw_output_dir=raw_output_dir,
         license_sources=license_sources,
         runtime=runner.RuntimeSnapshot(
-            gpu_name="NVIDIA GeForce RTX 4070 Ti",
-            peak_vram_bytes=1234,
+            vram=_vram_measurement("NVIDIA GeForce RTX 4070 Ti", 1234),
             torch_version="2.7.1+cu128",
             torch_cuda_version="12.8",
             torch_cuda_arch_list=["sm_89", "sm_120"],
@@ -217,8 +236,10 @@ def test_prepare_task_output_writes_triposg_contract_files(monkeypatch, tmp_path
     )
 
     meta = json.loads((task_output_dir / "meta.json").read_text(encoding="utf-8"))
-    assert set(meta) == REQUIRED_META_KEYS
+    assert set(meta) == REQUIRED_META_KEYS | {"vram_measurement"}
     assert meta["model_id"] == "triposg"
+    assert meta["vram_measurement"]["scope"] == "inference_process_group"
+    assert meta["vram_measurement"]["gpu_uuid"] == "GPU-11111111-2222-3333-4444-555555555555"
     assert meta["model_git_commit"] == "fc5c40990181e2a756c4e0b1c2f4d6b5202faf8c"
     assert meta["weights_revision"] == "2c1c516d22d58db486a058d98d31bb6177344e06"
     assert meta["parameters"] == runner.DEFAULT_PARAMETERS
@@ -254,21 +275,20 @@ def test_run_task_retries_once_and_records_retry_count(monkeypatch, tmp_path: Pa
         timeout_label: str,
         *,
         log_path: Path | None = None,
-    ) -> int:
+    ) -> runner_utils.VramMeasurement:
         calls.append(command)
         if len(calls) == 1:
             raise RuntimeError("transient decoder failure")
         output_path = Path(command[command.index("--infer-output-path") + 1])
         output_path.write_bytes(b"glTF")
-        return 1234
+        return _vram_measurement("NVIDIA GeForce RTX 5090", 1234)
 
     monkeypatch.setattr(runner, "run_with_peak_vram", fake_run_with_peak_vram)
     monkeypatch.setattr(
         runner,
         "collect_runtime_snapshot",
-        lambda peak, attention_backend: runner.RuntimeSnapshot(
-            gpu_name="NVIDIA GeForce RTX 5090",
-            peak_vram_bytes=peak,
+        lambda vram, attention_backend: runner.RuntimeSnapshot(
+            vram=vram,
             torch_version="2.7.1+cu128",
             torch_cuda_version="12.8",
             torch_cuda_arch_list=["sm_120"],
@@ -287,6 +307,7 @@ def test_run_task_retries_once_and_records_retry_count(monkeypatch, tmp_path: Pa
     meta = json.loads((output_root / "cartoon-apple" / "meta.json").read_text(encoding="utf-8"))
     assert len(calls) == 2
     assert meta["retry_count"] == 1
+    assert meta["vram_measurement"]["scope"] == "inference_process_group"
     assert (output_root / "cartoon-apple" / "output.glb").read_bytes() == b"glTF"
 
 
@@ -313,19 +334,18 @@ def test_run_task_upload_failure_does_not_retry_successful_triposg_task(monkeypa
         timeout_label: str,
         *,
         log_path: Path | None = None,
-    ) -> int:
+    ) -> runner_utils.VramMeasurement:
         calls.append(command)
         output_path = Path(command[command.index("--infer-output-path") + 1])
         output_path.write_bytes(b"glTF")
-        return 1234
+        return _vram_measurement("NVIDIA GeForce RTX 5090", 1234)
 
     monkeypatch.setattr(runner, "run_with_peak_vram", fake_run_with_peak_vram)
     monkeypatch.setattr(
         runner,
         "collect_runtime_snapshot",
-        lambda peak, attention_backend: runner.RuntimeSnapshot(
-            gpu_name="NVIDIA GeForce RTX 5090",
-            peak_vram_bytes=peak,
+        lambda vram, attention_backend: runner.RuntimeSnapshot(
+            vram=vram,
             torch_version="2.7.1+cu128",
             torch_cuda_version="12.8",
             torch_cuda_arch_list=["sm_120"],
@@ -453,3 +473,60 @@ def test_run_task_timeout_writes_and_uploads_failure_before_reraising(monkeypatc
     assert failure["retry_count"] == 0
     assert failure["error_type"] == "RunnerTimeoutError"
     assert (output_root / "cartoon-apple" / "infer.log").is_file()
+
+
+def test_run_task_vram_measurement_error_uploads_once_and_reraises_without_retry(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    runner = _load_runner(monkeypatch)
+    input_root = tmp_path / "input"
+    output_root = tmp_path / "output"
+    input_root.mkdir()
+    output_root.mkdir()
+    (input_root / "input.png").write_bytes(b"png")
+    license_sources = runner.LicenseSources(
+        root_license=tmp_path / "LICENSE",
+        notice=tmp_path / "NOTICE",
+        bundled_license=tmp_path / "triposg_LICENSE",
+    )
+    calls: list[list[str]] = []
+    uploads: list[str] = []
+    measurement_error = runner_utils.VramMeasurementError(
+        "target GPU UUID disappeared during process sampling"
+    )
+
+    def fake_run_with_peak_vram(
+        command: list[str],
+        timeout_seconds: float,
+        timeout_label: str,
+        *,
+        log_path: Path | None = None,
+    ) -> int:
+        calls.append(command)
+        raise measurement_error
+
+    def fake_upload(task_output_dir: Path, task_id: str, env: dict[str, str]) -> list[str]:
+        failure = json.loads((task_output_dir / "failure.json").read_text(encoding="utf-8"))
+        assert failure["error_type"] == "VramMeasurementError"
+        uploads.append(task_id)
+        return [f"{task_id}/failure.json"]
+
+    monkeypatch.setattr(runner, "run_with_peak_vram", fake_run_with_peak_vram)
+    monkeypatch.setattr(runner, "upload_task_increment_if_configured", fake_upload)
+
+    with pytest.raises(runner_utils.VramMeasurementError) as exc_info:
+        runner.run_task(
+            runner.TaskDefinition(id="cartoon-apple", prompt="apple", image="input.png", seed=20260708),
+            input_root,
+            output_root,
+            license_sources,
+            timeout_seconds=10,
+        )
+
+    failure = json.loads((output_root / "cartoon-apple" / "failure.json").read_text(encoding="utf-8"))
+    assert exc_info.value is measurement_error
+    assert len(calls) == 1
+    assert uploads == ["cartoon-apple"]
+    assert failure["retry_count"] == 0
+    assert failure["error_type"] == "VramMeasurementError"

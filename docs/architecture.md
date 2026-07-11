@@ -27,6 +27,7 @@ tasks/(25課題・リファレンス画像)
 
 - 各モデルはコード commit / 重み revision をピン留めした Docker イメージで実行。イメージ digest は [docs/runs/](runs/) の実行レポートに記録
 - メタデータ契約は [bench/src/bench_harness/meta.py](../bench/src/bench_harness/meta.py)(REQUIRED_META_KEYS)。全 `meta.json` を成果物と同じ場所で公開
+- 新規 VRAM 値は GPU UUID と測定 scope を `vram_measurement` に記録する。Linux の inference process group は同時刻の process 使用量を合算し、RunPod は公式の GPU 独占保証に基づく selected-device total と baseline を明示する。フィールドがない既存値は `legacy_device_total` であり、新口径と同一とは扱わない([詳細契約](../bench/README.md#vram-measurement-contract))
 - 決定的な生成になるモデルでは、独立した 2 回の実行でバイト一致の GLB を確認済み
 - 取得時点のライセンス原文を成果物に同梱(`LICENSES.txt`)
 - 非商用ライセンスの補助重み(背景除去モデル等)を含む Docker イメージは非公開(GHCR private)
