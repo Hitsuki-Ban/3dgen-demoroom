@@ -8,7 +8,7 @@
 
 生成時間・VRAM・ポリゴン数・使用パラメータ・**失敗を含む**全実測データを無修正で公開しています。想定読者はゲームグラフィックスの開発者 —「いま実際にどこまでできるのか」をデモ映像ではなく実物のメッシュで判断するための場です。
 
-## 実測サマリ(2026-07-11 時点)
+## 実測サマリ(全 11 モデル計測完了・2026-07-11)
 
 | モデル | 成功 | 平均生成時間 | 最長 | 最大 VRAM | 実行 GPU | 出力 |
 |---|---|---|---|---|---|---|
@@ -19,12 +19,12 @@
 | [PartCrafter](https://github.com/wgsxm/PartCrafter) | 24/25 | 49.9s | 83.1s | 16.2 GiB | RTX 4090 | **パーツ分離** mesh |
 | [3DTopia-XL](https://github.com/3DTopia/3DTopia-XL) | 25/25 | 76.4s | 114.4s | 10.0 GiB | RTX 4090 | PBR |
 | [Direct3D-S2](https://github.com/DreamTechAI/Direct3D-S2) | 25/25 | 140.1s | 236.4s | 30.6 GiB | RTX 5090 | geometry のみ(高解像度) |
+| [Hunyuan3D 2.1](https://github.com/tencent-hunyuan/hunyuan3d-2.1) ※3 | 25/25 | 180.9s | 225.0s | 16.5 GiB | RTX 6000 Ada 48GB | PBR |
 | [TRELLIS.2-4B](https://github.com/microsoft/TRELLIS.2) | 25/25 | 281.0s | 1380.2s | 33.1 GiB | RTX 5090 ※1 | PBR |
+| [Step1X-3D](https://github.com/stepfun-ai/Step1X-3D) | 25/25 | 323.6s | 543.5s | **64.0 GiB** ※4 | RTX PRO 6000 96GB | textured |
 | [Pixal3D](https://github.com/TencentARC/Pixal3D) | 23/25 ※2 | 331.8s | 501.1s | **45.9 GiB** | RTX 6000 Ada 48GB | textured |
-| [Step1X-3D](https://github.com/stepfun-ai/Step1X-3D) | ベンチ実行中 | – | – | – | – | textured |
-| [Hunyuan3D 2.1](https://github.com/tencent-hunyuan/hunyuan3d-2.1) | ベンチ実行中 | – | – | – | ※3 | PBR |
 
-<sub>※1 — 1 課題のみ 32GB で OOM、**設定を変えずに** 96GB GPU で再実行して成功。 ※2 — 2 課題は公式 1536 設定の後処理が 48GB でも OOM。低 VRAM モードへのフォールバックはせず**失敗として記録・公開**。 ※3 — ライセンス上 EU / 英国 / 韓国で実行・表示不可(後述)。</sub>
+<sub>※1 — 1 課題のみ 32GB で OOM、**設定を変えずに** 96GB GPU で再実行して成功。 ※2 — 2 課題は公式 1536 設定の後処理が 48GB でも OOM。低 VRAM モードへのフォールバックはせず**失敗として記録・公開**。 ※3 — ライセンス上 EU / 英国 / 韓国では表示不可(後述)。実行も非 EU DC で実施。 ※4 — 公式デフォルトでは 96GB 級 GPU のみで完走可能(32GB / 48GB は texture 段で OOM)。</sub>
 
 **表の読み方:** 実行 GPU はモデルごとに異なります(動作する最小クラスに寄せる方針 — VRAM 要求自体が主要な測定項目)。生成時間の直接比較は同一 GPU 同士で。「最長」は各モデルの初回タスクの重みロードを含みます。
 
