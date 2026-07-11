@@ -135,26 +135,20 @@ def test_partcrafter_incremental_upload_uses_task_id_prefix(monkeypatch, tmp_pat
     (task_dir / "meta.json").write_text("{}", encoding="utf-8")
     uploaded = []
 
-    class FakeS3Client:
-        def list_objects_v2(self, **request):
-            return {"Contents": [], "IsTruncated": False}
-
-        def delete_objects(self, **request) -> None:
-            raise AssertionError("empty task prefix must not issue a delete")
-
-        def upload_file(self, source: str, bucket: str, key: str) -> None:
-            uploaded.append((Path(source).name, bucket, key))
+    def fake_upload(self, source_dir: Path, relative_name: str = "") -> list[str]:
+        uploaded.append((source_dir, relative_name))
+        return ["runs/partcrafter/wave1/test/task-a/meta.json"]
 
     monkeypatch.setenv("RUNPOD_INCREMENTAL_S3_TARGET", "s3://3dgen-runs/runs/partcrafter/wave1/test")
     monkeypatch.setenv("R2_ENDPOINT", "https://example.r2.cloudflarestorage.com")
     monkeypatch.setenv("R2_ACCESS_KEY_ID", "access-key")
     monkeypatch.setenv("R2_SECRET_ACCESS_KEY", "secret-key")
-    monkeypatch.setattr("bench_harness.uploader.create_s3_client", lambda config: FakeS3Client())
+    monkeypatch.setattr("bench_harness.uploader.S3Uploader.upload_run", fake_upload)
 
     assert runner.upload_task_increment_if_configured(task_dir, "task-a", dict(os.environ)) == [
         "runs/partcrafter/wave1/test/task-a/meta.json",
     ]
-    assert uploaded == [("meta.json", "3dgen-runs", "runs/partcrafter/wave1/test/task-a/meta.json")]
+    assert uploaded == [(task_dir, "task-a")]
 
 
 def test_partcrafter_runner_requires_explicit_weight_env(monkeypatch) -> None:

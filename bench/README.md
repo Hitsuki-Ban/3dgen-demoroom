@@ -38,6 +38,34 @@ uv run bench-harness runpod-pods
 - `R2_ACCESS_KEY_ID`
 - `R2_SECRET_ACCESS_KEY`
 
+### Task publish protocol
+
+Runner task uploads configured by `RUNPOD_INCREMENTAL_S3_TARGET` use a recoverable publish protocol:
+
+1. Validate the local success or failure contract with `bench_harness.meta`, including GLB structure,
+   the declared license, and task/model IDs.
+2. Upload every file to a unique `.publish-staging/<id>/` prefix with SHA-256 user metadata, then
+   verify each staged object's size and hash with `HeadObject`.
+3. Copy the previous canonical task prefix to `.publish-backup/<id>/` and verify the backup before
+   mutating canonical keys.
+4. Remove the previous `meta.json`/`failure.json` marker, copy non-marker files, remove stale files,
+   and copy the new marker last. A pre-marker failure restores the complete previous prefix from backup.
+5. Delete staging and backup only after the new marker is committed. Cleanup failure is reported as
+   a committed publish with explicit residual prefixes; it does not roll back the valid new result.
+
+R2 has no multi-object rename. This protocol relies on its supported S3 `HeadObject`, `CopyObject`,
+source copy conditions, user metadata, and read-after-write consistency. Confirmed 2026-07-11:
+
+- https://developers.cloudflare.com/r2/api/s3/api/
+- https://developers.cloudflare.com/r2/reference/consistency/
+
+The launcher must keep a single writer per canonical task prefix. Python/S3 operation failures restore the
+backup before returning. A hard process or host termination during the short marker-free commit window cannot
+run rollback; the retained `.publish-backup/<id>/` is then the manual recovery source.
+
+`bench-harness upload-s3` without a relative task name remains a direct recursive upload for startup
+and final telemetry. It is not a canonical task replacement operation.
+
 RunPod launch commands additionally require `RUNPOD_API_KEY`:
 
 ```powershell
