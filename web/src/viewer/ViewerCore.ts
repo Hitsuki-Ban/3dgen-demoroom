@@ -21,9 +21,12 @@ interface Pane {
   toonLights: THREE.Group;
   /** 正規化前のモデル最大径。輪郭線の太さをワールド基準に揃えるのに使う */
   maxDim: number;
+  /** モデル別の向き補正(ラジアン)。トグルで生の向きと切り替えるため保持する */
+  orientationFix: THREE.Euler | null;
 }
 
 const CAMERA_HOME = new THREE.Vector3(1.2, 0.9, 1.6);
+const ZERO_EULER = new THREE.Euler();
 
 /**
  * 単一 WebGLRenderer + 単一 canvas で複数ペインを scissor viewport 描画するコア。
@@ -38,6 +41,8 @@ export class ViewerCore {
   private envMap: THREE.Texture;
   private mode: DisplayMode = 'pbr';
   private cameraSync = true;
+  /** モデル別向き補正の適用有無(既定 ON。OFF で生成物の生の向きを表示) */
+  private orientationFixEnabled = true;
   private syncing = false;
   private matcapTexture: THREE.Texture | null = null;
   private uvTexture: THREE.Texture | null = null;
@@ -60,11 +65,22 @@ export class ViewerCore {
     this.renderer.dispose();
   }
 
-  /** ペインを登録し、モデル(正規化済みで modelRoot に追加される)を表示する */
-  addPane(element: HTMLElement, object: THREE.Object3D): number {
+  /** ペインを登録し、モデル(正規化済みで modelRoot に追加される)を表示する。
+   *  orientationFixDeg はモデル別の向き補正(度)。適用有無はコアのトグルに従う */
+  addPane(
+    element: HTMLElement,
+    object: THREE.Object3D,
+    orientationFixDeg?: { x?: number; y?: number; z?: number },
+  ): number {
     const id = this.nextId++;
     const scene = new THREE.Scene();
     scene.environment = this.envMap;
+
+    const d = Math.PI / 180;
+    const orientationFix = orientationFixDeg
+      ? new THREE.Euler((orientationFixDeg.x ?? 0) * d, (orientationFixDeg.y ?? 0) * d, (orientationFixDeg.z ?? 0) * d)
+      : null;
+    if (orientationFix && this.orientationFixEnabled) object.rotation.copy(orientationFix);
 
     const modelRoot = new THREE.Group();
     const maxDim = normalizeIntoUnitBox(object);
@@ -85,7 +101,7 @@ export class ViewerCore {
     controls.enableDamping = true;
     controls.addEventListener('change', () => this.broadcastCamera(id));
 
-    const pane: Pane = { id, element, scene, camera, controls, modelRoot, toonLights, maxDim };
+    const pane: Pane = { id, element, scene, camera, controls, modelRoot, toonLights, maxDim, orientationFix };
     this.panes.set(id, pane);
     this.applyMode(pane, this.mode);
     return id;
@@ -135,6 +151,27 @@ export class ViewerCore {
 
   getCameraSync(): boolean {
     return this.cameraSync;
+  }
+
+  /** 向き補正の ON/OFF。OFF で「モデルが出力した生の向き」を表示する(比較の公平性検分用) */
+  setOrientationFixEnabled(enabled: boolean) {
+    if (this.orientationFixEnabled === enabled) return;
+    this.orientationFixEnabled = enabled;
+    for (const pane of this.panes.values()) {
+      if (!pane.orientationFix) continue;
+      const object = pane.modelRoot.children.find((c) => !c.userData.isOutline);
+      if (!object) continue;
+      object.rotation.copy(enabled ? pane.orientationFix : ZERO_EULER);
+      // 回転でバウンディングボックスが変わるので正規化をやり直す
+      object.position.set(0, 0, 0);
+      object.scale.set(1, 1, 1);
+      normalizeIntoUnitBox(object);
+    }
+    this.emitChange();
+  }
+
+  getOrientationFixEnabled(): boolean {
+    return this.orientationFixEnabled;
   }
 
   private changeListeners = new Set<() => void>();

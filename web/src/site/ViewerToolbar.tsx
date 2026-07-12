@@ -19,12 +19,14 @@ export function ViewerToolbar() {
   // 表示とコア状態が食い違う。
   const [mode, setMode] = useState<DisplayMode>(() => viewer?.getDisplayMode() ?? 'pbr');
   const [sync, setSync] = useState(() => viewer?.getCameraSync() ?? true);
+  const [orient, setOrient] = useState(() => viewer?.getOrientationFixEnabled() ?? true);
 
   useEffect(() => {
     if (!viewer) return;
     const syncFromCore = () => {
       setMode(viewer.getDisplayMode());
       setSync(viewer.getCameraSync());
+      setOrient(viewer.getOrientationFixEnabled());
     };
     syncFromCore();
     return viewer.subscribeChange(syncFromCore);
@@ -57,6 +59,17 @@ export function ViewerToolbar() {
           onChange={(e) => { setSync(e.target.checked); viewer?.setCameraSync(e.target.checked); }}
         />
         カメラ同期
+      </label>
+      <label
+        className="flex items-center gap-1.5 text-xs sm:text-sm text-slate-300 whitespace-nowrap"
+        title="OFF にするとモデルが出力した生の向きを表示します(軸慣習の違いも比較対象、という検分用)"
+      >
+        <input
+          type="checkbox"
+          checked={orient}
+          onChange={(e) => { setOrient(e.target.checked); viewer?.setOrientationFixEnabled(e.target.checked); }}
+        />
+        向き補正
       </label>
       <button
         onClick={() => viewer?.resetCameras()}
