@@ -31,6 +31,7 @@ RUNPOD_HF_HOME = f"{RUNPOD_VOLUME_MOUNT_PATH}/hf"
 RUNPOD_TORCH_HOME = f"{RUNPOD_VOLUME_MOUNT_PATH}/torch"
 RUNPOD_U2NET_HOME = f"{RUNPOD_WEIGHT_ROOT}/rembg"
 RUNPOD_TELEMETRY_ROOT = "/work/runpod-telemetry"
+RUNPOD_VRAM_MEASUREMENT_MODE = "runpod_exclusive_device"
 REQUIRED_R2_ENV_VARS = ("R2_ENDPOINT", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY")
 MODEL_RUNNER_PATHS = {
     "triposg": "/opt/3dgen-runner/triposg_runner.py",
@@ -651,6 +652,7 @@ def build_pod_payload(
     )
     runtime_env = {
         "MAX_RUNTIME_MIN": str(config.max_runtime_min),
+        "BENCH_VRAM_MEASUREMENT_MODE": RUNPOD_VRAM_MEASUREMENT_MODE,
         "RUNPOD_RUN_MODEL_ID": config.model_id,
         "RUNPOD_S3_TARGET": config.s3_target,
         "RUNPOD_INCREMENTAL_S3_TARGET": config.s3_target,

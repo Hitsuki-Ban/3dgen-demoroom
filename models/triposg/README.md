@@ -26,16 +26,18 @@ The default parameters are the official TripoSG generation path: `num_inference_
 Timing and VRAM notes:
 
 - `wall_clock_seconds` includes the runner's per-task subprocess startup, Python/torch import, model loading, and mesh export.
-- `peak_vram_bytes` is sampled from `nvidia-smi memory.used`. On a shared local workstation it can include other GPU processes.
+- New `peak_vram_bytes` results follow the explicit UUID/scope contract in [`bench/README.md`](../../bench/README.md): Linux host-PID process-group sampling or the RunPod-exclusive target-device mode. No query failure falls back to an unlabelled device total.
 
 ## Run Two-Task Smoke
 
-Prepare an input directory that contains `tasks.json` and `references/`.
+Prepare an input directory that contains `tasks.json` and `references/`. The complete local contract run below requires a Linux/TCC host with host PID visibility.
 
 ```powershell
 New-Item -ItemType Directory -Force outputs\triposg-smoke | Out-Null
-docker run --rm --gpus all `
+docker run --rm --gpus all --pid=host `
   -e MAX_RUNTIME_MIN=60 `
+  -e BENCH_VRAM_MEASUREMENT_MODE=process_group `
+  -e BENCH_PID_NAMESPACE=host `
   -e TRIPOSG_WEIGHTS_PATH=/workspace/weights/TripoSG `
   -e RMBG_WEIGHTS_PATH=/workspace/weights/RMBG-1.4 `
   -v ${PWD}\tasks:/work/input:ro `

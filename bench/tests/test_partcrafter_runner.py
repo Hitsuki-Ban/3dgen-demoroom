@@ -20,6 +20,26 @@ sys.path.insert(0, str(COMMON_PATH))
 import runner_utils  # noqa: E402
 
 
+def _vram_measurement(gpu_name: str, peak_vram_bytes: int) -> runner_utils.VramMeasurement:
+    return runner_utils.VramMeasurement(
+        device=runner_utils.GpuDeviceIdentity(
+            index=0,
+            uuid="GPU-11111111-2222-3333-4444-555555555555",
+            name=gpu_name,
+            driver_model="N/A",
+            mig_mode="N/A",
+        ),
+        peak_vram_bytes=peak_vram_bytes,
+        device_baseline_bytes=0,
+        mode=runner_utils.PROCESS_GROUP_VRAM_MODE,
+        root_pid=1234,
+        sample_interval_ms=500,
+        sample_count=3,
+        max_matched_process_count=1,
+        pid_namespace_verified=True,
+    )
+
+
 def _load_runner(monkeypatch):
     monkeypatch.setenv("PARTCRAFTER_WEIGHTS_PATH", "/workspace/weights/PartCrafter")
     monkeypatch.setenv("RMBG_WEIGHTS_PATH", "/workspace/weights/RMBG-1.4")
@@ -205,8 +225,7 @@ def test_prepare_task_output_writes_partcrafter_contract_files(monkeypatch, tmp_
         raw_output_dir=raw_output_dir,
         license_sources=license_sources,
         runtime=runner.RuntimeSnapshot(
-            gpu_name="NVIDIA GeForce RTX 4070 Ti",
-            peak_vram_bytes=1234,
+            vram=_vram_measurement("NVIDIA GeForce RTX 4070 Ti", 1234),
             torch_version="2.7.0+cu128",
             torch_cuda_version="12.8",
             torch_cuda_arch_list=["sm_89", "sm_120"],
@@ -219,8 +238,10 @@ def test_prepare_task_output_writes_partcrafter_contract_files(monkeypatch, tmp_
     )
 
     meta = json.loads((task_output_dir / "meta.json").read_text(encoding="utf-8"))
-    assert set(meta) == REQUIRED_META_KEYS
+    assert set(meta) == REQUIRED_META_KEYS | {"vram_measurement"}
     assert meta["model_id"] == "partcrafter"
+    assert meta["vram_measurement"]["scope"] == "inference_process_group"
+    assert meta["vram_measurement"]["gpu_uuid"] == "GPU-11111111-2222-3333-4444-555555555555"
     assert meta["model_git_commit"] == "3d773bf02fad51c7ab31a5615573fec93b287b30"
     assert meta["weights_revision"] == "69a0ffc1dad5e48e7e5ed91c0609f2b1276eb31f"
     assert meta["parameters"] == runner.DEFAULT_PARAMETERS
@@ -254,7 +275,7 @@ def test_run_task_retries_once_and_records_retry_count(monkeypatch, tmp_path: Pa
         timeout_label: str,
         *,
         log_path: Path | None = None,
-    ) -> int:
+    ) -> runner_utils.VramMeasurement:
         calls.append(command)
         if len(calls) == 1:
             raise RuntimeError("transient decoder failure")
@@ -264,15 +285,14 @@ def test_run_task_retries_once_and_records_retry_count(monkeypatch, tmp_path: Pa
         (raw_output_dir / "part_01.glb").write_bytes(b"part1")
         (raw_output_dir / "part_02.glb").write_bytes(b"part2")
         (raw_output_dir / "manifest.json").write_text('{"num_parts": 3}\n', encoding="utf-8")
-        return 1234
+        return _vram_measurement("NVIDIA GeForce RTX 5090", 1234)
 
     monkeypatch.setattr(runner, "run_with_peak_vram", fake_run_with_peak_vram)
     monkeypatch.setattr(
         runner,
         "collect_runtime_snapshot",
-        lambda peak, attention_backend: runner.RuntimeSnapshot(
-            gpu_name="NVIDIA GeForce RTX 5090",
-            peak_vram_bytes=peak,
+        lambda vram, attention_backend: runner.RuntimeSnapshot(
+            vram=vram,
             torch_version="2.7.0+cu128",
             torch_cuda_version="12.8",
             torch_cuda_arch_list=["sm_120"],
@@ -315,7 +335,7 @@ def test_run_task_upload_failure_does_not_retry_successful_partcrafter_task(monk
         timeout_label: str,
         *,
         log_path: Path | None = None,
-    ) -> int:
+    ) -> runner_utils.VramMeasurement:
         calls.append(command)
         raw_output_dir = Path(command[command.index("--infer-output-dir") + 1])
         (raw_output_dir / "object.glb").write_bytes(b"glTF")
@@ -323,15 +343,14 @@ def test_run_task_upload_failure_does_not_retry_successful_partcrafter_task(monk
         (raw_output_dir / "part_01.glb").write_bytes(b"part1")
         (raw_output_dir / "part_02.glb").write_bytes(b"part2")
         (raw_output_dir / "manifest.json").write_text('{"num_parts": 3}\n', encoding="utf-8")
-        return 1234
+        return _vram_measurement("NVIDIA GeForce RTX 5090", 1234)
 
     monkeypatch.setattr(runner, "run_with_peak_vram", fake_run_with_peak_vram)
     monkeypatch.setattr(
         runner,
         "collect_runtime_snapshot",
-        lambda peak, attention_backend: runner.RuntimeSnapshot(
-            gpu_name="NVIDIA GeForce RTX 5090",
-            peak_vram_bytes=peak,
+        lambda vram, attention_backend: runner.RuntimeSnapshot(
+            vram=vram,
             torch_version="2.7.0+cu128",
             torch_cuda_version="12.8",
             torch_cuda_arch_list=["sm_120"],

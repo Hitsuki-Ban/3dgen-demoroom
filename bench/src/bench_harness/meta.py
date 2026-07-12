@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import math
+import re
 import struct
 from datetime import datetime
 from pathlib import Path
@@ -33,7 +34,39 @@ OPTIONAL_META_KEYS = frozenset(
     {
         "external_weight_revisions",
         "external_code_revisions",
+        "vram_measurement",
     }
+)
+STRING_MAP_OPTIONAL_META_KEYS = frozenset(
+    {
+        "external_weight_revisions",
+        "external_code_revisions",
+    }
+)
+VRAM_MEASUREMENT_KEYS = frozenset(
+    {
+        "schema_version",
+        "method",
+        "scope",
+        "gpu_uuid",
+        "gpu_index",
+        "cuda_device_ordinal",
+        "root_pid",
+        "sample_interval_ms",
+        "sample_count",
+        "max_matched_process_count",
+        "pid_namespace_verified",
+        "device_baseline_bytes",
+        "device_baseline_included",
+        "co_resident_processes_included",
+    }
+)
+VRAM_PROCESS_METHOD = "nvidia_smi_compute_process_mib_sampled_sum"
+VRAM_PROCESS_SCOPE = "inference_process_group"
+VRAM_RUNPOD_METHOD = "nvidia_smi_device_memory_mib_sampled"
+VRAM_RUNPOD_SCOPE = "runpod_exclusive_device"
+GPU_UUID_PATTERN = re.compile(
+    r"GPU-[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
 )
 REQUIRED_FAILURE_KEYS = frozenset(
     {
@@ -90,9 +123,11 @@ def load_run_metadata(path: Path) -> dict[str, Any]:
     if finished_at < started_at:
         raise ValueError("finished_at must not be earlier than started_at")
     _require_relative_file(raw["license_file"], "license_file")
-    for field in OPTIONAL_META_KEYS:
+    for field in STRING_MAP_OPTIONAL_META_KEYS:
         if field in raw:
             _require_string_map(raw[field], field)
+    if "vram_measurement" in raw:
+        _require_vram_measurement(raw["vram_measurement"], raw["peak_vram_bytes"])
     return raw
 
 
@@ -255,6 +290,93 @@ def _require_string_map(value: Any, field: str) -> None:
         isinstance(key, str) and key and isinstance(item, str) and item for key, item in value.items()
     ):
         raise ValueError(f"{field} must be an object with non-empty string keys and values")
+
+
+def _require_vram_measurement(value: Any, peak_vram_bytes: int) -> None:
+    if not isinstance(value, dict):
+        raise ValueError("vram_measurement must be an object")
+    keys = set(value)
+    missing = VRAM_MEASUREMENT_KEYS - keys
+    unknown = keys - VRAM_MEASUREMENT_KEYS
+    if missing:
+        raise ValueError(f"vram_measurement missing field(s): {', '.join(sorted(missing))}")
+    if unknown:
+        raise ValueError(f"vram_measurement contains unknown field(s): {', '.join(sorted(unknown))}")
+
+    _require_exact_int(value, "schema_version", 1)
+    method = _require_nested_string(value, "method", "vram_measurement")
+    scope = _require_nested_string(value, "scope", "vram_measurement")
+    gpu_uuid = _require_nested_string(value, "gpu_uuid", "vram_measurement")
+    if GPU_UUID_PATTERN.fullmatch(gpu_uuid) is None:
+        raise ValueError("vram_measurement.gpu_uuid must be a full GPU UUID")
+    gpu_index = _require_nested_int(value, "gpu_index", "vram_measurement")
+    if gpu_index < 0:
+        raise ValueError("vram_measurement.gpu_index must be non-negative")
+    _require_exact_int(value, "cuda_device_ordinal", 0)
+    root_pid = _require_nested_int(value, "root_pid", "vram_measurement")
+    if root_pid <= 0:
+        raise ValueError("vram_measurement.root_pid must be positive")
+    _require_exact_int(value, "sample_interval_ms", 500)
+    sample_count = _require_nested_int(value, "sample_count", "vram_measurement")
+    if sample_count <= 0:
+        raise ValueError("vram_measurement.sample_count must be positive")
+    max_process_count = _require_nested_int(value, "max_matched_process_count", "vram_measurement")
+    if max_process_count < 0:
+        raise ValueError("vram_measurement.max_matched_process_count must be non-negative")
+    pid_namespace_verified = _require_nested_bool(value, "pid_namespace_verified", "vram_measurement")
+    baseline_bytes = _require_nested_int(value, "device_baseline_bytes", "vram_measurement")
+    if baseline_bytes < 0:
+        raise ValueError("vram_measurement.device_baseline_bytes must be non-negative")
+    baseline_included = _require_nested_bool(value, "device_baseline_included", "vram_measurement")
+    co_resident_included = _require_nested_bool(
+        value,
+        "co_resident_processes_included",
+        "vram_measurement",
+    )
+    if peak_vram_bytes <= 0:
+        raise ValueError("peak_vram_bytes must be positive when vram_measurement is present")
+
+    if (method, scope) == (VRAM_PROCESS_METHOD, VRAM_PROCESS_SCOPE):
+        if max_process_count <= 0:
+            raise ValueError("process-group VRAM measurement must match at least one process")
+        if not pid_namespace_verified or baseline_bytes != 0 or baseline_included or co_resident_included:
+            raise ValueError("process-group VRAM measurement flags do not match its scope")
+    elif (method, scope) == (VRAM_RUNPOD_METHOD, VRAM_RUNPOD_SCOPE):
+        if max_process_count != 0:
+            raise ValueError("RunPod exclusive-device measurement must not report matched processes")
+        if pid_namespace_verified or not baseline_included or not co_resident_included:
+            raise ValueError("RunPod exclusive-device VRAM measurement flags do not match its scope")
+        if peak_vram_bytes <= baseline_bytes:
+            raise ValueError("RunPod peak_vram_bytes must exceed device_baseline_bytes")
+    else:
+        raise ValueError("vram_measurement method and scope are not a supported pair")
+
+
+def _require_nested_string(raw: dict[str, Any], field: str, parent: str) -> str:
+    value = raw[field]
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"{parent}.{field} must be a non-empty string")
+    return value
+
+
+def _require_nested_int(raw: dict[str, Any], field: str, parent: str) -> int:
+    value = raw[field]
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ValueError(f"{parent}.{field} must be an integer")
+    return value
+
+
+def _require_nested_bool(raw: dict[str, Any], field: str, parent: str) -> bool:
+    value = raw[field]
+    if not isinstance(value, bool):
+        raise ValueError(f"{parent}.{field} must be a boolean")
+    return value
+
+
+def _require_exact_int(raw: dict[str, Any], field: str, expected: int) -> None:
+    value = _require_nested_int(raw, field, "vram_measurement")
+    if value != expected:
+        raise ValueError(f"vram_measurement.{field} must equal {expected}")
 
 
 def _reject_json_constant(value: str) -> None:

@@ -13,6 +13,7 @@ from runner_utils import (
     LicenseSource,
     RuntimeSnapshot,
     TaskDefinition,
+    VramMeasurementError,
     collect_runtime_snapshot,
     load_tasks,
     parse_max_runtime_seconds,
@@ -22,7 +23,7 @@ from runner_utils import (
     run_with_peak_vram,
     should_retry_task_error,
     upload_task_increment_if_configured,
-    upload_task_increment_then_raise_timeout,
+    upload_task_increment_then_raise,
     utc_now,
     write_license_bundle,
     write_task_failure,
@@ -123,7 +124,7 @@ def run_task(
         started_monotonic = time.monotonic()
         command = build_direct3d_s2_command(image_path, raw_output_dir, task.seed, DEFAULT_PARAMETERS)
         try:
-            peak_vram_bytes = run_with_peak_vram(
+            vram_measurement = run_with_peak_vram(
                 command,
                 timeout_seconds,
                 "Direct3D-S2",
@@ -131,7 +132,7 @@ def run_task(
             )
             wall_clock_seconds = time.monotonic() - started_monotonic
             finished_iso = utc_now()
-            runtime = collect_runtime_snapshot(peak_vram_bytes, DEFAULT_PARAMETERS["attention_backend"])
+            runtime = collect_runtime_snapshot(vram_measurement, DEFAULT_PARAMETERS["attention_backend"])
             prepare_task_output(
                 task=task,
                 task_output_dir=task_output_dir,
@@ -163,8 +164,8 @@ def run_task(
                 started_at=first_started_iso,
                 finished_at=utc_now(),
             )
-            if isinstance(exc, TimeoutError):
-                upload_task_increment_then_raise_timeout(
+            if isinstance(exc, (TimeoutError, VramMeasurementError)):
+                upload_task_increment_then_raise(
                     task_output_dir,
                     task.id,
                     os.environ,
@@ -292,6 +293,7 @@ def prepare_task_output(
         "gpu_name": runtime.gpu_name,
         "wall_clock_seconds": wall_clock_seconds,
         "peak_vram_bytes": runtime.peak_vram_bytes,
+        "vram_measurement": runtime.vram.to_meta(),
         "seed": task.seed,
         "parameters": DEFAULT_PARAMETERS,
         "retry_count": retry_count,

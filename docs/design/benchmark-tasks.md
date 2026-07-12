@@ -90,6 +90,7 @@ image-to-3D モデルの学習分布に合わせ、全課題で統一する:
 3. **シード固定で 1 課題 × 1 回生成(N=1)**。予算($20 スタート)を優先した決定。生成ばらつきの展示は、予算に余裕が出た場合に注目課題のみ N=3 で第 2 弾として追加する。失敗(クラッシュ・空出力)はリトライとしてカウントし、回数を記録
 4. **手動修正は一切しない**。エクスポート(GLB 化)と共通最適化パイプライン(meshopt/KTX2、全モデル同一設定)のみ通す。**raw 出力も保存**し、サイトには最適化前後のサイズを併記
 5. 記録するメタデータ(JSON、スキーマは実装 Issue で確定): モデル名/コミットハッシュ/重みバージョン、GPU、生成時間(wall-clock)、ピーク VRAM、シード、全パラメータ、三角形数・頂点数、テクスチャ枚数と解像度、ファイルサイズ(raw / 最適化後)、リトライ回数
+   - 新規ピーク VRAM は 500ms 間隔の sampled peak とし、GPU UUID/index・CUDA ordinal・測定 scope・baseline 口径を `vram_measurement` に記録する。Linux process-group 値と RunPod exclusive-device 値は別 scope であり、同じ名前に暗黙変換しない。フィールドがない既存成果物は legacy device-total とする([実装契約](../../bench/README.md#vram-measurement-contract))
 
 ## 5. サイト表示との対応
 

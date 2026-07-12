@@ -46,6 +46,41 @@ def _valid_failure() -> dict[str, object]:
     }
 
 
+def _valid_process_vram_measurement() -> dict[str, object]:
+    return {
+        "schema_version": 1,
+        "method": "nvidia_smi_compute_process_mib_sampled_sum",
+        "scope": "inference_process_group",
+        "gpu_uuid": "GPU-11111111-2222-3333-4444-555555555555",
+        "gpu_index": 0,
+        "cuda_device_ordinal": 0,
+        "root_pid": 1234,
+        "sample_interval_ms": 500,
+        "sample_count": 12,
+        "max_matched_process_count": 3,
+        "pid_namespace_verified": True,
+        "device_baseline_bytes": 0,
+        "device_baseline_included": False,
+        "co_resident_processes_included": False,
+    }
+
+
+def _valid_runpod_vram_measurement() -> dict[str, object]:
+    measurement = _valid_process_vram_measurement()
+    measurement.update(
+        {
+            "method": "nvidia_smi_device_memory_mib_sampled",
+            "scope": "runpod_exclusive_device",
+            "max_matched_process_count": 0,
+            "pid_namespace_verified": False,
+            "device_baseline_bytes": 268_435_456,
+            "device_baseline_included": True,
+            "co_resident_processes_included": True,
+        }
+    )
+    return measurement
+
+
 def _write_minimal_glb(path: Path) -> None:
     _write_glb_json(path, b'{"asset":{"version":"2.0"}}')
 
@@ -103,6 +138,49 @@ def test_load_run_metadata_accepts_external_revision_fields(tmp_path: Path) -> N
     meta_file.write_text(json.dumps(meta), encoding="utf-8")
 
     assert load_run_metadata(meta_file) == meta
+
+
+@pytest.mark.parametrize(
+    "measurement",
+    [_valid_process_vram_measurement(), _valid_runpod_vram_measurement()],
+)
+def test_load_run_metadata_accepts_explicit_vram_measurement_scope(
+    tmp_path: Path,
+    measurement: dict[str, object],
+) -> None:
+    meta_file = tmp_path / "meta.json"
+    meta = _valid_meta()
+    meta["vram_measurement"] = measurement
+    meta_file.write_text(json.dumps(meta), encoding="utf-8")
+
+    assert load_run_metadata(meta_file) == meta
+
+
+@pytest.mark.parametrize(
+    ("mutation", "message"),
+    [
+        (lambda value: value.pop("gpu_uuid"), "missing field"),
+        (lambda value: value.update({"unexpected": True}), "unknown field"),
+        (lambda value: value.update({"gpu_uuid": "GPU-short"}), "full GPU UUID"),
+        (lambda value: value.update({"sample_interval_ms": 100}), "sample_interval_ms"),
+        (lambda value: value.update({"pid_namespace_verified": False}), "flags"),
+        (lambda value: value.update({"method": "device-total"}), "supported pair"),
+    ],
+)
+def test_load_run_metadata_rejects_invalid_vram_measurement_contract(
+    tmp_path: Path,
+    mutation,
+    message: str,
+) -> None:
+    meta_file = tmp_path / "meta.json"
+    meta = _valid_meta()
+    measurement = _valid_process_vram_measurement()
+    mutation(measurement)
+    meta["vram_measurement"] = measurement
+    meta_file.write_text(json.dumps(meta), encoding="utf-8")
+
+    with pytest.raises(ValueError, match=message):
+        load_run_metadata(meta_file)
 
 
 def test_load_run_metadata_rejects_unknown_schema_field(tmp_path: Path) -> None:

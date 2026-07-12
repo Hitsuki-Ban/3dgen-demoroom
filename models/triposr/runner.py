@@ -12,12 +12,13 @@ from typing import Any
 from runner_utils import (
     RuntimeSnapshot,
     TaskDefinition,
+    VramMeasurementError,
     collect_runtime_snapshot,
     load_tasks,
     parse_max_runtime_seconds,
     run_with_peak_vram,
     upload_task_increment_if_configured,
-    upload_task_increment_then_raise_timeout,
+    upload_task_increment_then_raise,
     utc_now,
     write_task_failure,
 )
@@ -82,7 +83,7 @@ def run_task(task: TaskDefinition, input_root: Path, output_root: Path, timeout_
     started_monotonic = time.monotonic()
     command = build_triposr_command(image_path, raw_output_dir, DEFAULT_PARAMETERS)
     try:
-        peak_vram_bytes = run_with_peak_vram(
+        vram_measurement = run_with_peak_vram(
             command,
             timeout_seconds,
             "TripoSR",
@@ -90,7 +91,7 @@ def run_task(task: TaskDefinition, input_root: Path, output_root: Path, timeout_
         )
         wall_clock_seconds = time.monotonic() - started_monotonic
         finished_iso = utc_now()
-        runtime = collect_runtime_snapshot(peak_vram_bytes, "sdpa")
+        runtime = collect_runtime_snapshot(vram_measurement, "sdpa")
         prepare_task_output(
             task=task,
             task_output_dir=task_output_dir,
@@ -120,8 +121,8 @@ def run_task(task: TaskDefinition, input_root: Path, output_root: Path, timeout_
             started_at=first_started_iso,
             finished_at=utc_now(),
         )
-        if isinstance(exc, TimeoutError):
-            upload_task_increment_then_raise_timeout(
+        if isinstance(exc, (TimeoutError, VramMeasurementError)):
+            upload_task_increment_then_raise(
                 task_output_dir,
                 task.id,
                 os.environ,
@@ -191,6 +192,7 @@ def prepare_task_output(
         "gpu_name": runtime.gpu_name,
         "wall_clock_seconds": wall_clock_seconds,
         "peak_vram_bytes": runtime.peak_vram_bytes,
+        "vram_measurement": runtime.vram.to_meta(),
         "seed": task.seed,
         "parameters": DEFAULT_PARAMETERS,
         "retry_count": retry_count,

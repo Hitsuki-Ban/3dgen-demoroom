@@ -8,12 +8,36 @@ from types import ModuleType
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+COMMON_PATH = REPO_ROOT / "models" / "common"
 MODEL_SPEC_PATH = REPO_ROOT / "models" / "direct3d-s2" / "model.json"
 DOCKERFILE_PATH = REPO_ROOT / "models" / "direct3d-s2" / "Dockerfile"
+sys.path.insert(0, str(COMMON_PATH))
+
+import runner_utils  # noqa: E402
+
+
+def _vram_measurement(gpu_name: str, peak_vram_bytes: int) -> runner_utils.VramMeasurement:
+    return runner_utils.VramMeasurement(
+        device=runner_utils.GpuDeviceIdentity(
+            index=0,
+            uuid="GPU-11111111-2222-3333-4444-555555555555",
+            name=gpu_name,
+            driver_model="N/A",
+            mig_mode="N/A",
+        ),
+        peak_vram_bytes=peak_vram_bytes,
+        device_baseline_bytes=0,
+        mode=runner_utils.PROCESS_GROUP_VRAM_MODE,
+        root_pid=1234,
+        sample_interval_ms=500,
+        sample_count=3,
+        max_matched_process_count=1,
+        pid_namespace_verified=True,
+    )
 
 
 def load_direct3d_s2_runner() -> ModuleType:
-    sys.path.insert(0, str(REPO_ROOT / "models" / "common"))
+    sys.path.insert(0, str(COMMON_PATH))
     runner_path = REPO_ROOT / "models" / "direct3d-s2" / "runner.py"
     spec = importlib.util.spec_from_file_location("direct3d_s2_runner", runner_path)
     if spec is None or spec.loader is None:
@@ -68,8 +92,7 @@ def test_prepare_direct3d_s2_task_output_writes_geometry_only_meta(tmp_path, mon
         seed=20260708,
     )
     runtime = runner.RuntimeSnapshot(
-        gpu_name="NVIDIA GeForce RTX 5090",
-        peak_vram_bytes=24 * 1024**3,
+        vram=_vram_measurement("NVIDIA GeForce RTX 5090", 24 * 1024**3),
         torch_version="2.7.1+cu128",
         torch_cuda_version="12.8",
         torch_cuda_arch_list=["sm_120"],
@@ -93,6 +116,8 @@ def test_prepare_direct3d_s2_task_output_writes_geometry_only_meta(tmp_path, mon
 
     meta = json.loads((tmp_path / "task-output" / "meta.json").read_text(encoding="utf-8"))
     assert meta["model_id"] == "direct3d-s2"
+    assert meta["vram_measurement"]["scope"] == "inference_process_group"
+    assert meta["vram_measurement"]["gpu_uuid"] == "GPU-11111111-2222-3333-4444-555555555555"
     assert meta["parameters"]["sdf_resolution"] == 1024
     assert meta["parameters"]["geometry_only"] is True
     assert (tmp_path / "task-output" / "output.glb").read_bytes() == b"glb"
