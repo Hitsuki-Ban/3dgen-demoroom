@@ -35,6 +35,11 @@ function load() {
     .then(async (r) => {
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const manifest = (await r.json()) as SiteManifest;
+      // JSON として valid でも DTO 形状が違えば error 扱いにする
+      // (SPA fallback で index.html が 200 で返る類の事故を render クラッシュにしない)
+      if (!Array.isArray(manifest?.entries) || !manifest.entries.every((e) => typeof e?.modelId === 'string')) {
+        throw new Error('unexpected manifest shape');
+      }
       state = { status: 'ready', manifest };
     })
     .catch(() => {

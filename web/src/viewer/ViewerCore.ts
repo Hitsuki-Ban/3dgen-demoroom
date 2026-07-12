@@ -38,6 +38,7 @@ export class ViewerCore {
   private panes = new Map<number, Pane>();
   private nextId = 1;
   private rafId = 0;
+  private envRT: THREE.WebGLRenderTarget;
   private envMap: THREE.Texture;
   private mode: DisplayMode = 'pbr';
   private cameraSync = true;
@@ -54,15 +55,34 @@ export class ViewerCore {
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
 
     const pmrem = new THREE.PMREMGenerator(this.renderer);
-    this.envMap = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    this.envRT = pmrem.fromScene(new RoomEnvironment(), 0.04);
+    this.envMap = this.envRT.texture;
+    pmrem.dispose(); // 生成後は不要(RT は envRT として保持し dispose() で解放)
 
     this.rafId = requestAnimationFrame(this.renderLoop);
   }
 
+  /** 課題詳細を離れるたびに呼ばれる(#59 で生成/破棄が繰り返される前提)。
+   *  renderer.dispose() はアプリ側リソースを解放しないため、
+   *  PMREM RT・共有テクスチャ・全ペインの GLTF リソースを明示的に破棄し、
+   *  最後に context を強制解放して古い WebGL context が溜まらないようにする */
   dispose() {
     cancelAnimationFrame(this.rafId);
     for (const pane of [...this.panes.values()]) this.removePane(pane.id);
+    this.envRT.dispose();
+    this.toonGradient?.dispose();
+    this.matcapTexture?.dispose();
+    this.uvTexture?.dispose();
     this.renderer.dispose();
+    // 古い context の解放を GC 任せにしない(ブラウザの同時 context 数上限で
+    // アクティブなビューアが落ちるのを防ぐ)。ただし context は canvas 単位で共有なので、
+    // canvas がまだ DOM にある場合(StrictMode の二重マウントで同じ canvas に
+    // 次の renderer が作られるケース)に即時 loss すると新しい renderer まで壊れる。
+    // 1 tick 後に canvas が DOM から外れているときだけ強制解放する
+    const canvas = this.renderer.domElement;
+    setTimeout(() => {
+      if (!canvas.isConnected) this.renderer.forceContextLoss();
+    }, 0);
   }
 
   /** ペインを登録し、モデル(正規化済みで modelRoot に追加される)を表示する。
@@ -111,15 +131,25 @@ export class ViewerCore {
     const pane = this.panes.get(id);
     if (!pane) return;
     pane.controls.dispose();
+    const keep = this.sharedTextures();
     pane.scene.traverse((o) => {
       if (o instanceof THREE.Mesh) {
         o.geometry.dispose();
-        disposeMaterial(o.material);
+        disposeMaterial(o.material, keep);
         const original = o.userData.originalMaterial as THREE.Material | undefined;
-        if (original && original !== o.material) disposeMaterial(original);
+        if (original && original !== o.material) disposeMaterial(original, keep);
       }
     });
     this.panes.delete(id);
+  }
+
+  /** ペイン間で使い回すモード用テクスチャ。マテリアル破棄時に巻き込まないための keep セット */
+  private sharedTextures(): Set<THREE.Texture> {
+    const keep = new Set<THREE.Texture>();
+    if (this.toonGradient) keep.add(this.toonGradient);
+    if (this.matcapTexture) keep.add(this.matcapTexture);
+    if (this.uvTexture) keep.add(this.uvTexture);
+    return keep;
   }
 
   getStats(id: number): PaneStats {
@@ -238,14 +268,15 @@ export class ViewerCore {
         o.geometry.computeVertexNormals();
       }
       // 前のモードの輪郭線メッシュを外す(ジオメトリは本体と共有なので dispose しない)
+      const keep = this.sharedTextures();
       for (const child of [...o.children]) {
         if (child.userData.isOutline) {
           o.remove(child);
-          disposeMaterial((child as THREE.Mesh).material);
+          disposeMaterial((child as THREE.Mesh).material, keep);
         }
       }
-      // モード用に生成した差し替えマテリアルはここで破棄する(共有テクスチャは dispose されない)
-      if (o.material !== original) disposeMaterial(o.material);
+      // モード用に生成した差し替えマテリアルはここで破棄する(共有テクスチャは keep で守る)
+      if (o.material !== original) disposeMaterial(o.material, keep);
       switch (mode) {
         case 'pbr':
           o.material = original;
@@ -408,6 +439,15 @@ function createOutlineMaterial(thickness: number): THREE.Material {
   return material;
 }
 
-function disposeMaterial(material: THREE.Material | THREE.Material[]) {
-  for (const m of Array.isArray(material) ? material : [material]) m.dispose();
+/** マテリアルと、それが参照するテクスチャ(map/normalMap/matcap 等)を破棄する。
+ *  keep に入っているテクスチャ(ペイン間共有のモード用テクスチャ)は残す。
+ *  material.dispose() はテクスチャを解放しないため、GLTF 原本マテリアルの
+ *  テクスチャはここで明示的に解放しないと詳細ページの出入りで VRAM が溜まる */
+function disposeMaterial(material: THREE.Material | THREE.Material[], keep?: Set<THREE.Texture>) {
+  for (const m of Array.isArray(material) ? material : [material]) {
+    for (const value of Object.values(m)) {
+      if (value instanceof THREE.Texture && !keep?.has(value)) value.dispose();
+    }
+    m.dispose();
+  }
 }

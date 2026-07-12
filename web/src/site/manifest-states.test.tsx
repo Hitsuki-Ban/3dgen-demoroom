@@ -75,6 +75,12 @@ it('HTTP エラーや不正 JSON もエラーとして表示する', async () =>
   expect(await screen.findByRole('alert')).toBeTruthy();
 });
 
+it('valid JSON でも manifest の形をしていなければエラーとして表示する', async () => {
+  fetchManifest = async () => new Response(JSON.stringify({ hello: 'world' }), { status: 200 });
+  render(<App />);
+  expect(await screen.findByRole('alert')).toBeTruthy();
+});
+
 it('failure セルは「ベンチ待機中」ではなく「生成失敗」として表示される', async () => {
   fetchManifest = async () => new Response(JSON.stringify(okManifest), { status: 200 });
   render(<TaskDetail taskId="chrome-espresso-machine" onBack={() => {}} />);
