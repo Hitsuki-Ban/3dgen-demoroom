@@ -1,6 +1,8 @@
 const RUN_ASSET_PREFIX = '/run-assets/';
-const RUN_OUTPUT_RE = /^[a-z0-9-]+\/[a-z0-9-]+\/output\.glb$/;
+const RUN_OUTPUT_RE = /^[a-z0-9-]+\/[a-z0-9-]+\/(?:output\.glb|thumb\.webp)$/;
 const RANGE_UNIT_RE = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/;
+const GLB_CACHE_CONTROL = 'public, max-age=31536000, immutable';
+const THUMB_CACHE_CONTROL = 'public, max-age=300, stale-while-revalidate=86400';
 
 type NormalizedRange = {
   start: number;
@@ -41,14 +43,24 @@ function runAssetKey(pathname: string): string | null {
   return `site-data/${relativePath}`;
 }
 
-function runAssetHeaders(object: R2Object, contentLength: number | null): Headers {
+function runAssetContentType(key: string): string {
+  if (key.endsWith('/output.glb')) return 'model/gltf-binary';
+  if (key.endsWith('/thumb.webp')) return 'image/webp';
+  throw new Error(`unsupported run asset key: ${key}`);
+}
+
+function runAssetCacheControl(key: string): string {
+  return key.endsWith('/thumb.webp') ? THUMB_CACHE_CONTROL : GLB_CACHE_CONTROL;
+}
+
+function runAssetHeaders(key: string, object: R2Object, contentLength: number | null): Headers {
   const headers = new Headers();
   object.writeHttpMetadata(headers);
-  headers.set('Content-Type', 'model/gltf-binary');
+  headers.set('Content-Type', runAssetContentType(key));
   if (contentLength === null) headers.delete('Content-Length');
   else headers.set('Content-Length', String(contentLength));
   headers.set('ETag', object.httpEtag);
-  headers.set('Cache-Control', 'public, max-age=31536000, immutable');
+  headers.set('Cache-Control', runAssetCacheControl(key));
   headers.set('Accept-Ranges', 'bytes');
   return headers;
 }
@@ -63,10 +75,10 @@ function rangeFailureHeaders(object: R2Object, contentRange?: string): Headers {
   return headers;
 }
 
-function notModified(object: R2Object): Response {
+function notModified(key: string, object: R2Object): Response {
   const headers = new Headers({
     'Accept-Ranges': 'bytes',
-    'Cache-Control': 'public, max-age=31536000, immutable',
+    'Cache-Control': runAssetCacheControl(key),
     ETag: object.httpEtag,
   });
   return new Response(null, {
@@ -201,7 +213,7 @@ async function getMatchingObject(
   });
   if (!object) return new Response('Not Found', { status: 404 });
   if (!('body' in object)) return repeatAfterVersionChange(request, env, key, canRepeat);
-  return new Response(object.body, { headers: runAssetHeaders(object, object.size) });
+  return new Response(object.body, { headers: runAssetHeaders(key, object, object.size) });
 }
 
 async function getMatchingRange(
@@ -220,7 +232,7 @@ async function getMatchingRange(
   if (!object) return new Response('Not Found', { status: 404 });
   if (!('body' in object)) return repeatAfterVersionChange(request, env, key, canRepeat);
 
-  const headers = runAssetHeaders(object, contentLength);
+  const headers = runAssetHeaders(key, object, contentLength);
   headers.set('Content-Range', `bytes ${range.start}-${range.end}/${object.size}`);
   return new Response(object.body, { status: 206, headers });
 }
@@ -258,11 +270,11 @@ async function serveRunAsset(request: Request, env: Env, key: string, canRepeat 
     if (!metadata) return new Response('Not Found', { status: 404 });
 
     if (ifNoneMatch !== null && ifNoneMatchMatches(ifNoneMatch, metadata.httpEtag)) {
-      return notModified(metadata);
+      return notModified(key, metadata);
     }
 
     if (request.method === 'HEAD') {
-      return new Response(null, { headers: runAssetHeaders(metadata, metadata.size) });
+      return new Response(null, { headers: runAssetHeaders(key, metadata, metadata.size) });
     }
 
     if (rangeHeader === null) return getMatchingObject(request, env, key, metadata, canRepeat);
@@ -291,7 +303,7 @@ async function serveRunAsset(request: Request, env: Env, key: string, canRepeat 
   // #52 の進捗表示が使う通常 GET は、追加 HEAD なしの単一 R2 read を維持する。
   const object = await env.SITE_DATA.get(key);
   if (!object) return new Response('Not Found', { status: 404 });
-  return new Response(object.body, { headers: runAssetHeaders(object, object.size) });
+  return new Response(object.body, { headers: runAssetHeaders(key, object, object.size) });
 }
 
 export default {

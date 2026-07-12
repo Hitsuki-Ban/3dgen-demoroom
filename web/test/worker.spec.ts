@@ -6,8 +6,12 @@ const MODEL_ID = 'triposr';
 const TASK_ID = 'task-one';
 const OBJECT_KEY = `site-data/${MODEL_ID}/${TASK_ID}/output.glb`;
 const ASSET_URL = `https://example.com/run-assets/${MODEL_ID}/${TASK_ID}/output.glb`;
+const THUMB_OBJECT_KEY = `site-data/${MODEL_ID}/${TASK_ID}/thumb.webp`;
+const THUMB_ASSET_URL = `https://example.com/run-assets/${MODEL_ID}/${TASK_ID}/thumb.webp?v=abc123`;
 const BODY_TEXT = '0123456789';
 const BODY = new TextEncoder().encode(BODY_TEXT);
+const THUMB_BODY_TEXT = 'webp-thumbnail';
+const THUMB_BODY = new TextEncoder().encode(THUMB_BODY_TEXT);
 
 function assetRequest(headers?: HeadersInit, method = 'GET'): Request {
   return new Request(ASSET_URL, { method, headers });
@@ -15,6 +19,14 @@ function assetRequest(headers?: HeadersInit, method = 'GET'): Request {
 
 async function fetchAsset(headers?: HeadersInit, method = 'GET'): Promise<Response> {
   return exports.default.fetch(assetRequest(headers, method));
+}
+
+function thumbRequest(headers?: HeadersInit, method = 'GET'): Request {
+  return new Request(THUMB_ASSET_URL, { method, headers });
+}
+
+async function fetchThumb(headers?: HeadersInit, method = 'GET'): Promise<Response> {
+  return exports.default.fetch(thumbRequest(headers, method));
 }
 
 async function responseBodyText(response: Response): Promise<string> {
@@ -90,10 +102,16 @@ beforeAll(async () => {
       cacheControl: 'max-age=60',
     },
   });
+  await env.SITE_DATA.put(THUMB_OBJECT_KEY, THUMB_BODY, {
+    httpMetadata: {
+      contentType: 'application/octet-stream',
+      cacheControl: 'public, max-age=31536000, immutable',
+    },
+  });
 });
 
 afterAll(async () => {
-  await env.SITE_DATA.delete(OBJECT_KEY);
+  await env.SITE_DATA.delete([OBJECT_KEY, THUMB_OBJECT_KEY]);
 });
 
 describe('run asset full responses', () => {
@@ -150,6 +168,57 @@ describe('run asset full responses', () => {
     const response = await exports.default.fetch('https://example.com/');
     expect(response.status).toBe(200);
     expect((await responseBodyText(response)).trim()).toBe('static asset fallback');
+  });
+});
+
+describe('thumbnail responses', () => {
+  it('serves the exact thumb.webp asset with its image MIME and a revalidating cache policy', async () => {
+    const response = await fetchThumb();
+
+    expect(response.status).toBe(200);
+    expect(await responseBodyText(response)).toBe(THUMB_BODY_TEXT);
+    expect(response.headers.get('Content-Type')).toBe('image/webp');
+    expect(response.headers.get('Content-Length')).toBe(String(THUMB_BODY.byteLength));
+    expect(response.headers.get('Cache-Control')).toBe(
+      'public, max-age=300, stale-while-revalidate=86400',
+    );
+    expect(response.headers.get('Cache-Control')).not.toContain('immutable');
+    expect(response.headers.get('Accept-Ranges')).toBe('bytes');
+  });
+
+  it('preserves the thumbnail cache policy on conditional 304 responses', async () => {
+    const object = await env.SITE_DATA.head(THUMB_OBJECT_KEY);
+    if (!object) throw new Error('test thumbnail is missing');
+
+    const response = await fetchThumb({ 'If-None-Match': object.httpEtag });
+
+    expect(response.status).toBe(304);
+    expect(response.headers.get('ETag')).toBe(object.httpEtag);
+    expect(response.headers.get('Cache-Control')).toBe(
+      'public, max-age=300, stale-while-revalidate=86400',
+    );
+    expect(response.headers.has('Content-Type')).toBe(false);
+  });
+
+  it('serves a thumbnail HEAD without a body', async () => {
+    const response = await fetchThumb(undefined, 'HEAD');
+
+    expect(response.status).toBe(200);
+    expect((await response.arrayBuffer()).byteLength).toBe(0);
+    expect(response.headers.get('Content-Type')).toBe('image/webp');
+    expect(response.headers.get('Content-Length')).toBe(String(THUMB_BODY.byteLength));
+  });
+
+  it('serves thumbnail byte ranges with the WebP MIME and thumbnail cache policy', async () => {
+    const response = await fetchThumb({ Range: 'bytes=0-3' });
+
+    expect(response.status).toBe(206);
+    expect(await responseBodyText(response)).toBe(THUMB_BODY_TEXT.slice(0, 4));
+    expect(response.headers.get('Content-Type')).toBe('image/webp');
+    expect(response.headers.get('Content-Range')).toBe(`bytes 0-3/${THUMB_BODY.byteLength}`);
+    expect(response.headers.get('Cache-Control')).toBe(
+      'public, max-age=300, stale-while-revalidate=86400',
+    );
   });
 });
 
@@ -381,6 +450,34 @@ describe('routing and policy precedence', () => {
     );
     expect(response.status).toBe(451);
     expect((await response.arrayBuffer()).byteLength).toBe(0);
+  });
+
+  it.each(['GET', 'HEAD'])('applies the Hunyuan geo restriction to thumbnail %s before object lookup', async (method) => {
+    const forbiddenBucket = new Proxy(env.SITE_DATA, {
+      get() {
+        throw new Error('geo-blocked thumbnail requests must not access R2');
+      },
+    });
+    const response = await worker.fetch(
+      new Request('https://example.com/run-assets/hunyuan3d-21/missing-task/thumb.webp', { method }),
+      { ASSETS: env.ASSETS, SITE_DATA: forbiddenBucket },
+    );
+
+    expect(response.status).toBe(451);
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    if (method === 'HEAD') expect((await response.arrayBuffer()).byteLength).toBe(0);
+  });
+
+  it.each([
+    'preview.webp',
+    'thumb.png',
+    'nested/thumb.webp',
+    'thumb.webp.bak',
+  ])('keeps non-contract run asset %s outside the R2 whitelist', async (name) => {
+    const response = await exports.default.fetch(
+      `https://example.com/run-assets/${MODEL_ID}/${TASK_ID}/${name}`,
+    );
+    expect(response.status).toBe(404);
   });
 
   it('returns 404 for a missing unrestricted object even with If-None-Match star', async () => {

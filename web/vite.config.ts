@@ -31,17 +31,18 @@ function serveTaskReferences(): Plugin {
   };
 }
 
-/** dev 時に outputs/site-data/ のベンチ成果物 GLB を /run-assets/ で配信する */
+/** dev 時に outputs/site-data/ のベンチ成果物 GLB / WebP を /run-assets/ で配信する */
 function serveRunOutputs(): Plugin {
   return {
     name: 'serve-run-outputs',
     configureServer(server) {
       server.middlewares.use('/run-assets', (req, res, next) => {
         const rel = decodeURIComponent((req.url ?? '').split('?')[0].replace(/^\//, ''));
-        if (!/^[a-z0-9-]+\/[a-z0-9-]+\/output\.glb$/.test(rel)) return next();
+        const match = /^[a-z0-9-]+\/[a-z0-9-]+\/(output\.glb|thumb\.webp)$/.exec(rel);
+        if (!match) return next();
         fs.readFile(path.join(runsDir, rel), (err, data) => {
           if (err) return next();
-          res.setHeader('Content-Type', 'model/gltf-binary');
+          res.setHeader('Content-Type', match[1] === 'thumb.webp' ? 'image/webp' : 'model/gltf-binary');
           res.setHeader('Cache-Control', 'no-cache');
           res.end(data);
         });

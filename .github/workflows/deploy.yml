@@ -35,6 +35,18 @@ jobs:
         working-directory: web
         run: pnpm test
 
+      - name: Audit published thumbnail freshness
+        working-directory: web
+        env:
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        run: >-
+          pnpm thumbnail:check -- s3://3dgen-runs/site-data
+          --expected-failure partcrafter/chrome-espresso-machine
+          --backend gpu
+          --report ../outputs/thumbnail-check-report.json
+
       - name: Sync benchmark results from R2
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
@@ -45,9 +57,11 @@ jobs:
           aws s3 sync "s3://3dgen-runs/site-data/" outputs/site-data/ --endpoint-url "${{ secrets.R2_ENDPOINT }}" --only-show-errors
           meta_count=$(find outputs/site-data -mindepth 3 -maxdepth 3 -name meta.json | wc -l)
           glb_count=$(find outputs/site-data -mindepth 3 -maxdepth 3 -name output.glb | wc -l)
+          thumb_count=$(find outputs/site-data -mindepth 3 -maxdepth 3 -name thumb.webp | wc -l)
           failure_count=$(find outputs/site-data -mindepth 3 -maxdepth 3 -name failure.json | wc -l)
           echo "synced top-level meta.json: ${meta_count}"
           echo "synced top-level output.glb: ${glb_count}"
+          echo "synced top-level thumb.webp: ${thumb_count}"
           echo "synced top-level failure.json: ${failure_count}"
 
       - name: Validate complete site-data snapshot

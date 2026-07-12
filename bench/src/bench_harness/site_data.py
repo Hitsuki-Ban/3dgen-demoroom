@@ -1,11 +1,17 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 from typing import Any, Iterable
 
+from PIL import Image, UnidentifiedImageError
+
 from bench_harness.meta import validate_failed_task_output, validate_task_output
 from bench_harness.tasks import load_tasks
+
+
+THUMBNAIL_SIZE = (320, 320)
 
 
 def load_model_ids(path: Path) -> tuple[str, ...]:
@@ -23,8 +29,14 @@ def parse_expected_failures(values: Iterable[str]) -> frozenset[tuple[str, str]]
     parsed: set[tuple[str, str]] = set()
     for value in values:
         parts = value.split("/")
-        if len(parts) != 2 or not all(parts) or not all(_is_safe_id(part) for part in parts):
-            raise ValueError(f"expected failure must be MODEL_ID/TASK_ID, received: {value}")
+        if (
+            len(parts) != 2
+            or not all(parts)
+            or not all(_is_safe_id(part) for part in parts)
+        ):
+            raise ValueError(
+                f"expected failure must be MODEL_ID/TASK_ID, received: {value}"
+            )
         cell = (parts[0], parts[1])
         if cell in parsed:
             raise ValueError(f"duplicate expected failure: {value}")
@@ -49,9 +61,13 @@ def build_site_manifest(
     task_ids = tuple(task.id for task in load_tasks(tasks_json))
     known_models = set(model_ids)
     known_tasks = set(task_ids)
-    unknown_expected = expected_failures - {(model_id, task_id) for model_id in model_ids for task_id in task_ids}
+    unknown_expected = expected_failures - {
+        (model_id, task_id) for model_id in model_ids for task_id in task_ids
+    }
     if unknown_expected:
-        formatted = ", ".join(f"{model}/{task}" for model, task in sorted(unknown_expected))
+        formatted = ", ".join(
+            f"{model}/{task}" for model, task in sorted(unknown_expected)
+        )
         raise ValueError(f"expected failure references unknown cell(s): {formatted}")
 
     _validate_directory_members(runs_root, known_models, "model")
@@ -83,9 +99,15 @@ def build_site_manifest(
     if actual_failures != expected_present_failures:
         expected = _format_cells(expected_present_failures)
         actual = _format_cells(actual_failures)
-        raise ValueError(f"failure matrix mismatch: expected [{expected}], received [{actual}]")
+        raise ValueError(
+            f"failure matrix mismatch: expected [{expected}], received [{actual}]"
+        )
 
-    manifest = {"generatedAt": generated_at, "partial": allow_partial, "entries": entries}
+    manifest = {
+        "generatedAt": generated_at,
+        "partial": allow_partial,
+        "entries": entries,
+    }
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(
         json.dumps(manifest, indent=2, ensure_ascii=False, allow_nan=False) + "\n",
@@ -102,15 +124,21 @@ def _load_cell(
 ) -> dict[str, Any]:
     meta_path = task_dir / "meta.json"
     glb_path = task_dir / "output.glb"
+    thumb_path = task_dir / "thumb.webp"
     failure_path = task_dir / "failure.json"
     has_meta = meta_path.is_file()
     has_glb = glb_path.is_file()
+    has_thumb = thumb_path.is_file()
     has_failure = failure_path.is_file()
     cell = f"{model_id}/{task_id}"
 
     if has_failure:
+        if has_thumb:
+            raise ValueError(f"failed site-data cell contains stale thumb.webp: {cell}")
         if has_meta or has_glb:
-            raise ValueError(f"site-data cell must be exclusively success or failed: {cell}")
+            raise ValueError(
+                f"site-data cell must be exclusively success or failed: {cell}"
+            )
         failure = validate_failed_task_output(task_dir)
         _validate_payload_ids(failure, model_id, task_id, failure_path)
         actual_failures.add((model_id, task_id))
@@ -132,7 +160,7 @@ def _load_cell(
         )
     meta = validate_task_output(task_dir)
     _validate_payload_ids(meta, model_id, task_id, meta_path)
-    return {
+    entry: dict[str, Any] = {
         "status": "success",
         "taskId": task_id,
         "modelId": model_id,
@@ -145,6 +173,43 @@ def _load_cell(
         },
         "meta": meta,
     }
+    if has_thumb:
+        _validate_thumbnail(thumb_path)
+        digest = _sha256_file(thumb_path)
+        entry["thumbUrl"] = f"/run-assets/{model_id}/{task_id}/thumb.webp?v={digest}"
+    return entry
+
+
+def _validate_thumbnail(path: Path) -> None:
+    try:
+        image = Image.open(path)
+    except (UnidentifiedImageError, OSError, SyntaxError, ValueError) as exc:
+        raise ValueError(f"{path} must be a decodable WebP image") from exc
+
+    with image:
+        if image.format != "WEBP":
+            raise ValueError(
+                f"{path} must use WebP format, received {image.format or 'unknown'}"
+            )
+        if image.size != THUMBNAIL_SIZE:
+            raise ValueError(
+                f"{path} must be {THUMBNAIL_SIZE[0]}x{THUMBNAIL_SIZE[1]} pixels, "
+                f"received {image.width}x{image.height}"
+            )
+        if getattr(image, "is_animated", False):
+            raise ValueError(f"{path} must be a static WebP image")
+        try:
+            image.load()
+        except (OSError, SyntaxError, ValueError) as exc:
+            raise ValueError(f"{path} must be a decodable WebP image") from exc
+
+
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def _validate_directory_members(root: Path, expected: set[str], label: str) -> None:
@@ -155,7 +220,9 @@ def _validate_directory_members(root: Path, expected: set[str], label: str) -> N
             raise ValueError(f"unknown {label} directory: {entry.name}")
 
 
-def _validate_payload_ids(payload: dict[str, Any], model_id: str, task_id: str, path: Path) -> None:
+def _validate_payload_ids(
+    payload: dict[str, Any], model_id: str, task_id: str, path: Path
+) -> None:
     if payload["model_id"] != model_id or payload["task_id"] != task_id:
         raise ValueError(
             f"{path} ID mismatch: expected {model_id}/{task_id}, "
@@ -164,7 +231,11 @@ def _validate_payload_ids(payload: dict[str, Any], model_id: str, task_id: str, 
 
 
 def _is_safe_id(value: str) -> bool:
-    return all(character.isascii() and (character.islower() or character.isdigit() or character == "-") for character in value)
+    return all(
+        character.isascii()
+        and (character.islower() or character.isdigit() or character == "-")
+        for character in value
+    )
 
 
 def _format_cells(cells: Iterable[tuple[str, str]]) -> str:

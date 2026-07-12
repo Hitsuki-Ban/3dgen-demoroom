@@ -66,6 +66,8 @@ export interface RunResult {
   modelId: string;
   /** GLB の URL(geo 制限モデルは /restricted/ プレフィックス) */
   glbUrl: string;
+  /** 生成済みの場合だけ付与される 320px WebP サムネイル URL */
+  thumbUrl?: string;
   glbSizeBytes: number;
   metrics: {
     wallClockSeconds: number;

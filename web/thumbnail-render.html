@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>3DGen thumbnail renderer</title>
+    <style>
+      html,
+      body {
+        width: 320px;
+        height: 320px;
+        margin: 0;
+        overflow: hidden;
+        background: transparent;
+      }
+
+      #thumbnail-pane,
+      #thumbnail-canvas {
+        position: absolute;
+        inset: 0;
+        width: 320px;
+        height: 320px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="thumbnail-pane" aria-hidden="true"></div>
+    <canvas id="thumbnail-canvas" width="320" height="320"></canvas>
+    <script type="module" src="/src/thumbnail-render.ts"></script>
+  </body>
+</html>
