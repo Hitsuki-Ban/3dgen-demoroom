@@ -7,6 +7,13 @@ function Stars({ n }: { n: number }) {
   return <span className="text-amber-400">{'★'.repeat(n)}</span>;
 }
 
+/** 一覧カードは build 時生成の 320px WebP を使う(#51)。原本 PNG(~1MiB/枚)は詳細ページ専用。
+ *  loading=lazy だけでは一覧全体が Chrome の先読み距離に入り 25 枚全部落ちてくるため、
+ *  サムネイル化そのもので初期転送を削減する */
+function thumbUrl(task: TaskInfo): string {
+  return task.referenceImage.replace('/references/', '/thumbs/').replace(/\.png$/, '.webp');
+}
+
 function TaskCard({
   task,
   resultCount,
@@ -21,7 +28,15 @@ function TaskCard({
       onClick={() => onSelect(task.id)}
       className="text-left rounded-lg border border-slate-700 overflow-hidden bg-slate-900/40 hover:border-sky-600 transition-colors"
     >
-      <img src={task.referenceImage} alt={task.id} loading="lazy" className="w-full aspect-square object-cover" />
+      {/* width/height 固定で CLS を防ぐ(表示は aspect-square が支配) */}
+      <img
+        src={thumbUrl(task)}
+        alt={task.id}
+        loading="lazy"
+        width={320}
+        height={320}
+        className="w-full aspect-square object-cover"
+      />
       <div className="px-3 py-2">
         <div className="flex items-center justify-between gap-2">
           <span className="text-sm font-medium truncate">{task.id}</span>
