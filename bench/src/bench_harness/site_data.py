@@ -12,6 +12,8 @@ from bench_harness.tasks import load_tasks
 
 
 THUMBNAIL_SIZE = (320, 320)
+# Worker の geo-restricted cache contract を manifest URL の cache key に含める。
+RESTRICTED_CACHE_POLICY_VERSIONS = {"hunyuan3d-21": "no-store-v1"}
 
 
 def load_model_ids(path: Path) -> tuple[str, ...]:
@@ -164,7 +166,7 @@ def _load_cell(
         "status": "success",
         "taskId": task_id,
         "modelId": model_id,
-        "glbUrl": f"/run-assets/{model_id}/{task_id}/output.glb",
+        "glbUrl": _run_asset_url(model_id, task_id, "output.glb"),
         "glbSizeBytes": glb_path.stat().st_size,
         "metrics": {
             "wallClockSeconds": meta["wall_clock_seconds"],
@@ -176,8 +178,27 @@ def _load_cell(
     if has_thumb:
         _validate_thumbnail(thumb_path)
         digest = _sha256_file(thumb_path)
-        entry["thumbUrl"] = f"/run-assets/{model_id}/{task_id}/thumb.webp?v={digest}"
+        entry["thumbUrl"] = _run_asset_url(
+            model_id, task_id, "thumb.webp", content_version=digest
+        )
     return entry
+
+
+def _run_asset_url(
+    model_id: str,
+    task_id: str,
+    filename: str,
+    *,
+    content_version: str | None = None,
+) -> str:
+    url = f"/run-assets/{model_id}/{task_id}/{filename}"
+    query: list[str] = []
+    if content_version is not None:
+        query.append(f"v={content_version}")
+    policy_version = RESTRICTED_CACHE_POLICY_VERSIONS.get(model_id)
+    if policy_version is not None:
+        query.append(f"policy={policy_version}")
+    return f"{url}?{'&'.join(query)}" if query else url
 
 
 def _validate_thumbnail(path: Path) -> None:

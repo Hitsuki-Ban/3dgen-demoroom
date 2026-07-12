@@ -93,11 +93,14 @@ unrestricted の `triposr/cartoon-apple/output.glb` で確認した結果:
 | `Range: bytes=0-0` | 206 | 206 | `Content-Range: bytes 0-0/3562436`, `Content-Length: 1` |
 | matching `If-None-Match` | 304 | 304 | full GET と同じ strong ETag |
 
-いずれも `Cache-Control: public, max-age=31536000, immutable` を維持するが、Worker
-entrypoint 自体の caching は無効なので、この browser / intermediary 向け header を根拠に
-geo 判定前の Worker response が再利用されることはない。
+上記 unrestricted GLB は `Cache-Control: public, max-age=31536000, immutable` を維持する。
+一方、Hunyuan3D 2.1 の allowed response は GLB / thumbnail と status (200 / 206 / 304) を
+問わず `Cache-Control: no-store` とする。Workers Caching だけでなく browser / intermediary
+にも保存させないため、許可地域で取得した user agent が別地域へ移動した場合も次の request で
+WAF / Worker の geo 判定を再実行する。manifest URL には `policy=no-store-v1` を付け、変更前の
+一年期 public / immutable response と cache key を分離する。
 
-Hunyuan3D 2.1 は最新 Custom Domain probe
+変更前の Hunyuan3D 2.1 は最新 Custom Domain probe
 ([Globalping measurement `2In3xJB1F14K9CPhl00020kN4`](https://globalping.io?measurement=2In3xJB1F14K9CPhl00020kN4))
 で JP 200、DE / GB / KR は zone WAF が 403 を返した。WAF を通らない workers.dev の
 独立 probe は前節の measurement のとおり JP 200、DE / GB / KR 451 + `no-store` で、

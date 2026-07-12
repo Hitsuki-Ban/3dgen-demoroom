@@ -28,11 +28,15 @@ const GEO_BLOCKED_COUNTRIES = new Set([
   'GB', 'KR',
 ]);
 
+function isGeoRestrictedAsset(key: string): boolean {
+  const modelId = key.slice('site-data/'.length).split('/')[0];
+  return GEO_RESTRICTED_MODELS.has(modelId);
+}
+
 /** ブロック対象モデルのアセットか、および閲覧国コードから遮断要否を判定する。
  * 国が判定できない場合はライセンス安全側(遮断)に倒す。 */
 export function isGeoBlocked(key: string, country: string | undefined): boolean {
-  const modelId = key.slice('site-data/'.length).split('/')[0];
-  if (!GEO_RESTRICTED_MODELS.has(modelId)) return false;
+  if (!isGeoRestrictedAsset(key)) return false;
   return !country || GEO_BLOCKED_COUNTRIES.has(country);
 }
 
@@ -50,6 +54,8 @@ function runAssetContentType(key: string): string {
 }
 
 function runAssetCacheControl(key: string): string {
+  // 許可地域で取得後に別地域へ移動しても、browser cache から geo 判定を迂回させない。
+  if (isGeoRestrictedAsset(key)) return 'no-store';
   return key.endsWith('/thumb.webp') ? THUMB_CACHE_CONTROL : GLB_CACHE_CONTROL;
 }
 
