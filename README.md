@@ -2,7 +2,7 @@
 
 オープンソースの 3D 生成モデル(text/image-to-3D)11 種を**同一の 25 課題・公式デフォルト設定・固定シード**でベンチマークし、生成メッシュそのものをブラウザで見比べられる公開展示室。
 
-### ▶ [展示サイトを開く](https://3dgen-demoroom.houtei-ban.workers.dev)
+### ▶ [展示サイトを開く](https://3dgen.hitsuki.space)
 
 <!-- TODO(screenshot-tool): サイトのヒーロースクリーンショット(ギャラリー+3ペイン比較)をここに挿入 -->
 
