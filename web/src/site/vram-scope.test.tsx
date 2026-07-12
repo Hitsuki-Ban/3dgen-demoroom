@@ -44,24 +44,37 @@ beforeEach(() => {
   );
 });
 
-it('口径の混在する課題で各セルに正しいラベルと tooltip が付く', async () => {
+it('口径の混在する課題で各セルに正しいラベルとアクセシブルな tooltip が付く', async () => {
   render(<TaskDetail taskId="cartoon-apple" onBack={() => {}} />);
 
   const legacy = await screen.findByText(/装置計・旧/);
   const process = screen.getByText(/プロセス計/);
   const device = screen.getByText(/専有装置計/);
 
-  // それぞれの説明 tooltip(title)が付いている
-  expect(legacy.closest('[title]')?.getAttribute('title')).toContain('legacy device total');
-  expect(process.closest('[title]')?.getAttribute('title')).toContain('共存プロセスは含みません');
-  expect(device.closest('[title]')?.getAttribute('title')).toContain('ベースラインを含みます');
+  // tooltip はキーボード/支援技術から到達可能:
+  // focusable(tabIndex=0)+ aria-describedby → role=tooltip の説明本文
+  for (const [labelEl, hintPart] of [
+    [legacy, 'legacy device total'],
+    [process, '共存プロセスは含みません'],
+    [device, 'ベースラインを含みます'],
+  ] as const) {
+    const trigger = labelEl.closest('[aria-describedby]')!;
+    expect(trigger.getAttribute('tabindex')).toBe('0');
+    const tooltip = document.getElementById(trigger.getAttribute('aria-describedby')!)!;
+    expect(tooltip.getAttribute('role')).toBe('tooltip');
+    expect(tooltip.textContent).toContain(hintPart);
+  }
 
   // 数値は補正されずそのまま(8GB 表示が 3 件)
   expect(screen.getAllByText(/VRAM 8\.0GB/).length).toBe(3);
 });
 
-it('vramScopeInfo は未知の scope を推測せず生の値で表示する', () => {
+it('vramScopeInfo: legacy は field 欠落のみ。壊れた記録は「口径不明」、未知 scope は生の値', () => {
   expect(vramScopeInfo({}).label).toBe('装置計・旧');
-  expect(vramScopeInfo({ vram_measurement: 'broken' }).label).toBe('装置計・旧');
+  // field があるのに読めない → legacy に落とさずデータ不正を可視化する(PR #82 レビュー指摘)
+  expect(vramScopeInfo({ vram_measurement: 'broken' }).label).toBe('口径不明');
+  expect(vramScopeInfo({ vram_measurement: {} }).label).toBe('口径不明');
+  expect(vramScopeInfo({ vram_measurement: { scope: '' } }).label).toBe('口径不明');
+  expect(vramScopeInfo({ vram_measurement: { scope: 42 } }).label).toBe('口径不明');
   expect(vramScopeInfo({ vram_measurement: { scope: 'future_scope_v9' } }).label).toBe('future_scope_v9');
 });

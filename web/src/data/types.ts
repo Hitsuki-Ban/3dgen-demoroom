@@ -60,6 +60,14 @@ export interface GeometryStats {
   optimizedSizeBytes: number;
 }
 
+/** meta.json の optional `vram_measurement`(#71 schema)のうち UI が読む部分。
+ *  全キーは bench/src/bench_harness/meta.py の VRAM_MEASUREMENT_KEYS が正本 */
+export interface VramMeasurementMeta {
+  scope: string;
+  device_baseline_included?: boolean;
+  co_resident_processes_included?: boolean;
+}
+
 export interface RunResult {
   status: 'success';
   taskId: string;
@@ -74,8 +82,9 @@ export interface RunResult {
     peakVramBytes: number;
     gpuName: string;
   };
-  /** Python schema で検証済みの完全な meta.json。meta modal 以外の表示は metrics を使う。 */
-  meta: Record<string, unknown>;
+  /** Python schema で検証済みの完全な meta.json。meta modal 以外の表示は metrics を使う。
+   *  `vram_measurement` は [[VramMeasurementMeta]] の形(存在すれば)— 読み手は防御的にパースすること */
+  meta: Record<string, unknown> & { vram_measurement?: unknown };
   /** 最適化パイプライン導入後に付与される */
   stats?: GeometryStats;
 }

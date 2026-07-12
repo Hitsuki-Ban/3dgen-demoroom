@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { MODELS } from '../data/models';
 import { TASKS } from '../data/tasks';
 import { useManifest } from '../data/useManifest';
@@ -11,19 +11,30 @@ import { ModelCard, ModelFailureCard } from './ModelCard';
 import { ViewerToolbar } from './ViewerToolbar';
 
 /** フッター 2 行目の実測サマリ。VRAM には計測口径ラベル+説明 tooltip を付ける(#72)。
- *  口径が違う値同士の直接比較を防ぐための識別表示で、数値の補正はしない */
+ *  口径が違う値同士の直接比較を防ぐための識別表示で、数値の補正はしない。
+ *  tooltip は native title でなく hover/focus で出す要素にする — キーボード・タッチ・
+ *  支援技術からも説明(baseline/共存プロセスの扱い)へ到達できるように(PR #82 レビュー指摘) */
 function ResultInfo({ result }: { result: RunResult }) {
   const { wallClockSeconds, peakVramBytes, gpuName } = result.metrics;
   const scope = vramScopeInfo(result.meta);
+  const hintId = useId();
   return (
     <>
       {wallClockSeconds.toFixed(1)}s /{' '}
       <span
-        title={scope.hint}
-        className="cursor-help underline decoration-dotted decoration-slate-600 underline-offset-2"
+        tabIndex={0}
+        aria-describedby={hintId}
+        className="group relative cursor-help underline decoration-dotted decoration-slate-600 underline-offset-2 focus:outline-none focus-visible:ring-1 focus-visible:ring-sky-500 rounded-sm"
       >
         VRAM {(peakVramBytes / 2 ** 30).toFixed(1)}GB
         <span className="text-slate-600">({scope.label})</span>
+        <span
+          id={hintId}
+          role="tooltip"
+          className="invisible group-hover:visible group-focus-within:visible pointer-events-none absolute left-0 bottom-full mb-1 z-10 w-64 rounded-md border border-slate-600 bg-slate-900 px-2.5 py-1.5 text-xs leading-relaxed text-slate-300 whitespace-normal"
+        >
+          {scope.hint}
+        </span>
       </span>{' '}
       / {(result.glbSizeBytes / 2 ** 20).toFixed(1)}MB / {gpuName}
     </>
