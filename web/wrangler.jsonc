@@ -3,6 +3,17 @@
   "name": "3dgen-demoroom",
   "main": "src/worker.ts",
   "compatibility_date": "2026-07-08",
+  // Fable が移行方針を決めるまでは既存 URL と Custom Domain を併存させる。
+  "workers_dev": true,
+  "preview_urls": false,
+  // hitsuki.space zone が Active になってから deploy する。
+  // Custom Domain は DNS レコードと証明書を Cloudflare 側で自動管理する。
+  "routes": [
+    {
+      "pattern": "3dgen.hitsuki.space",
+      "custom_domain": true
+    }
+  ],
   // GLB は 25MiB を超えるモデルがあるため R2 binding から /run-assets/* で配信する。
   // React bundle と参照画像だけ Workers Static Assets に載せる。
   "assets": {
