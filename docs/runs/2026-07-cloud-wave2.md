@@ -174,7 +174,7 @@ Both published prefixes were rechecked after upload:
 
 - Batch A: `trellis1` and `3dtopia-xl` complete and published, 25/25 each.
 - Batch B: `direct3d-s2`, `sf3d`, `trellis2`, `step1x-3d`, and `pixal3d` complete and published to R2, 25/25 each. Pixal3D's two 48GB CuMesh OOM tasks were replaced by unchanged-protocol 96GB exact retries under #46.
-- Batch C: `hunyuan3d-21` complete and published, 25/25 from a license-compliant non-EU run; the live Worker blocks EU27, GB, and KR with HTTP 451.
+- Batch C: `hunyuan3d-21` complete and published, 25/25 from a license-compliant non-EU run. At publication the live Worker blocked the 27 EU member-state codes, GB, and KR with HTTP 451; the Issue #67 audit later found that Cloudflare's EU geolocation set also contains seven separately coded EU regions (`AX/GF/GP/MF/MQ/RE/YT`) and expands both Worker and WAF lists to the official 34-code EU set plus GB/KR.
 - Final R2 deployment source: Pixal3D 25/25 with 75 site-data objects; Fable owns the post-merge Worker deployment and live verification for #46.
 - Final cloud cleanup: active pods `[]`, network volumes `[]`.
 - Final local cleanup: Docker has zero images, containers, volumes, and build cache. The #46 build cache and disposable F-drive data VHD were removed after verification, reclaiming about 46.4 GiB; Docker remains configured to recreate data under the ignored workspace path.
