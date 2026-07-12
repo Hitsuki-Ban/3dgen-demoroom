@@ -19,7 +19,8 @@ tasks/(25課題・リファレンス画像)
 
 - Three.js。**単一 WebGL コンテキスト**のシザービューポートで最大 11 モデルを同時レンダリング(コンテキスト数制限の回避と省メモリ)
 - カメラ同期つき比較、表示モード切替(PBR / ワイヤーフレーム / matcap / 法線 / UV チェッカー)
-- Hunyuan3D 2.1 の地域制限(EU / 英国 / 韓国)は Worker 側で HTTP 451 を返し、UI はライセンス解説プレースホルダを表示([web/src/worker.ts](../web/src/worker.ts))
+- 本番 URL は `https://3dgen.hitsuki.space`。Worker の Custom Domain は [web/wrangler.jsonc](../web/wrangler.jsonc)、zone の WAF / apex redirect は [infra/cloudflare/hitsuki-space/](../infra/cloudflare/hitsuki-space/) を source of truth とする
+- Hunyuan3D 2.1 の地域制限(EU / 英国 / 韓国)は、zone WAF が対象パスを入口で Block し、Worker も HTTP 451 を返す二層構成。UI はライセンス解説プレースホルダを表示する([web/src/worker.ts](../web/src/worker.ts))
 
 ## 再現性
 
@@ -41,6 +42,7 @@ tasks/(25課題・リファレンス画像)
 | [`models/`](../models/) | モデルごとの Dockerfile / runner(ピン留め済み) |
 | [`bench/`](../bench/) | 実行ハーネス(uv / Python)。タスク検証・メタデータ契約・RunPod 起動・R2 アップロード |
 | [`web/`](../web/) | 展示サイト(Vite + React + Three.js + Tailwind) |
+| [`infra/cloudflare/`](../infra/cloudflare/) | Custom Domain 周辺の Cloudflare zone 構成(Terraform) |
 | [`docs/design/`](design/) | ベンチマーク設計・実行プロトコル |
 | [`docs/research/`](research/) | モデル選定・GPU レンタル・ホスティングの調査記録(二重調査の突き合わせ形式) |
 | [`docs/runs/`](runs/) | クラウド実行レポート(コスト・イメージ digest・失敗の記録) |

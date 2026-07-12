@@ -25,6 +25,14 @@ outputs/
 # Generated site manifest
 web/public/manifest.json
 
+# Terraform (Cloudflare zone configuration)
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+backend.hcl
+*.auto.tfvars
+
 # OS / editor
 .DS_Store
 Thumbs.db
