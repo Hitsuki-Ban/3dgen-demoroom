@@ -3,7 +3,7 @@ import { MODELS } from '../data/models';
 import { TASKS } from '../data/tasks';
 import { useManifest } from '../data/useManifest';
 import { isRunResult, type ModelInfo, type RunFailure, type RunResult, type TaskInfo } from '../data/types';
-import { vramScopeInfo } from '../data/vramScope';
+import { parseVramMeasurement, vramScopeInfo } from '../data/vramScope';
 import { loadModel } from '../viewer/loadModel';
 import { ViewerProvider, useViewer } from '../viewer/ViewerContext';
 import { ViewerPane } from '../viewer/ViewerPane';
@@ -16,7 +16,7 @@ import { ViewerToolbar } from './ViewerToolbar';
  *  支援技術からも説明(baseline/共存プロセスの扱い)へ到達できるように(PR #82 レビュー指摘) */
 function ResultInfo({ result }: { result: RunResult }) {
   const { wallClockSeconds, peakVramBytes, gpuName } = result.metrics;
-  const scope = vramScopeInfo(result.meta);
+  const scope = vramScopeInfo(parseVramMeasurement(result.meta));
   const hintId = useId();
   return (
     <>
