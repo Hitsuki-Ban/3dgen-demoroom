@@ -6,7 +6,9 @@
   "type": "module",
   "scripts": {
     "dev": "node scripts/require-manifest.mjs && vite",
-    "build": "node scripts/require-manifest.mjs --reject-partial && tsc -p tsconfig.json && vite build && node scripts/copy-references.mjs",
+    "build": "node scripts/validate-wrangler-config.mjs && node scripts/require-manifest.mjs --reject-partial && tsc -p tsconfig.json && vite build && node scripts/copy-references.mjs",
+    "test": "node --test scripts/*.test.mjs",
+    "test:config": "node --test scripts/validate-wrangler-config.test.mjs",
     "test:manifest": "node --test scripts/require-manifest.test.mjs",
     "preview": "vite preview"
   },
@@ -21,6 +23,7 @@
     "@types/react-dom": "^19.2.0",
     "@types/three": "^0.185.0",
     "@vitejs/plugin-react": "^5.0.0",
+    "jsonc-parser": "^3.3.1",
     "tailwindcss": "^4.1.0",
     "typescript": "~5.9.0",
     "vite": "^8.1.0",

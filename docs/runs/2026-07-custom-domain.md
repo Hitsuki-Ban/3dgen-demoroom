@@ -51,12 +51,12 @@ Terraform plan は 3 add / 0 change / 0 destroy だけを含み、保存した p
 | Apex redirect ruleset | `7522cf5c7d9b48b9a74bd9725d026979`; version 1; 301 / path + query preserved |
 | Remote state | `s3://3dgen-runs/terraform/hitsuki-space/terraform.tfstate`; 11,462 bytes |
 
-Wrangler `4.107.0` で production build を deploy し、Custom Domain と read-only AAAA record、certificate が自動作成された。最初の deploy で、Wrangler 4 は未指定の `workers_dev` を無効化することが判明した。Issue の Phase 3 で Fable が移行方針を決めるまで既存 URL を維持する要件に従い、`workers_dev: true` を source of truth に追加して即時再 deploy した。最終 version は `3665aa5a-2613-4e1a-951f-4013dd7221ad` で、以下の 2 triggers を持つ。
+Wrangler `4.107.0` で production build を deploy し、Custom Domain と read-only AAAA record、certificate が自動作成された。最初の deploy で、Wrangler 4 は未指定の `workers_dev` を無効化することが判明した。Issue の Phase 3 で Fable が移行方針を決めるまで既存 URL を維持する要件に従い、`workers_dev: true` を source of truth に追加した。さらに暗黙の Preview URL を公開入口に増やさないよう `preview_urls: false` も明示した。最終 version は `6373eb8e-f673-442f-b8a7-128083ae9f96` で、Wrangler が報告する trigger は以下の 2 件だけである。
 
 - `https://3dgen-demoroom.houtei-ban.workers.dev`
 - `3dgen.hitsuki.space` Custom Domain (domain ID `5c288b3fb9ddcc30dcdac7f347e724cb6f7c3a98`)
 
-### Live verification (2026-07-12 13:00–13:04 JST)
+### Live verification (2026-07-12 13:00–13:11 JST)
 
 | Check | Result |
 |---|---|
@@ -81,7 +81,7 @@ WAF expression は Custom Domain host だけを対象とするため、workers.d
 - mock provider の `terraform test -verbose` は 1/1 pass。plan は apex DNS、WAF ruleset、redirect ruleset の 3 add で、WAF の 36 country codes、host / path、redirect の 301 / path / query 契約を検査した。
 - Worker と Terraform の country set は双方 36 unique codes で、差分 0 を機械比較した。
 - R2 の canonical `site-data/` から 274 success / 1 expected failure の完全な 11 models x 25 tasks snapshot を再構成し、production manifest validator と Vite build を通した。
-- Wrangler `4.107.0` の `deploy --dry-run` は、上記 production build の 31 assets、R2 / Static Assets bindings、Custom Domain route を検証して成功した。その同じ build を live deploy した。
+- Wrangler `4.107.0` の `deploy --dry-run` は、上記 production build の 31 assets、R2 / Static Assets bindings、Custom Domain route、明示した `workers_dev: true` / `preview_urls: false` を検証して成功した。その同じ build を live deploy し、Custom Domain と既存 workers.dev の 2 triggers だけであることを確認した。
 - R2 remote backend は既存の bucket-scoped credentials で初期化し、first apply 後に state object と 3 resources、続く no-change plan を確認した。
 - Terraform は `hitsuki.space` だけに限定した Zone Read / DNS Edit / Zone WAF Edit / Single Redirect Edit token を使った。live resources を state 外で作成する API fallback は使用していない。
 

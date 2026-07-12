@@ -5,6 +5,7 @@
   "compatibility_date": "2026-07-08",
   // Fable が移行方針を決めるまでは既存 URL と Custom Domain を併存させる。
   "workers_dev": true,
+  "preview_urls": false,
   // hitsuki.space zone が Active になってから deploy する。
   // Custom Domain は DNS レコードと証明書を Cloudflare 側で自動管理する。
   "routes": [
