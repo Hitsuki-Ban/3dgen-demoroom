@@ -16,7 +16,8 @@
     "thumbnail:render": "node scripts/thumbnail-renderer.mjs",
     "thumbnail:generate": "node scripts/generate-thumbnails.mjs",
     "thumbnail:check": "node scripts/generate-thumbnails.mjs --check",
-    "test:thumbnails": "node --test scripts/generate-thumbnails.test.mjs && node scripts/thumbnail-render-smoke.mjs"
+    "test:thumbnails": "node --test scripts/generate-thumbnails.test.mjs && node scripts/thumbnail-render-smoke.mjs",
+    "shots": "node scripts/capture-screenshots.mjs"
   },
   "dependencies": {
     "react": "^19.2.0",
