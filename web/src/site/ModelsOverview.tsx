@@ -5,12 +5,16 @@ import { ModelCard } from './ModelCard';
 
 /** 収録モデル一覧。manifest に結果があるモデルは status を 'done' に昇格して表示する */
 export function ModelsOverview() {
-  const results = useManifest().entries.filter(isRunResult);
+  const { status, manifest } = useManifest();
+  const results = manifest.entries.filter(isRunResult);
   const doneModels = new Set(results.map((r) => r.modelId));
 
   return (
     <section className="pt-10">
-      <h2 className="text-lg font-semibold pb-1">収録モデル({doneModels.size}/{MODELS.length} 実測済み)</h2>
+      <h2 className="text-lg font-semibold pb-1">
+        {/* manifest 未取得時に「0/11 実測済み」という誤った断定を出さない(#54) */}
+        収録モデル{status === 'ready' && `(${doneModels.size}/${MODELS.length} 実測済み)`}
+      </h2>
       <p className="text-sm text-slate-400 pb-3">
         選定根拠とライセンス調査は{' '}
         <a

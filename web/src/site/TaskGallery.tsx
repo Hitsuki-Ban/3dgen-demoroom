@@ -41,7 +41,7 @@ function TaskCard({
 }
 
 export function TaskGallery({ onSelect }: { onSelect: (id: string) => void }) {
-  const results = useManifest().entries.filter(isRunResult);
+  const results = useManifest().manifest.entries.filter(isRunResult);
   const countByTask = new Map<string, number>();
   for (const r of results) countByTask.set(r.taskId, (countByTask.get(r.taskId) ?? 0) + 1);
 

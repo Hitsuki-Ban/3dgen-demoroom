@@ -14,7 +14,8 @@ const TaskDetail = lazy(() => import('./site/TaskDetail').then((m) => ({ default
 const REPO_URL = 'https://github.com/Hitsuki-Ban/3dgen-demoroom';
 
 function Hero() {
-  const results = useManifest().entries.filter(isRunResult);
+  const { status, manifest, retry } = useManifest();
+  const results = manifest.entries.filter(isRunResult);
   const doneModels = new Set(results.map((r) => r.modelId)).size;
 
   return (
@@ -37,8 +38,27 @@ function Hero() {
       </div>
       <div className="flex flex-wrap gap-2 mt-4">
         <span className="text-xs px-2.5 py-1 rounded-full bg-slate-800 text-slate-300">{TASKS.length} 課題</span>
-        <span className="text-xs px-2.5 py-1 rounded-full bg-sky-900/60 text-sky-200">モデル {doneModels}/{MODELS.length} 実測済み</span>
+        {status === 'loading' ? (
+          <span className="text-xs px-2.5 py-1 rounded-full bg-slate-800 text-slate-400">実測データ読み込み中…</span>
+        ) : status === 'ready' ? (
+          <span className="text-xs px-2.5 py-1 rounded-full bg-sky-900/60 text-sky-200">モデル {doneModels}/{MODELS.length} 実測済み</span>
+        ) : null}
       </div>
+      {/* fetch 失敗を「0/11」という誤った正常表示にせず、明示バナー+再試行を出す(#54) */}
+      {status === 'error' && (
+        <div
+          role="alert"
+          className="mt-4 flex flex-wrap items-center gap-3 rounded-md border border-red-900 bg-red-950/40 px-3 py-2 text-sm text-red-200"
+        >
+          <span>実測データ(manifest)の読み込みに失敗しました。ネットワークを確認してください。</span>
+          <button
+            onClick={retry}
+            className="px-2.5 py-1 rounded-md border border-red-700 text-red-100 text-xs hover:bg-red-900/50"
+          >
+            再試行
+          </button>
+        </div>
+      )}
     </header>
   );
 }
