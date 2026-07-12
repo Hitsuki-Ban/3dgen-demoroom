@@ -26,7 +26,7 @@ export function MethodNote() {
         ))}
       </div>
       <p className="text-xs text-slate-500 mt-3">
-        補足: TripoSR / Pixal3D は出力の向きが課題(入力カメラ)ごとに変わるため、既定視点が傾くことがあります — これもモデル特性としてそのまま表示しています。
+        補足: 各モデルの出力座標系は揃っていないため、表示の向きだけを課題ごとに比較用へ整列しています(生成データは無修正。ツールバーの「向き補正」を OFF にすると各モデルが出力した生の向きに戻ります)。
         詳細なプロトコルは{' '}
         <a
           className="text-sky-400 hover:underline"

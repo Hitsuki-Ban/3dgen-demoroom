@@ -2,6 +2,7 @@ import { useEffect, useId, useState } from 'react';
 import { MODELS } from '../data/models';
 import { TASKS } from '../data/tasks';
 import { useManifest } from '../data/useManifest';
+import { resolveOrientationFix } from '../data/orientationFixes';
 import { isRunResult, type ModelInfo, type RunFailure, type RunResult, type TaskInfo } from '../data/types';
 import { parseVramMeasurement, vramScopeInfo } from '../data/vramScope';
 import { loadModel } from '../viewer/loadModel';
@@ -87,7 +88,8 @@ function ResultPane({
       sizeBytes={result.glbSizeBytes}
       downloadUrl={result.glbUrl}
       metaJson={JSON.stringify(result.meta, null, 2)}
-      orientationFix={m.orientationFix}
+      // セル単位の absolute viewing 回転(#85)。cell が model 既定 fix を置き換える(加算しない)
+      orientationFix={resolveOrientationFix(m.id, taskId)}
       // 未ロード/クリックロードのプレビューは、このモデル自身の出力サムネイル(#66/#73)を優先。
       // 古い manifest や失敗直後の再発行などで thumbUrl が無いセルはリファレンス画像に落とす
       previewImage={result.thumbUrl ?? task.referenceImage}
