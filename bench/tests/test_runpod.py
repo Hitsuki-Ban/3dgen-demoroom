@@ -1,7 +1,6 @@
 import pytest
-import os
-import shutil
-import subprocess
+import shlex
+from datetime import datetime, timezone
 from urllib.error import HTTPError
 
 from bench_harness.runpod import (
@@ -19,7 +18,10 @@ from bench_harness.runpod import (
     RunPodLaunchConfig,
     build_balance_query,
     build_cloud_run_command,
+    build_create_pod_request,
     build_pod_payload,
+    build_terminate_after,
+    parse_create_pod_response,
     parse_client_balance,
     request_json,
 )
@@ -31,6 +33,74 @@ def make_r2_credentials() -> R2Credentials:
         access_key_id="access-key",
         secret_access_key="secret-key",
     )
+
+
+def make_launch_config(*, startup_poll_seconds: float = 0) -> RunPodLaunchConfig:
+    return RunPodLaunchConfig(
+        name="3dgen-triposg-test",
+        image_name="ghcr.io/hitsuki-ban/3dgen-triposg@sha256:abc",
+        model_id="triposg",
+        s3_target="s3://3dgen-runs/runs/triposg/test/20260711T000000Z",
+        max_runtime_min=90,
+        gpu_type_ids=("NVIDIA GeForce RTX 4090",),
+        allowed_cuda_versions=("12.8",),
+        r2_credentials=make_r2_credentials(),
+        network_volume_id="volume-123",
+        data_center_id="EU-RO-1",
+        startup_timeout_min=10,
+        startup_poll_seconds=startup_poll_seconds,
+    )
+
+
+def graphql_create_response(pod_id: str = "pod-123") -> dict[str, object]:
+    return {"data": {"podFindAndDeployOnDemand": {"id": pod_id, "desiredStatus": "RUNNING"}}}
+
+
+def graphql_response_for(body: dict[str, object] | None, *, balance: float = 20.0) -> dict[str, object]:
+    assert body is not None
+    query = body["query"]
+    assert isinstance(query, str)
+    if "CurrentUserBalance" in query:
+        return {"data": {"myself": {"clientBalance": balance}}}
+    if "CreateBenchmarkPod" in query:
+        return graphql_create_response()
+    raise AssertionError(query)
+
+
+def payload_env(payload: dict[str, object]) -> dict[str, str]:
+    raw_env = payload["env"]
+    assert isinstance(raw_env, list)
+    return {item["key"]: item["value"] for item in raw_env}
+
+
+class FakeOwnershipCoordinator:
+    def __init__(
+        self,
+        *,
+        handoff_error: BaseException | None = None,
+        cleanup_claimed: bool = True,
+        cleanup_error: BaseException | None = None,
+    ) -> None:
+        self.events = []
+        self.handoff_error = handoff_error
+        self.cleanup_claimed = cleanup_claimed
+        self.cleanup_error = cleanup_error
+
+    def initialize(self, target, lifecycle_token, env) -> None:
+        self.events.append(("initialize", target, lifecycle_token, env))
+
+    def handoff(self, target, pod_id, lifecycle_token, env, *, timeout_seconds, poll_seconds) -> None:
+        assert timeout_seconds == 60.0
+        assert poll_seconds == 1.0
+        self.events.append(("handoff", target, pod_id, lifecycle_token, env))
+        if self.handoff_error is not None:
+            raise self.handoff_error
+
+    def claim_cleanup(self, target, pod_id, lifecycle_token, env) -> bool:
+        self.events.append(("claim_cleanup", target, pod_id, lifecycle_token, env))
+        if self.cleanup_error is not None:
+            raise self.cleanup_error
+        return self.cleanup_claimed
 
 
 WAVE2_MODELS = {
@@ -77,6 +147,39 @@ def test_build_balance_query_requests_client_balance() -> None:
     assert "clientBalance" in build_balance_query()
 
 
+def test_graphql_create_request_wraps_payload_in_typed_mutation() -> None:
+    payload = {"name": "benchmark", "terminateAfter": "2026-07-11T02:10:00Z"}
+
+    request = build_create_pod_request(payload)
+
+    assert "PodFindAndDeployOnDemandInput" in request["query"]
+    assert request["variables"] == {"input": payload}
+
+
+def test_server_hard_termination_covers_startup_runtime_and_evidence_grace() -> None:
+    deadline = build_terminate_after(
+        make_launch_config(),
+        now=datetime(2026, 7, 11, tzinfo=timezone.utc),
+    )
+
+    assert deadline == "2026-07-11T02:10:00Z"
+
+
+def test_server_hard_termination_rejects_naive_clock() -> None:
+    with pytest.raises(ValueError, match="timezone-aware"):
+        build_terminate_after(make_launch_config(), now=datetime(2026, 7, 11))
+
+
+def test_graphql_create_response_is_strict_and_surfaces_api_error() -> None:
+    assert parse_create_pod_response(graphql_create_response()) == {
+        "id": "pod-123",
+        "desiredStatus": "RUNNING",
+    }
+
+    with pytest.raises(RuntimeError, match="no capacity"):
+        parse_create_pod_response({"errors": [{"message": "no capacity"}]})
+
+
 def test_parse_client_balance_rejects_under_threshold() -> None:
     response = {"data": {"myself": {"clientBalance": 7.5}}}
 
@@ -90,20 +193,18 @@ def test_parse_client_balance_accepts_enough_balance() -> None:
     assert parse_client_balance(response, min_balance_usd=10.0) == 12.0
 
 
-def test_build_cloud_run_command_runs_model_then_uploads_to_s3() -> None:
+def test_build_cloud_run_command_passes_model_and_evidence_target_to_runtime() -> None:
     command = build_cloud_run_command(
         model_id="triposg",
         output_root="/work/output",
         s3_target="s3://3dgen-runs/runs/triposg/rtx-5090/20260708T000000Z",
     )
 
-    assert "python3 /opt/3dgen-runner/triposg_runner.py" in command
+    assert command.startswith("runpod ")
     assert "--input-root /opt/3dgen-tasks" in command
     assert "--output-root /work/output" in command
-    assert "python3 -m bench_harness.cli upload-s3" in command
-    assert "upload-s3 /work/output" not in command
-    assert command.count(f"upload-s3 {RUNPOD_TELEMETRY_ROOT} ") == 2
-    assert command.count("/work/output") == 1
+    assert f"--telemetry-root {RUNPOD_TELEMETRY_ROOT}" in command
+    assert "bench_harness.cli upload-s3" not in command
     assert "s3://3dgen-runs/runs/triposg/rtx-5090/20260708T000000Z" in command
 
 
@@ -160,7 +261,6 @@ def test_build_cloud_run_command_passes_task_limit_to_runner() -> None:
         task_limit=3,
     )
 
-    assert "python3 /opt/3dgen-runner/direct3d_s2_runner.py" in command
     assert "--task-limit 3" in command
 
 
@@ -257,66 +357,44 @@ def test_build_cloud_run_command_rejects_task_ids_for_unsupported_runner() -> No
         )
 
 
-def test_build_cloud_run_command_uploads_status_even_when_runner_fails() -> None:
+def test_build_cloud_run_command_delegates_the_complete_lifecycle_to_runtime_owner() -> None:
     command = build_cloud_run_command(
         model_id="triposg",
         output_root="/work/output",
         s3_target="s3://3dgen-runs/runs/triposg/wave1/20260708T000000Z",
     )
 
-    assert "mkdir -p /run/sshd" in command
-    assert "service ssh start" in command
-    assert "ssh_exit_code=$?" in command
-    assert "runpod-startup.json" in command
-    assert "telemetry_root = Path(sys.argv[1])" in command
-    assert "(telemetry_root / 'runpod-startup.json')" in command
-    assert "(telemetry_root / 'runpod-status.json')" in command
-    assert f"upload-s3 {RUNPOD_TELEMETRY_ROOT} " in command
-    assert "upload-s3 /work/output" not in command
+    assert command.startswith("runpod")
     assert "--output-root /work/output" in command
-    assert "startup_status_exit_code=$?" in command
-    assert "startup_upload_exit_code=$?" in command
-    assert command.index("service ssh start") < command.index("python3 /opt/3dgen-runner/triposg_runner.py")
-    assert command.index("runpod-startup.json") < command.index("python3 /opt/3dgen-runner/triposg_runner.py")
-    assert command.index("startup_upload_exit_code=$?") < command.index("python3 /opt/3dgen-runner/triposg_runner.py")
-    assert "runner_exit_code=$?" in command
-    assert "runpod-status.json" in command
-    assert "upload_exit_code=$?" in command
-    assert "status_exit_code=$?" in command
-    assert "bench_harness.cli upload-s3" in command
-    assert command.index("startup_upload_exit_code=$?") < command.index("runner_exit_code=$?")
-    assert command.index("runner_exit_code=$?") < command.rindex("bench_harness.cli upload-s3")
-    assert "https://rest.runpod.io/v1/pods/" in command
-    assert 'elif [ "$startup_upload_exit_code" -ne 0 ]; then' in command
-    assert 'if [ "$upload_exit_code" -ne 0 ]; then exit "$upload_exit_code"; fi' in command
-    assert 'if [ "$status_exit_code" -ne 0 ]; then exit "$status_exit_code"; fi' in command
-    assert "exit \"$runner_exit_code\"" in command
-    assert "&& PYTHONPATH=/opt/bench/src" not in command
+    assert f"--telemetry-root {RUNPOD_TELEMETRY_ROOT}" in command
+    assert "--s3-target s3://3dgen-runs/runs/triposg/wave1/20260708T000000Z" in command
+    assert "-- --input-root /opt/3dgen-tasks" in command
+    assert "bench_harness.cli upload-s3" not in command
+    assert "https://rest.runpod.io/v1/pods/" not in command
+    assert "PYTHONPATH=" not in command
 
 
-def test_build_cloud_run_command_has_valid_bash_syntax(tmp_path) -> None:
-    bash = shutil.which("bash")
-    if bash is None:
-        pytest.skip("bash is not available")
-    script_path = tmp_path / "runpod-command.sh"
-    script_path.write_text(
-        build_cloud_run_command(
-            model_id="triposg",
-            output_root="/work/output",
-            s3_target="s3://3dgen-runs/runs/triposg/wave1/20260708T000000Z",
-        ),
-        encoding="utf-8",
-        newline="\n",
+def test_build_cloud_run_command_is_valid_container_entrypoint_arguments() -> None:
+    command = build_cloud_run_command(
+        model_id="triposg",
+        output_root="/work/output",
+        s3_target="s3://3dgen-runs/runs/triposg/wave1/20260708T000000Z",
     )
 
-    bash_script_path = str(script_path)
-    if os.name == "nt" and bash.lower().endswith("bash.exe"):
-        bash_script_path = subprocess.check_output(
-            ["wsl", "wslpath", "-a", script_path.as_posix()],
-            text=True,
-        ).strip()
-
-    subprocess.run([bash, "-n", bash_script_path], check=True)
+    assert shlex.split(command) == [
+        "runpod",
+        "--output-root",
+        "/work/output",
+        "--telemetry-root",
+        RUNPOD_TELEMETRY_ROOT,
+        "--s3-target",
+        "s3://3dgen-runs/runs/triposg/wave1/20260708T000000Z",
+        "--",
+        "--input-root",
+        "/opt/3dgen-tasks",
+        "--output-root",
+        "/work/output",
+    ]
 
 
 def test_build_cloud_run_command_rejects_unknown_model() -> None:
@@ -337,7 +415,6 @@ def test_wave2_models_have_cloud_runner_paths(model_id: str, expected: dict[str,
     )
 
     assert MODEL_RUNNER_PATHS[model_id] == expected["runner"]
-    assert f"python3 {expected['runner']}" in command
     assert "--input-root /opt/3dgen-tasks" in command
     assert "--output-root /work/output" in command
 
@@ -359,15 +436,18 @@ def test_wave2_models_have_explicit_volume_weight_env(model_id: str, expected: d
             startup_timeout_min=10,
         ),
         runpod_api_key="token",
+        lifecycle_token="handoff-token",
+        terminate_after="2026-07-11T02:10:00Z",
     )
 
+    env = payload_env(payload)
     assert MODEL_WEIGHT_ENVS[model_id] == expected["env"]
     for name, value in expected["env"].items():
-        assert payload["env"][name] == value
-    assert payload["env"]["HF_HUB_OFFLINE"] == "1"
-    assert payload["env"]["TRANSFORMERS_OFFLINE"] == "1"
-    assert payload["env"]["TORCH_HOME"] == "/workspace/torch"
-    assert payload["env"]["U2NET_HOME"] == "/workspace/weights/rembg"
+        assert env[name] == value
+    assert env["HF_HUB_OFFLINE"] == "1"
+    assert env["TRANSFORMERS_OFFLINE"] == "1"
+    assert env["TORCH_HOME"] == "/workspace/torch"
+    assert env["U2NET_HOME"] == "/workspace/weights/rembg"
 
 
 def test_build_pod_payload_uses_on_demand_gpu_priority_and_runtime_env() -> None:
@@ -387,39 +467,43 @@ def test_build_pod_payload_uses_on_demand_gpu_priority_and_runtime_env() -> None
             task_limit=2,
         ),
         runpod_api_key="token",
+        lifecycle_token="handoff-token",
+        terminate_after="2026-07-11T02:10:00Z",
     )
 
+    env = payload_env(payload)
     assert payload["name"] == "3dgen-triposg-wave1"
     assert payload["imageName"] == "ghcr.io/hitsuki-ban/3dgen-triposg@sha256:abc"
     assert payload["cloudType"] == "SECURE"
     assert payload["computeType"] == "GPU"
-    assert payload["gpuTypeIds"] == ["NVIDIA GeForce RTX 5090", "NVIDIA GeForce RTX 4090"]
-    assert payload["gpuTypePriority"] == "custom"
+    assert payload["gpuTypeIdList"] == ["NVIDIA GeForce RTX 5090", "NVIDIA GeForce RTX 4090"]
     assert payload["allowedCudaVersions"] == ["12.8"]
-    assert payload["interruptible"] is False
-    assert payload["dataCenterIds"] == ["US-IL-1"]
-    assert payload["dataCenterPriority"] == "custom"
+    assert payload["dataCenterId"] == "US-IL-1"
     assert payload["networkVolumeId"] == "volume-123"
     assert payload["volumeMountPath"] == "/workspace"
     assert "containerRegistryAuthId" not in payload
     assert "volumeInGb" not in payload
-    assert payload["env"]["MAX_RUNTIME_MIN"] == "90"
-    assert payload["env"]["RUNPOD_RUN_MODEL_ID"] == "triposg"
-    assert payload["env"]["RUNPOD_API_KEY"] == "token"
-    assert payload["env"]["HF_HOME"] == "/workspace/hf"
-    assert payload["env"]["HF_HUB_OFFLINE"] == "1"
-    assert payload["env"]["TRANSFORMERS_OFFLINE"] == "1"
-    assert payload["env"]["TORCH_HOME"] == "/workspace/torch"
-    assert payload["env"]["U2NET_HOME"] == "/workspace/weights/rembg"
-    assert payload["env"]["RUNPOD_INCREMENTAL_S3_TARGET"] == "s3://3dgen-runs/runs/triposg/rtx-5090/20260708T000000Z"
-    assert payload["env"]["TRIPOSG_WEIGHTS_PATH"] == "/workspace/weights/TripoSG"
-    assert payload["env"]["RMBG_WEIGHTS_PATH"] == "/workspace/weights/RMBG-1.4"
-    assert payload["env"]["R2_ENDPOINT"] == "https://example.r2.cloudflarestorage.com"
-    assert payload["env"]["R2_ACCESS_KEY_ID"] == "access-key"
-    assert payload["env"]["R2_SECRET_ACCESS_KEY"] == "secret-key"
-    assert payload["dockerEntrypoint"] == ["bash", "-lc"]
-    assert "bench_harness.cli upload-s3" in payload["dockerStartCmd"][0]
-    assert "--task-limit 2" in payload["dockerStartCmd"][0]
+    assert env["MAX_RUNTIME_MIN"] == "90"
+    assert env["RUNPOD_RUN_MODEL_ID"] == "triposg"
+    assert env["RUNPOD_API_KEY"] == "token"
+    assert env["RUNPOD_LIFECYCLE_TOKEN"] == "handoff-token"
+    assert env["RUNPOD_HANDOFF_TIMEOUT_SECONDS"] == "600"
+    assert env["HF_HOME"] == "/workspace/hf"
+    assert env["HF_HUB_OFFLINE"] == "1"
+    assert env["TRANSFORMERS_OFFLINE"] == "1"
+    assert env["TORCH_HOME"] == "/workspace/torch"
+    assert env["U2NET_HOME"] == "/workspace/weights/rembg"
+    assert env["RUNPOD_INCREMENTAL_S3_TARGET"] == "s3://3dgen-runs/runs/triposg/rtx-5090/20260708T000000Z"
+    assert env["TRIPOSG_WEIGHTS_PATH"] == "/workspace/weights/TripoSG"
+    assert env["RMBG_WEIGHTS_PATH"] == "/workspace/weights/RMBG-1.4"
+    assert env["R2_ENDPOINT"] == "https://example.r2.cloudflarestorage.com"
+    assert env["R2_ACCESS_KEY_ID"] == "access-key"
+    assert env["R2_SECRET_ACCESS_KEY"] == "secret-key"
+    assert payload["dockerArgs"].startswith("runpod ")
+    assert "--task-limit 2" in payload["dockerArgs"]
+    assert payload["ports"] == "22/tcp"
+    assert payload["startSsh"] is True
+    assert payload["terminateAfter"] == "2026-07-11T02:10:00Z"
 
 
 def test_build_pod_payload_uses_container_registry_auth_id_when_provided() -> None:
@@ -439,6 +523,8 @@ def test_build_pod_payload_uses_container_registry_auth_id_when_provided() -> No
             startup_timeout_min=10,
         ),
         runpod_api_key="token",
+        lifecycle_token="handoff-token",
+        terminate_after="2026-07-11T02:10:00Z",
     )
 
     assert payload["containerRegistryAuthId"] == "cmrc1l2gc00847uotrnjn2des"
@@ -462,6 +548,8 @@ def test_build_pod_payload_rejects_empty_container_registry_auth_id() -> None:
                 startup_timeout_min=10,
             ),
             runpod_api_key="token",
+            lifecycle_token="handoff-token",
+            terminate_after="2026-07-11T02:10:00Z",
         )
 
 
@@ -482,6 +570,8 @@ def test_build_pod_payload_rejects_empty_network_volume_id() -> None:
                 startup_timeout_min=10,
             ),
             runpod_api_key="token",
+            lifecycle_token="handoff-token",
+            terminate_after="2026-07-11T02:10:00Z",
         )
 
 
@@ -502,6 +592,8 @@ def test_build_pod_payload_rejects_empty_data_center_id() -> None:
                 startup_timeout_min=10,
             ),
             runpod_api_key="token",
+            lifecycle_token="handoff-token",
+            terminate_after="2026-07-11T02:10:00Z",
         )
 
 
@@ -521,11 +613,14 @@ def test_build_pod_payload_uses_partcrafter_volume_weight_paths() -> None:
             startup_timeout_min=10,
         ),
         runpod_api_key="token",
+        lifecycle_token="handoff-token",
+        terminate_after="2026-07-11T02:10:00Z",
     )
 
-    assert payload["env"]["PARTCRAFTER_WEIGHTS_PATH"] == "/workspace/weights/PartCrafter"
-    assert payload["env"]["RMBG_WEIGHTS_PATH"] == "/workspace/weights/RMBG-1.4"
-    assert "TRIPOSG_WEIGHTS_PATH" not in payload["env"]
+    env = payload_env(payload)
+    assert env["PARTCRAFTER_WEIGHTS_PATH"] == "/workspace/weights/PartCrafter"
+    assert env["RMBG_WEIGHTS_PATH"] == "/workspace/weights/RMBG-1.4"
+    assert "TRIPOSG_WEIGHTS_PATH" not in env
 
 
 def test_r2_credentials_are_loaded_from_explicit_env() -> None:
@@ -559,13 +654,12 @@ def test_cloud_launcher_defaults_are_issue_25_values() -> None:
 
 def test_runpod_client_checks_balance_before_creating_pod() -> None:
     calls = []
+    coordinator = FakeOwnershipCoordinator()
 
     def fake_request(method: str, url: str, headers: dict[str, str], body: dict[str, object] | None) -> dict[str, object]:
         calls.append((method, url, headers, body))
         if url == "https://api.runpod.io/graphql":
-            return {"data": {"myself": {"clientBalance": 20.0}}}
-        if url == "https://rest.runpod.io/v1/pods":
-            return {"id": "pod-123", "desiredStatus": "RUNNING"}
+            return graphql_response_for(body)
         if url == "https://rest.runpod.io/v1/pods/pod-123":
             return {
                 "id": "pod-123",
@@ -575,7 +669,14 @@ def test_runpod_client_checks_balance_before_creating_pod() -> None:
             }
         raise AssertionError(url)
 
-    client = RunPodClient(api_key="token", request_json=fake_request, tcp_connect=lambda host, port, timeout: True)
+    client = RunPodClient(
+        api_key="token",
+        request_json=fake_request,
+        tcp_connect=lambda host, port, timeout: True,
+        ownership_coordinator=coordinator,
+        lifecycle_token_factory=lambda: "handoff-token",
+        utc_now=lambda: datetime(2026, 7, 11, tzinfo=timezone.utc),
+    )
     pod = client.launch_pod(
         RunPodLaunchConfig(
             name="3dgen-triposg-wave1",
@@ -601,24 +702,65 @@ def test_runpod_client_checks_balance_before_creating_pod() -> None:
         "desiredStatus": "RUNNING",
     }
     assert calls[0][0:2] == ("POST", "https://api.runpod.io/graphql")
-    assert calls[1][0:2] == ("POST", "https://rest.runpod.io/v1/pods")
+    assert calls[1][0:2] == ("POST", "https://api.runpod.io/graphql")
     assert calls[2][0:2] == ("GET", "https://rest.runpod.io/v1/pods/pod-123")
     assert calls[0][2] == {"Authorization": "Bearer token"}
     assert calls[1][2] == {"Authorization": "Bearer token"}
-    assert calls[1][3]["env"]["RUNPOD_API_KEY"] == "token"
-    assert calls[1][3]["env"]["R2_ENDPOINT"] == "https://example.r2.cloudflarestorage.com"
+    create_payload = calls[1][3]["variables"]["input"]
+    create_env = payload_env(create_payload)
+    assert create_env["RUNPOD_API_KEY"] == "token"
+    assert create_env["RUNPOD_LIFECYCLE_TOKEN"] == "handoff-token"
+    assert create_env["RUNPOD_HANDOFF_TIMEOUT_SECONDS"] == "600"
+    assert create_env["R2_ENDPOINT"] == "https://example.r2.cloudflarestorage.com"
+    assert create_payload["terminateAfter"] == "2026-07-11T02:10:00Z"
+    assert [event[0] for event in coordinator.events] == ["initialize", "handoff"]
+    assert coordinator.events[1][1:] == (
+        "s3://3dgen-runs/runs/triposg/rtx-5090/20260708T000000Z",
+        "pod-123",
+        "handoff-token",
+        make_r2_credentials().as_env(),
+    )
+
+
+def test_create_response_loss_still_sends_server_hard_termination_deadline() -> None:
+    create_error = OSError("GraphQL response lost after pod creation")
+    calls = []
+    coordinator = FakeOwnershipCoordinator()
+
+    def fake_request(method, url, headers, body):
+        calls.append((method, url, headers, body))
+        if "CurrentUserBalance" in body["query"]:
+            return graphql_response_for(body)
+        if "CreateBenchmarkPod" in body["query"]:
+            raise create_error
+        raise AssertionError(body)
+
+    client = RunPodClient(
+        api_key="token",
+        request_json=fake_request,
+        ownership_coordinator=coordinator,
+        lifecycle_token_factory=lambda: "handoff-token",
+        utc_now=lambda: datetime(2026, 7, 11, tzinfo=timezone.utc),
+    )
+
+    with pytest.raises(OSError) as caught:
+        client.launch_pod(make_launch_config(), min_balance_usd=5.0)
+
+    assert caught.value is create_error
+    create_payload = calls[1][3]["variables"]["input"]
+    assert create_payload["terminateAfter"] == "2026-07-11T02:10:00Z"
+    assert [event[0] for event in coordinator.events] == ["initialize"]
 
 
 def test_runpod_client_waits_for_ssh_port_before_startup_ready() -> None:
     calls = []
     tcp_checks = []
+    coordinator = FakeOwnershipCoordinator()
 
     def fake_request(method: str, url: str, headers: dict[str, str], body: dict[str, object] | None) -> dict[str, object]:
         calls.append((method, url, headers, body))
         if url == "https://api.runpod.io/graphql":
-            return {"data": {"myself": {"clientBalance": 20.0}}}
-        if url == "https://rest.runpod.io/v1/pods":
-            return {"id": "pod-123", "desiredStatus": "RUNNING"}
+            return graphql_response_for(body)
         if url == "https://rest.runpod.io/v1/pods/pod-123":
             return {"id": "pod-123", "publicIp": "203.0.113.10", "portMappings": {"22": 22001}}
         raise AssertionError(url)
@@ -627,7 +769,13 @@ def test_runpod_client_waits_for_ssh_port_before_startup_ready() -> None:
         tcp_checks.append((host, port, timeout_seconds))
         return len(tcp_checks) > 1
 
-    client = RunPodClient(api_key="token", request_json=fake_request, tcp_connect=fake_tcp_connect)
+    client = RunPodClient(
+        api_key="token",
+        request_json=fake_request,
+        tcp_connect=fake_tcp_connect,
+        ownership_coordinator=coordinator,
+        lifecycle_token_factory=lambda: "handoff-token",
+    )
     pod = client.launch_pod(
         RunPodLaunchConfig(
             name="3dgen-triposg-wave1",
@@ -649,6 +797,184 @@ def test_runpod_client_waits_for_ssh_port_before_startup_ready() -> None:
     assert pod == {"id": "pod-123", "publicIp": "203.0.113.10", "portMappings": {"22": 22001}}
     assert tcp_checks == [("203.0.113.10", 22001, 5.0), ("203.0.113.10", 22001, 5.0)]
     assert [call[0:2] for call in calls].count(("GET", "https://rest.runpod.io/v1/pods/pod-123")) == 2
+    assert [event[0] for event in coordinator.events] == ["initialize", "handoff"]
+
+
+def test_runpod_client_retains_ownership_when_runtime_handoff_cas_fails() -> None:
+    calls = []
+    handoff_error = OSError("R2 handoff publish failed")
+    coordinator = FakeOwnershipCoordinator(handoff_error=handoff_error)
+
+    def fake_request(method: str, url: str, headers: dict[str, str], body: dict[str, object] | None):
+        calls.append((method, url))
+        if url == "https://api.runpod.io/graphql":
+            return graphql_response_for(body)
+        if method == "GET" and url == "https://rest.runpod.io/v1/pods/pod-123":
+            return {"id": "pod-123", "publicIp": "203.0.113.10", "portMappings": {"22": 22001}}
+        if method == "DELETE" and url == "https://rest.runpod.io/v1/pods/pod-123":
+            return {}
+        raise AssertionError((method, url))
+
+    client = RunPodClient(
+        api_key="token",
+        request_json=fake_request,
+        tcp_connect=lambda host, port, timeout: True,
+        ownership_coordinator=coordinator,
+        lifecycle_token_factory=lambda: "handoff-token",
+    )
+
+    with pytest.raises(OSError) as caught:
+        client.launch_pod(make_launch_config(), min_balance_usd=5.0)
+
+    assert caught.value is handoff_error
+    assert calls[-1] == ("DELETE", "https://rest.runpod.io/v1/pods/pod-123")
+    assert [event[0] for event in coordinator.events] == ["initialize", "handoff", "claim_cleanup"]
+
+
+@pytest.mark.parametrize(
+    ("failure_mode", "expected_type", "message"),
+    [
+        ("http", RunPodApiError, "Internal Server Error"),
+        ("json", ValueError, "JSON object"),
+        ("tcp", LookupError, "tcp probe failed"),
+    ],
+)
+def test_runpod_client_terminates_known_pod_on_every_startup_poll_failure(
+    failure_mode: str,
+    expected_type: type[BaseException],
+    message: str,
+) -> None:
+    calls = []
+    coordinator = FakeOwnershipCoordinator()
+
+    def fake_request(method: str, url: str, headers: dict[str, str], body: dict[str, object] | None):
+        calls.append((method, url, headers, body))
+        if url == "https://api.runpod.io/graphql":
+            return graphql_response_for(body)
+        if method == "GET" and url == "https://rest.runpod.io/v1/pods/pod-123":
+            if failure_mode == "http":
+                raise RunPodApiError(
+                    method="GET",
+                    url=url,
+                    status_code=500,
+                    reason="Internal Server Error",
+                    response_body='{"error":"temporary failure"}',
+                )
+            if failure_mode == "json":
+                return []
+            return {"id": "pod-123", "publicIp": "203.0.113.10", "portMappings": {"22": 22001}}
+        if method == "DELETE" and url == "https://rest.runpod.io/v1/pods/pod-123":
+            return {}
+        raise AssertionError((method, url))
+
+    def fake_tcp_connect(host: str, port: int, timeout_seconds: float) -> bool:
+        if failure_mode == "tcp":
+            raise LookupError("tcp probe failed")
+        return True
+
+    client = RunPodClient(
+        api_key="token",
+        request_json=fake_request,
+        tcp_connect=fake_tcp_connect,
+        ownership_coordinator=coordinator,
+        lifecycle_token_factory=lambda: "handoff-token",
+    )
+
+    with pytest.raises(expected_type, match=message):
+        client.launch_pod(make_launch_config(), min_balance_usd=5.0)
+
+    assert [call[0:2] for call in calls][-1] == ("DELETE", "https://rest.runpod.io/v1/pods/pod-123")
+    assert [call[0:2] for call in calls].count(("DELETE", "https://rest.runpod.io/v1/pods/pod-123")) == 1
+    assert [event[0] for event in coordinator.events] == ["initialize", "claim_cleanup"]
+
+
+def test_runpod_client_preserves_startup_error_when_termination_fails(capsys) -> None:
+    primary_error = RunPodApiError(
+        method="GET",
+        url="https://rest.runpod.io/v1/pods/pod-123",
+        status_code=500,
+        reason="Internal Server Error",
+        response_body='{"error":"temporary failure"}',
+    )
+
+    def fake_request(method: str, url: str, headers: dict[str, str], body: dict[str, object] | None):
+        if url == "https://api.runpod.io/graphql":
+            return graphql_response_for(body)
+        if method == "GET" and url == "https://rest.runpod.io/v1/pods/pod-123":
+            raise primary_error
+        if method == "DELETE" and url == "https://rest.runpod.io/v1/pods/pod-123":
+            raise RuntimeError("delete failed")
+        raise AssertionError((method, url))
+
+    client = RunPodClient(
+        api_key="token",
+        request_json=fake_request,
+        ownership_coordinator=FakeOwnershipCoordinator(),
+        lifecycle_token_factory=lambda: "handoff-token",
+    )
+
+    with pytest.raises(RunPodApiError) as caught:
+        client.launch_pod(make_launch_config(), min_balance_usd=5.0)
+
+    assert caught.value is primary_error
+    report = capsys.readouterr().err
+    assert "RUNPOD_CLEANUP_FAILED pod_id=pod-123" in report
+    assert 'manual="runpodctl pod delete pod-123"' in report
+
+
+def test_launcher_never_deletes_after_cleanup_cas_reports_owner_changed(capsys) -> None:
+    coordinator = FakeOwnershipCoordinator(cleanup_claimed=False)
+
+    def fake_request(method: str, url: str, headers: dict[str, str], body: dict[str, object] | None):
+        if url == "https://api.runpod.io/graphql":
+            return graphql_response_for(body)
+        if method == "GET" and url == "https://rest.runpod.io/v1/pods/pod-123":
+            raise RuntimeError("poll failed after runtime won ownership")
+        if method == "DELETE":
+            raise AssertionError("launcher that lost cleanup CAS must not delete")
+        raise AssertionError((method, url))
+
+    client = RunPodClient(
+        api_key="token",
+        request_json=fake_request,
+        ownership_coordinator=coordinator,
+        lifecycle_token_factory=lambda: "handoff-token",
+    )
+
+    with pytest.raises(RuntimeError, match="poll failed"):
+        client.launch_pod(make_launch_config(), min_balance_usd=5.0)
+
+    assert "RUNPOD_CLEANUP_SKIPPED pod_id=pod-123 owner_changed_or_uncertain=true" in capsys.readouterr().err
+
+
+def test_launcher_cleanup_cas_outage_defers_to_server_deadline_without_racing_runtime(capsys) -> None:
+    startup_error = RuntimeError("startup poll failed")
+    coordinator = FakeOwnershipCoordinator(cleanup_error=OSError("R2 unavailable"))
+
+    def fake_request(method, url, headers, body):
+        if url == "https://api.runpod.io/graphql":
+            return graphql_response_for(body)
+        if method == "GET":
+            raise startup_error
+        if method == "DELETE":
+            raise AssertionError("launcher without cleanup CAS must not race runtime cleanup")
+        raise AssertionError((method, url))
+
+    client = RunPodClient(
+        api_key="token",
+        request_json=fake_request,
+        ownership_coordinator=coordinator,
+        lifecycle_token_factory=lambda: "handoff-token",
+        utc_now=lambda: datetime(2026, 7, 11, tzinfo=timezone.utc),
+    )
+
+    with pytest.raises(RuntimeError) as caught:
+        client.launch_pod(make_launch_config(), min_balance_usd=5.0)
+
+    assert caught.value is startup_error
+    report = capsys.readouterr().err
+    assert "RUNPOD_CLEANUP_FAILED pod_id=pod-123" in report
+    assert "owner_changed_or_uncertain=true terminate_after=2026-07-11T02:10:00Z" in report
 
 
 def test_runpod_client_reports_pod_disappearing_before_startup(monkeypatch) -> None:
@@ -660,9 +986,7 @@ def test_runpod_client_reports_pod_disappearing_before_startup(monkeypatch) -> N
     def fake_request(method: str, url: str, headers: dict[str, str], body: dict[str, object] | None) -> dict[str, object]:
         calls.append((method, url, headers, body))
         if url == "https://api.runpod.io/graphql":
-            return {"data": {"myself": {"clientBalance": 20.0}}}
-        if method == "POST" and url == "https://rest.runpod.io/v1/pods":
-            return {"id": "pod-123", "desiredStatus": "RUNNING"}
+            return graphql_response_for(body)
         if method == "GET" and url == "https://rest.runpod.io/v1/pods/pod-123":
             get_count = [call[0:2] for call in calls].count(("GET", "https://rest.runpod.io/v1/pods/pod-123"))
             if get_count == 1:
@@ -674,6 +998,8 @@ def test_runpod_client_reports_pod_disappearing_before_startup(monkeypatch) -> N
                 reason="Not Found",
                 response_body='{"error":"pod not found","status":404}',
             )
+        if method == "DELETE" and url == "https://rest.runpod.io/v1/pods/pod-123":
+            return {}
         raise AssertionError((method, url))
 
     monkeypatch.setattr("bench_harness.runpod.time.sleep", fake_sleep)
@@ -682,6 +1008,8 @@ def test_runpod_client_reports_pod_disappearing_before_startup(monkeypatch) -> N
         api_key="token",
         request_json=fake_request,
         tcp_connect=lambda host, port, timeout_seconds: False,
+        ownership_coordinator=FakeOwnershipCoordinator(),
+        lifecycle_token_factory=lambda: "handoff-token",
     )
 
     with pytest.raises(RuntimeError, match="disappeared before startup"):
@@ -705,10 +1033,11 @@ def test_runpod_client_reports_pod_disappearing_before_startup(monkeypatch) -> N
 
     assert [call[0:2] for call in calls] == [
         ("POST", "https://api.runpod.io/graphql"),
-        ("POST", "https://rest.runpod.io/v1/pods"),
+        ("POST", "https://api.runpod.io/graphql"),
         ("GET", "https://rest.runpod.io/v1/pods/pod-123"),
         ("SLEEP", 15),
         ("GET", "https://rest.runpod.io/v1/pods/pod-123"),
+        ("DELETE", "https://rest.runpod.io/v1/pods/pod-123"),
     ]
 
 
@@ -725,9 +1054,7 @@ def test_runpod_client_terminates_pod_when_startup_watchdog_expires(monkeypatch)
     def fake_request(method: str, url: str, headers: dict[str, str], body: dict[str, object] | None) -> dict[str, object]:
         calls.append((method, url, headers, body))
         if url == "https://api.runpod.io/graphql":
-            return {"data": {"myself": {"clientBalance": 20.0}}}
-        if method == "POST" and url == "https://rest.runpod.io/v1/pods":
-            return {"id": "pod-123", "desiredStatus": "RUNNING"}
+            return graphql_response_for(body)
         if method == "GET" and url == "https://rest.runpod.io/v1/pods/pod-123":
             return {"id": "pod-123", "publicIp": "", "desiredStatus": "RUNNING"}
         if method == "DELETE" and url == "https://rest.runpod.io/v1/pods/pod-123":
@@ -737,7 +1064,12 @@ def test_runpod_client_terminates_pod_when_startup_watchdog_expires(monkeypatch)
     monkeypatch.setattr("bench_harness.runpod.time.monotonic", fake_monotonic)
     monkeypatch.setattr("bench_harness.runpod.time.sleep", fake_sleep)
 
-    client = RunPodClient(api_key="token", request_json=fake_request)
+    client = RunPodClient(
+        api_key="token",
+        request_json=fake_request,
+        ownership_coordinator=FakeOwnershipCoordinator(),
+        lifecycle_token_factory=lambda: "handoff-token",
+    )
 
     with pytest.raises(TimeoutError, match="reachable SSH port"):
         client.launch_pod(
@@ -776,6 +1108,46 @@ def test_runpod_client_terminates_pod_idempotently() -> None:
     ]
 
 
+def test_runpod_client_retries_delete_transport_failures(monkeypatch) -> None:
+    attempts = 0
+    sleeps = []
+
+    def fake_request(method, url, headers, body):
+        nonlocal attempts
+        attempts += 1
+        if attempts < 3:
+            raise OSError("delete response lost")
+        return {}
+
+    monkeypatch.setattr("bench_harness.runpod.time.sleep", sleeps.append)
+
+    assert RunPodClient(api_key="token", request_json=fake_request).terminate_pod("pod-123") == {}
+    assert attempts == 3
+    assert sleeps == [1.0, 1.0]
+
+
+def test_runpod_client_treats_not_found_after_delete_response_loss_as_terminated(monkeypatch) -> None:
+    attempts = 0
+
+    def fake_request(method, url, headers, body):
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            raise OSError("delete response lost")
+        raise RunPodApiError(
+            method="DELETE",
+            url=url,
+            status_code=404,
+            reason="Not Found",
+            response_body='{"error":"pod not found"}',
+        )
+
+    monkeypatch.setattr("bench_harness.runpod.time.sleep", lambda seconds: None)
+
+    assert RunPodClient(api_key="token", request_json=fake_request).terminate_pod("pod-123") == {}
+    assert attempts == 2
+
+
 def test_request_json_accepts_runpod_list_response(monkeypatch) -> None:
     class FakeResponse:
         def __enter__(self):
@@ -793,6 +1165,27 @@ def test_request_json_accepts_runpod_list_response(monkeypatch) -> None:
     monkeypatch.setattr("bench_harness.runpod.urlopen", fake_urlopen)
 
     assert request_json("GET", "https://rest.runpod.io/v1/pods", {"Authorization": "Bearer token"}, None) == []
+
+
+def test_request_json_accepts_empty_runpod_delete_response(monkeypatch) -> None:
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc_value, traceback) -> None:
+            pass
+
+        def read(self) -> bytes:
+            return b""
+
+    monkeypatch.setattr("bench_harness.runpod.urlopen", lambda request, timeout: FakeResponse())
+
+    assert request_json(
+        "DELETE",
+        "https://rest.runpod.io/v1/pods/pod-123",
+        {"Authorization": "Bearer token"},
+        None,
+    ) == {}
 
 
 def test_request_json_includes_runpod_error_body(monkeypatch) -> None:

@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import json
+import secrets
 import socket
+import sys
 import time
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from pathlib import PurePosixPath
 from shlex import quote
-from typing import Any, Callable, Mapping
+from typing import Any, Callable, Mapping, Optional, Union
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
@@ -18,6 +21,10 @@ DEFAULT_MIN_BALANCE_USD = 5.0
 DEFAULT_MAX_RUNTIME_MIN = 90
 DEFAULT_GPU_TYPE_IDS = ("NVIDIA GeForce RTX 5090", "NVIDIA GeForce RTX 4090")
 DEFAULT_ALLOWED_CUDA_VERSIONS = ("12.8",)
+RUNPOD_HANDOFF_ACK_TIMEOUT_SECONDS = 60.0
+RUNPOD_EVIDENCE_GRACE_MIN = 30
+RUNPOD_TERMINATE_ATTEMPTS = 3
+RUNPOD_TERMINATE_RETRY_SECONDS = 1.0
 RUNPOD_VOLUME_MOUNT_PATH = "/workspace"
 RUNPOD_WEIGHT_ROOT = f"{RUNPOD_VOLUME_MOUNT_PATH}/weights"
 RUNPOD_HF_HOME = f"{RUNPOD_VOLUME_MOUNT_PATH}/hf"
@@ -73,9 +80,11 @@ MODEL_WEIGHT_ENVS = {
     },
 }
 
-JsonResponse = dict[str, object] | list[object]
-RequestJson = Callable[[str, str, dict[str, str], dict[str, object] | None], JsonResponse]
+JsonResponse = Union[dict[str, object], list[object]]
+RequestJson = Callable[[str, str, dict[str, str], Optional[dict[str, object]]], JsonResponse]
 TcpConnect = Callable[[str, int, float], bool]
+LifecycleTokenFactory = Callable[[], str]
+UtcNow = Callable[[], datetime]
 
 
 class RunPodApiError(RuntimeError):
@@ -111,6 +120,46 @@ class RunPodBalanceCheck:
     @property
     def headers(self) -> dict[str, str]:
         return {"Authorization": f"Bearer {self.api_key}"}
+
+
+@dataclass(frozen=True)
+class RunPodOwnershipCoordinator:
+    def initialize(self, target: str, lifecycle_token: str, env: Mapping[str, str]) -> None:
+        from bench_harness.runpod_handoff import initialize_launcher_ownership
+
+        initialize_launcher_ownership(target, lifecycle_token, env)
+
+    def handoff(
+        self,
+        target: str,
+        pod_id: str,
+        lifecycle_token: str,
+        env: Mapping[str, str],
+        *,
+        timeout_seconds: float,
+        poll_seconds: float,
+    ) -> None:
+        from bench_harness.runpod_handoff import handoff_to_runtime
+
+        handoff_to_runtime(
+            target,
+            pod_id,
+            lifecycle_token,
+            env,
+            timeout_seconds=timeout_seconds,
+            poll_seconds=poll_seconds,
+        )
+
+    def claim_cleanup(
+        self,
+        target: str,
+        pod_id: str,
+        lifecycle_token: str,
+        env: Mapping[str, str],
+    ) -> bool:
+        from bench_harness.runpod_handoff import claim_cleanup
+
+        return claim_cleanup(target, pod_id, lifecycle_token, "launcher", env)
 
 
 @dataclass(frozen=True)
@@ -165,6 +214,9 @@ class RunPodClient:
     api_key: str
     request_json: RequestJson | None = None
     tcp_connect: TcpConnect | None = None
+    ownership_coordinator: RunPodOwnershipCoordinator | None = None
+    lifecycle_token_factory: LifecycleTokenFactory | None = None
+    utc_now: UtcNow | None = None
 
     @property
     def headers(self) -> dict[str, str]:
@@ -186,22 +238,111 @@ class RunPodClient:
             {"query": build_balance_query()},
         )
         parse_client_balance(balance_response, min_balance_usd=min_balance_usd)
-        created_pod = self._request_json(
+        token_factory = self.lifecycle_token_factory or create_lifecycle_token
+        lifecycle_token = token_factory()
+        if not isinstance(lifecycle_token, str) or not lifecycle_token.strip():
+            raise ValueError("RunPod lifecycle token factory returned an empty token")
+        coordinator = self.ownership_coordinator or RunPodOwnershipCoordinator()
+        ownership_env = config.r2_credentials.as_env()
+        coordinator.initialize(config.s3_target, lifecycle_token, ownership_env)
+        now_fn = self.utc_now or utc_now
+        terminate_after = build_terminate_after(config, now=now_fn())
+        create_response = self._request_json(
             "POST",
-            f"{RUNPOD_REST_ENDPOINT}/pods",
+            RUNPOD_GRAPHQL_ENDPOINT,
             self.headers,
-            build_pod_payload(config, runpod_api_key=self.api_key),
+            build_create_pod_request(
+                build_pod_payload(
+                    config,
+                    runpod_api_key=self.api_key,
+                    lifecycle_token=lifecycle_token,
+                    terminate_after=terminate_after,
+                )
+            ),
         )
-        return self.wait_for_startup(
-            parse_pod_id(created_pod),
-            timeout_seconds=config.startup_timeout_min * 60,
-            poll_seconds=config.startup_poll_seconds,
-        )
+        created_pod = parse_create_pod_response(create_response)
+        pod_id = parse_pod_id(created_pod)
+        handed_off = False
+        handoff_started = False
+        launcher_cleanup_already_claimed = False
+        startup_error: BaseException | None = None
+        try:
+            pod = self.wait_for_startup(
+                pod_id,
+                timeout_seconds=config.startup_timeout_min * 60,
+                poll_seconds=config.startup_poll_seconds,
+            )
+            handoff_started = True
+            coordinator.handoff(
+                config.s3_target,
+                pod_id,
+                lifecycle_token,
+                ownership_env,
+                timeout_seconds=RUNPOD_HANDOFF_ACK_TIMEOUT_SECONDS,
+                poll_seconds=1.0,
+            )
+            handed_off = True
+            return pod
+        except BaseException as error:
+            startup_error = error
+            if handoff_started:
+                from bench_harness.runpod_handoff import RunPodHandoffTimeout
+
+                launcher_cleanup_already_claimed = isinstance(error, RunPodHandoffTimeout)
+            raise
+        finally:
+            if not handed_off:
+                cleanup_claimed = False
+                try:
+                    cleanup_claimed = coordinator.claim_cleanup(
+                        config.s3_target,
+                        pod_id,
+                        lifecycle_token,
+                        ownership_env,
+                    )
+                except BaseException as cleanup_error:
+                    message = format_cleanup_failure(pod_id, cleanup_error)
+                    print(message, file=sys.stderr, flush=True)
+                    cleanup_claimed = launcher_cleanup_already_claimed
+                if cleanup_claimed:
+                    try:
+                        self.terminate_pod(pod_id)
+                    except BaseException as cleanup_error:
+                        message = format_cleanup_failure(pod_id, cleanup_error)
+                        print(message, file=sys.stderr, flush=True)
+                        if startup_error is None:
+                            raise
+                else:
+                    print(
+                        f"RUNPOD_CLEANUP_SKIPPED pod_id={pod_id} "
+                        f"owner_changed_or_uncertain=true terminate_after={terminate_after}",
+                        file=sys.stderr,
+                        flush=True,
+                    )
 
     def terminate_pod(self, pod_id: str) -> JsonResponse:
         if not pod_id.strip():
             raise ValueError("RunPod pod_id is required")
-        return self._request_json("DELETE", f"{RUNPOD_REST_ENDPOINT}/pods/{pod_id}", self.headers, None)
+        last_error: Exception | None = None
+        for attempt in range(RUNPOD_TERMINATE_ATTEMPTS):
+            try:
+                return self._request_json(
+                    "DELETE",
+                    f"{RUNPOD_REST_ENDPOINT}/pods/{pod_id}",
+                    self.headers,
+                    None,
+                )
+            except RunPodApiError as error:
+                if error.status_code == 404:
+                    return {}
+                last_error = error
+            except Exception as error:
+                last_error = error
+            if attempt + 1 < RUNPOD_TERMINATE_ATTEMPTS:
+                time.sleep(RUNPOD_TERMINATE_RETRY_SECONDS)
+        if last_error is None:
+            raise AssertionError("RunPod termination retry loop completed without a result")
+        raise last_error
 
     def get_pod(self, pod_id: str) -> JsonResponse:
         if not pod_id.strip():
@@ -231,7 +372,6 @@ class RunPodClient:
             if pod_is_startup_ready(pod, tcp_connect=tcp_connect):
                 return pod
             if time.monotonic() >= deadline:
-                self.terminate_pod(pod_id)
                 raise TimeoutError(
                     f"RunPod pod {pod_id} did not expose a reachable SSH port within {timeout_seconds / 60:.1f} minutes"
                 )
@@ -253,12 +393,39 @@ def build_balance_query() -> str:
     return "query CurrentUserBalance { myself { clientBalance } }"
 
 
+def build_create_pod_query() -> str:
+    return (
+        "mutation CreateBenchmarkPod($input: PodFindAndDeployOnDemandInput!) { "
+        "podFindAndDeployOnDemand(input: $input) { id desiredStatus } }"
+    )
+
+
+def build_create_pod_request(payload: dict[str, Any]) -> dict[str, object]:
+    return {"query": build_create_pod_query(), "variables": {"input": payload}}
+
+
+def build_terminate_after(config: RunPodLaunchConfig, *, now: datetime) -> str:
+    if now.tzinfo is None or now.utcoffset() is None:
+        raise ValueError("RunPod hard-termination clock must be timezone-aware")
+    lifetime_minutes = config.startup_timeout_min + config.max_runtime_min + RUNPOD_EVIDENCE_GRACE_MIN
+    deadline = now.astimezone(timezone.utc) + timedelta(minutes=lifetime_minutes)
+    return deadline.isoformat(timespec="seconds").replace("+00:00", "Z")
+
+
+def create_lifecycle_token() -> str:
+    return secrets.token_urlsafe(32)
+
+
+def utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
 def parse_client_balance(response: dict[str, Any], min_balance_usd: float) -> float:
     try:
         balance = response["data"]["myself"]["clientBalance"]
     except KeyError as exc:
         raise ValueError("RunPod balance response missing data.myself.clientBalance") from exc
-    if isinstance(balance, bool) or not isinstance(balance, int | float):
+    if isinstance(balance, bool) or not isinstance(balance, (int, float)):
         raise ValueError("RunPod clientBalance must be numeric")
     balance = float(balance)
     if balance < min_balance_usd:
@@ -273,6 +440,26 @@ def parse_pod_id(response: JsonResponse) -> str:
     if not isinstance(pod_id, str) or not pod_id.strip():
         raise ValueError("RunPod create pod response missing id")
     return pod_id
+
+
+def parse_create_pod_response(response: JsonResponse) -> dict[str, object]:
+    if not isinstance(response, dict):
+        raise ValueError("RunPod create pod GraphQL response must be a JSON object")
+    errors = response.get("errors")
+    if errors is not None:
+        if not isinstance(errors, list) or not errors:
+            raise ValueError("RunPod create pod GraphQL errors must be a non-empty array")
+        first_error = errors[0]
+        if not isinstance(first_error, dict) or not isinstance(first_error.get("message"), str):
+            raise ValueError("RunPod create pod GraphQL error is missing message")
+        raise RuntimeError(f"RunPod create pod GraphQL error: {first_error['message']}")
+    data = response.get("data")
+    if not isinstance(data, dict):
+        raise ValueError("RunPod create pod GraphQL response missing data")
+    pod = data.get("podFindAndDeployOnDemand")
+    if not isinstance(pod, dict):
+        raise ValueError("RunPod create pod GraphQL response missing podFindAndDeployOnDemand")
+    return pod
 
 
 def pod_has_public_ip(response: dict[str, object]) -> bool:
@@ -335,6 +522,13 @@ def format_startup_state(response: dict[str, object] | None) -> str:
     return f" (last observed: {', '.join(parts)})"
 
 
+def format_cleanup_failure(pod_id: str, error: BaseException) -> str:
+    return (
+        f"RUNPOD_CLEANUP_FAILED pod_id={pod_id} error={type(error).__name__}: {error} "
+        f'manual="runpodctl pod delete {pod_id}"'
+    )
+
+
 def build_cloud_run_command(
     model_id: str,
     output_root: str,
@@ -344,10 +538,8 @@ def build_cloud_run_command(
     task_ids: tuple[str, ...] = (),
     retry_count: int = 0,
 ) -> str:
-    try:
-        runner_path = MODEL_RUNNER_PATHS[model_id]
-    except KeyError as exc:
-        raise ValueError(f"unknown model for RunPod cloud run: {model_id}") from exc
+    if model_id not in MODEL_RUNNER_PATHS:
+        raise ValueError(f"unknown model for RunPod cloud run: {model_id}")
     if not s3_target.startswith("s3://"):
         raise ValueError("RunPod cloud run S3 target must use s3://")
     if task_limit is not None and task_limit <= 0:
@@ -389,143 +581,17 @@ def build_cloud_run_command(
     quoted_output_root = quote(output_root)
     quoted_telemetry_root = quote(RUNPOD_TELEMETRY_ROOT)
     quoted_s3_target = quote(s3_target)
-    quoted_model_id = quote(model_id)
-    run_command = (
-        f"python3 {quote(runner_path)} "
-        f"--input-root {quote('/opt/3dgen-tasks')} "
-        f"--output-root {quoted_output_root}"
-    )
+    run_command = f"--input-root {quote('/opt/3dgen-tasks')} --output-root {quoted_output_root}"
     if task_limit is not None:
         run_command = f"{run_command} --task-limit {task_limit}"
     for task_id in task_ids:
         run_command = f"{run_command} --task-id {quote(task_id)}"
     if retry_count > 0:
         run_command = f"{run_command} --retry-count {retry_count}"
-    ssh_command = (
-        "mkdir -p /run/sshd\n"
-        "if [ -n \"${PUBLIC_KEY:-}\" ]; then\n"
-        "  mkdir -p /root/.ssh\n"
-        "  printf '%s\\n' \"$PUBLIC_KEY\" >> /root/.ssh/authorized_keys\n"
-        "  chmod 700 /root/.ssh\n"
-        "  chmod 600 /root/.ssh/authorized_keys\n"
-        "fi\n"
-        "service ssh start\n"
-        "ssh_exit_code=$?"
-    )
-    startup_status_command = (
-        "python3 - "
-        f"{quoted_telemetry_root} {quoted_model_id} {quoted_s3_target} "
-        '"$ssh_exit_code" <<\'PY_RUNPOD_STARTUP\'\n'
-        "from __future__ import annotations\n"
-        "import json\n"
-        "import os\n"
-        "import sys\n"
-        "from datetime import datetime, timezone\n"
-        "from pathlib import Path\n"
-        "\n"
-        "telemetry_root = Path(sys.argv[1])\n"
-        "model_id = sys.argv[2]\n"
-        "s3_target = sys.argv[3]\n"
-        "ssh_exit_code = int(sys.argv[4])\n"
-        "telemetry_root.mkdir(parents=True, exist_ok=True)\n"
-        "status = {\n"
-        "    'model_id': model_id,\n"
-        "    'pod_id': os.environ.get('RUNPOD_POD_ID'),\n"
-        "    's3_target': s3_target,\n"
-        "    'ssh_exit_code': ssh_exit_code,\n"
-        "    'started_at': datetime.now(timezone.utc).isoformat(),\n"
-        "    'status': 'started',\n"
-        "}\n"
-        "(telemetry_root / 'runpod-startup.json').write_text(json.dumps(status, indent=2, sort_keys=True) + '\\n', encoding='utf-8')\n"
-        "PY_RUNPOD_STARTUP"
-    )
-    startup_upload_command = (
-        "PYTHONPATH=/opt/bench/src "
-        f"python3 -m bench_harness.cli upload-s3 {quoted_telemetry_root} {quoted_s3_target}"
-    )
-    status_command = (
-        "python3 - "
-        f"{quoted_telemetry_root} {quoted_model_id} {quoted_s3_target} "
-        '"$runner_exit_code" <<\'PY_RUNPOD_STATUS\'\n'
-        "from __future__ import annotations\n"
-        "import json\n"
-        "import os\n"
-        "import sys\n"
-        "from datetime import datetime, timezone\n"
-        "from pathlib import Path\n"
-        "\n"
-        "telemetry_root = Path(sys.argv[1])\n"
-        "model_id = sys.argv[2]\n"
-        "s3_target = sys.argv[3]\n"
-        "runner_exit_code = int(sys.argv[4])\n"
-        "telemetry_root.mkdir(parents=True, exist_ok=True)\n"
-        "status = {\n"
-        "    'finished_at': datetime.now(timezone.utc).isoformat(),\n"
-        "    'model_id': model_id,\n"
-        "    'pod_id': os.environ.get('RUNPOD_POD_ID'),\n"
-        "    'runner_exit_code': runner_exit_code,\n"
-        "    'self_termination_configured': bool(os.environ.get('RUNPOD_POD_ID') and os.environ.get('RUNPOD_API_KEY')),\n"
-        "    's3_target': s3_target,\n"
-        "    'status': 'ok' if runner_exit_code == 0 else 'failed',\n"
-        "}\n"
-        "(telemetry_root / 'runpod-status.json').write_text(json.dumps(status, indent=2, sort_keys=True) + '\\n', encoding='utf-8')\n"
-        "PY_RUNPOD_STATUS"
-    )
-    upload_command = (
-        "PYTHONPATH=/opt/bench/src "
-        f"python3 -m bench_harness.cli upload-s3 {quoted_telemetry_root} {quoted_s3_target}"
-    )
-    terminate_command = (
-        "python3 - <<'PY_RUNPOD_TERMINATE'\n"
-        "from __future__ import annotations\n"
-        "import os\n"
-        "import urllib.request\n"
-        "\n"
-        "pod_id = os.environ.get('RUNPOD_POD_ID')\n"
-        "api_key = os.environ.get('RUNPOD_API_KEY')\n"
-        "if not pod_id or not api_key:\n"
-        "    print('RunPod self-termination warning: RUNPOD_POD_ID or RUNPOD_API_KEY is missing', flush=True)\n"
-        "else:\n"
-        "    request = urllib.request.Request(\n"
-        "        f'https://rest.runpod.io/v1/pods/{pod_id}',\n"
-        "        method='DELETE',\n"
-        "        headers={\n"
-        "            'Authorization': f'Bearer {api_key}',\n"
-        "            'User-Agent': '3dgen-demoroom-bench-harness/0.1',\n"
-        "        },\n"
-        "    )\n"
-        "    try:\n"
-        "        urllib.request.urlopen(request, timeout=30).read()\n"
-        "    except Exception as exc:\n"
-        "        print(f'RunPod self-termination warning: {exc}', flush=True)\n"
-        "PY_RUNPOD_TERMINATE"
-    )
     return (
-        "set +e\n"
-        "runner_exit_code=0\n"
-        f"{ssh_command}\n"
-        f"{startup_status_command}\n"
-        "startup_status_exit_code=$?\n"
-        f"{startup_upload_command}\n"
-        "startup_upload_exit_code=$?\n"
-        "if [ \"$ssh_exit_code\" -ne 0 ]; then\n"
-        "  runner_exit_code=\"$ssh_exit_code\"\n"
-        "elif [ \"$startup_status_exit_code\" -ne 0 ]; then\n"
-        "  runner_exit_code=\"$startup_status_exit_code\"\n"
-        "elif [ \"$startup_upload_exit_code\" -ne 0 ]; then\n"
-        "  runner_exit_code=\"$startup_upload_exit_code\"\n"
-        "else\n"
-        f"  {run_command}\n"
-        "  runner_exit_code=$?\n"
-        "fi\n"
-        f"{status_command}\n"
-        "status_exit_code=$?\n"
-        f"{upload_command}\n"
-        "upload_exit_code=$?\n"
-        f"{terminate_command}\n"
-        'if [ "$upload_exit_code" -ne 0 ]; then exit "$upload_exit_code"; fi\n'
-        'if [ "$status_exit_code" -ne 0 ]; then exit "$status_exit_code"; fi\n'
-        'exit "$runner_exit_code"'
+        f"runpod --output-root {quoted_output_root} "
+        f"--telemetry-root {quoted_telemetry_root} "
+        f"--s3-target {quoted_s3_target} -- {run_command}"
     )
 
 
@@ -544,15 +610,27 @@ def build_model_weight_env(model_id: str) -> dict[str, str]:
     }
 
 
-def build_pod_payload(config: RunPodLaunchConfig, *, runpod_api_key: str) -> dict[str, Any]:
+def build_pod_payload(
+    config: RunPodLaunchConfig,
+    *,
+    runpod_api_key: str,
+    lifecycle_token: str,
+    terminate_after: str,
+) -> dict[str, Any]:
     if not config.name.strip():
         raise ValueError("RunPod pod name is required")
     if not config.image_name.strip():
         raise ValueError("RunPod image name is required")
     if not runpod_api_key.strip():
         raise ValueError("RunPod API key is required for pod self-termination")
+    if not lifecycle_token.strip():
+        raise ValueError("RunPod lifecycle token is required")
+    if not terminate_after.strip():
+        raise ValueError("RunPod terminate_after is required")
     if config.max_runtime_min <= 0:
         raise ValueError("RunPod max_runtime_min must be positive")
+    if config.startup_timeout_min <= 0:
+        raise ValueError("RunPod startup_timeout_min must be positive")
     if not config.gpu_type_ids:
         raise ValueError("RunPod gpu_type_ids must not be empty")
     if not config.allowed_cuda_versions:
@@ -571,32 +649,34 @@ def build_pod_payload(config: RunPodLaunchConfig, *, runpod_api_key: str) -> dic
         task_ids=config.task_ids,
         retry_count=config.retry_count,
     )
+    runtime_env = {
+        "MAX_RUNTIME_MIN": str(config.max_runtime_min),
+        "RUNPOD_RUN_MODEL_ID": config.model_id,
+        "RUNPOD_S3_TARGET": config.s3_target,
+        "RUNPOD_INCREMENTAL_S3_TARGET": config.s3_target,
+        "RUNPOD_API_KEY": runpod_api_key,
+        "RUNPOD_LIFECYCLE_TOKEN": lifecycle_token,
+        "RUNPOD_HANDOFF_TIMEOUT_SECONDS": str(config.startup_timeout_min * 60),
+        **build_model_weight_env(config.model_id),
+        **config.r2_credentials.as_env(),
+    }
     payload: dict[str, Any] = {
         "name": config.name,
         "imageName": config.image_name,
         "cloudType": "SECURE",
         "computeType": "GPU",
-        "gpuTypeIds": list(config.gpu_type_ids),
-        "gpuTypePriority": "custom",
-        "dataCenterIds": [config.data_center_id],
-        "dataCenterPriority": "custom",
+        "gpuTypeIdList": list(config.gpu_type_ids),
+        "dataCenterId": config.data_center_id,
         "gpuCount": 1,
         "allowedCudaVersions": list(config.allowed_cuda_versions),
-        "interruptible": False,
         "containerDiskInGb": config.container_disk_gb,
         "networkVolumeId": config.network_volume_id,
         "volumeMountPath": RUNPOD_VOLUME_MOUNT_PATH,
-        "dockerEntrypoint": ["bash", "-lc"],
-        "dockerStartCmd": [command],
-        "env": {
-            "MAX_RUNTIME_MIN": str(config.max_runtime_min),
-            "RUNPOD_RUN_MODEL_ID": config.model_id,
-            "RUNPOD_S3_TARGET": config.s3_target,
-            "RUNPOD_INCREMENTAL_S3_TARGET": config.s3_target,
-            "RUNPOD_API_KEY": runpod_api_key,
-            **build_model_weight_env(config.model_id),
-            **config.r2_credentials.as_env(),
-        },
+        "dockerArgs": command,
+        "env": [{"key": key, "value": value} for key, value in runtime_env.items()],
+        "ports": "22/tcp",
+        "startSsh": True,
+        "terminateAfter": terminate_after,
     }
     if config.container_registry_auth_id is not None:
         payload["containerRegistryAuthId"] = config.container_registry_auth_id
@@ -631,6 +711,6 @@ def request_json(
     if not raw:
         return {}
     parsed = json.loads(raw)
-    if not isinstance(parsed, dict | list):
+    if not isinstance(parsed, (dict, list)):
         raise ValueError("RunPod API response must be a JSON object or array")
     return parsed

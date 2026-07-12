@@ -75,7 +75,8 @@ RUN uv pip install --python /opt/venv/bin/python \
 
 COPY bench/src /opt/bench/src
 COPY tasks /opt/3dgen-tasks
+COPY models/common/runner_utils.py /opt/3dgen-runner/runner_utils.py
 COPY models/partcrafter/runner.py /opt/3dgen-runner/partcrafter_runner.py
 
 WORKDIR /work
-ENTRYPOINT ["python3", "/opt/3dgen-runner/partcrafter_runner.py"]
+ENTRYPOINT ["python3", "-m", "bench_harness.container_entrypoint", "--model-id", "partcrafter", "--runner-path", "/opt/3dgen-runner/partcrafter_runner.py"]

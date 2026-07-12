@@ -54,7 +54,8 @@ RUN uv pip install --system "setuptools<81" wheel \
 
 RUN MAX_JOBS=1 uv pip install --system --no-build-isolation -r /opt/Step1X-3D/requirements.txt
 
-RUN uv pip install --system --no-build-isolation /opt/Step1X-3D/step1x3d_texture/custom_rasterizer \
+RUN uv pip install --system boto3 \
+    && uv pip install --system --no-build-isolation /opt/Step1X-3D/step1x3d_texture/custom_rasterizer \
     && uv pip install --system --no-build-isolation /opt/Step1X-3D/step1x3d_texture/differentiable_renderer
 
 COPY bench/src /opt/bench/src
@@ -63,4 +64,4 @@ COPY models/common/runner_utils.py /opt/3dgen-runner/runner_utils.py
 COPY models/step1x-3d/runner.py /opt/3dgen-runner/step1x_3d_runner.py
 
 WORKDIR /work
-ENTRYPOINT ["python3", "/opt/3dgen-runner/step1x_3d_runner.py"]
+ENTRYPOINT ["python3", "-m", "bench_harness.container_entrypoint", "--model-id", "step1x-3d", "--runner-path", "/opt/3dgen-runner/step1x_3d_runner.py"]

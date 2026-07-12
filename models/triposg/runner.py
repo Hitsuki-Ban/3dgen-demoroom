@@ -4,30 +4,35 @@ import argparse
 import json
 import os
 import shutil
-import subprocess
 import sys
 import time
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+from runner_utils import (
+    RuntimeSnapshot,
+    TaskDefinition,
+    collect_runtime_snapshot,
+    load_tasks,
+    parse_max_runtime_seconds,
+    require_infer_arg,
+    required_env,
+    run_with_peak_vram,
+    should_retry_task_error,
+    upload_task_increment_if_configured,
+    upload_task_increment_then_raise_timeout,
+    utc_now,
+    write_task_failure,
+)
 
 
 MODEL_ID = "triposg"
 MODEL_GIT_COMMIT = "fc5c40990181e2a756c4e0b1c2f4d6b5202faf8c"
 WEIGHTS_REVISION = "2c1c516d22d58db486a058d98d31bb6177344e06"
-RUNPOD_USER_AGENT = "3dgen-demoroom-bench-harness/0.1"
 TRIPOSG_ROOT = Path("/opt/TripoSG")
 LICENSE_SOURCES = None
 MAX_TASK_ATTEMPTS = 2
-
-
-def required_env(name: str) -> str:
-    value = os.environ.get(name)
-    if not value:
-        raise ValueError(f"{name} is required")
-    return value
-
 
 TRIPOSG_WEIGHTS_PATH = required_env("TRIPOSG_WEIGHTS_PATH")
 RMBG_WEIGHTS_PATH = required_env("RMBG_WEIGHTS_PATH")
@@ -45,27 +50,6 @@ DEFAULT_PARAMETERS = {
     "triposg_weights_path": TRIPOSG_WEIGHTS_PATH,
     "rmbg_weights_path": RMBG_WEIGHTS_PATH,
 }
-
-REQUIRED_TASK_KEYS = frozenset({"id", "prompt", "image", "seed"})
-
-
-@dataclass(frozen=True)
-class TaskDefinition:
-    id: str
-    prompt: str
-    image: str
-    seed: int
-
-
-@dataclass(frozen=True)
-class RuntimeSnapshot:
-    gpu_name: str
-    peak_vram_bytes: int
-    torch_version: str
-    torch_cuda_version: str
-    torch_cuda_arch_list: list[str]
-    attention_backend: str
-
 
 @dataclass(frozen=True)
 class LicenseSources:
@@ -115,38 +99,8 @@ def main() -> None:
     for task in tasks:
         remaining = max_runtime_seconds - (time.monotonic() - started_at)
         if remaining <= 0:
-            terminate_runpod_if_needed(os.environ)
             raise TimeoutError("MAX_RUNTIME_MIN exceeded before starting next task")
         run_task(task, args.input_root, args.output_root, license_sources, remaining)
-
-
-def load_tasks(path: Path) -> list[TaskDefinition]:
-    raw = json.loads(path.read_text(encoding="utf-8"))
-    if not isinstance(raw, list):
-        raise ValueError(f"{path} must contain a JSON array")
-    tasks: list[TaskDefinition] = []
-    seen: set[str] = set()
-    for index, item in enumerate(raw):
-        if not isinstance(item, dict):
-            raise ValueError(f"task[{index}] must be an object")
-        keys = set(item)
-        missing = REQUIRED_TASK_KEYS - keys
-        unknown = keys - REQUIRED_TASK_KEYS
-        if missing:
-            raise ValueError(f"task[{index}] missing field(s): {', '.join(sorted(missing))}")
-        if unknown:
-            raise ValueError(f"task[{index}] unknown field(s): {', '.join(sorted(unknown))}")
-        task = TaskDefinition(
-            id=require_string(item["id"], f"task[{index}].id"),
-            prompt=require_string(item["prompt"], f"task[{index}].prompt"),
-            image=require_string(item["image"], f"task[{index}].image"),
-            seed=require_int(item["seed"], f"task[{index}].seed"),
-        )
-        if task.id in seen:
-            raise ValueError(f"duplicate task id: {task.id}")
-        seen.add(task.id)
-        tasks.append(task)
-    return tasks
 
 
 def run_task(
@@ -179,10 +133,15 @@ def run_task(
         started_monotonic = time.monotonic()
         command = build_triposg_command(image_path, raw_output_dir, task.seed, DEFAULT_PARAMETERS)
         try:
-            peak_vram_bytes = run_with_peak_vram(command, timeout_seconds)
+            peak_vram_bytes = run_with_peak_vram(
+                command,
+                timeout_seconds,
+                "TripoSG",
+                log_path=raw_output_dir / "infer.log",
+            )
             wall_clock_seconds = time.monotonic() - started_monotonic
             finished_iso = utc_now()
-            runtime = collect_runtime_snapshot(peak_vram_bytes)
+            runtime = collect_runtime_snapshot(peak_vram_bytes, "sdpa")
             prepare_task_output(
                 task=task,
                 task_output_dir=task_output_dir,
@@ -200,61 +159,33 @@ def run_task(
                 shutil.rmtree(work_dir)
             if task_output_dir.exists():
                 shutil.rmtree(task_output_dir)
-            if attempt_index + 1 < MAX_TASK_ATTEMPTS:
+            if should_retry_task_error(exc, attempt_index, MAX_TASK_ATTEMPTS):
                 continue
             write_task_failure(
                 task=task,
                 task_output_dir=task_output_dir,
+                model_id=MODEL_ID,
+                model_git_commit=MODEL_GIT_COMMIT,
+                weights_revision=WEIGHTS_REVISION,
+                parameters=DEFAULT_PARAMETERS,
                 error=exc,
                 retry_count=attempt_index,
                 started_at=first_started_iso,
                 finished_at=utc_now(),
             )
+            if isinstance(exc, TimeoutError):
+                upload_task_increment_then_raise_timeout(
+                    task_output_dir,
+                    task.id,
+                    os.environ,
+                    exc,
+                    upload=upload_task_increment_if_configured,
+                )
             upload_task_increment_if_configured(task_output_dir, task.id, os.environ)
             return
         else:
             upload_task_increment_if_configured(task_output_dir, task.id, os.environ)
             return
-
-
-def upload_task_increment_if_configured(task_output_dir: Path, task_id: str, env: dict[str, str]) -> list[str]:
-    target = env.get("RUNPOD_INCREMENTAL_S3_TARGET")
-    if not target:
-        return []
-    from bench_harness.uploader import create_uploader
-
-    uploader = create_uploader("s3", target, env=env)
-    return uploader.upload_run(task_output_dir, task_id)
-
-
-def write_task_failure(
-    *,
-    task: TaskDefinition,
-    task_output_dir: Path,
-    error: Exception,
-    retry_count: int,
-    started_at: str,
-    finished_at: str,
-) -> None:
-    task_output_dir.mkdir(parents=True, exist_ok=False)
-    failure = {
-        "status": "failed",
-        "task_id": task.id,
-        "model_id": MODEL_ID,
-        "model_git_commit": MODEL_GIT_COMMIT,
-        "weights_revision": WEIGHTS_REVISION,
-        "seed": task.seed,
-        "parameters": DEFAULT_PARAMETERS,
-        "retry_count": retry_count,
-        "error_type": type(error).__name__,
-        "error_message": str(error),
-        "started_at": started_at,
-        "finished_at": finished_at,
-    }
-    (task_output_dir / "failure.json").write_text(
-        json.dumps(failure, indent=2, ensure_ascii=False) + "\n",
-        encoding="utf-8",
-    )
 
 
 def build_triposg_command(
@@ -423,114 +354,6 @@ def write_license_bundle(destination: Path, sources: LicenseSources) -> None:
             raise FileNotFoundError(f"missing license source: {path}")
         chunks.extend([f"# {title}", f"Source: {path}", "", path.read_text(encoding="utf-8").rstrip(), ""])
     destination.write_text("\n".join(chunks).rstrip() + "\n", encoding="utf-8")
-
-
-def collect_runtime_snapshot(peak_vram_bytes: int) -> RuntimeSnapshot:
-    import torch
-
-    return RuntimeSnapshot(
-        gpu_name=query_gpu_name(),
-        peak_vram_bytes=peak_vram_bytes,
-        torch_version=torch.__version__,
-        torch_cuda_version=str(torch.version.cuda),
-        torch_cuda_arch_list=list(torch.cuda.get_arch_list()),
-        attention_backend="sdpa",
-    )
-
-
-def run_with_peak_vram(command: list[str], timeout_seconds: float) -> int:
-    process = subprocess.Popen(command)
-    deadline = time.monotonic() + timeout_seconds
-    peak_mib = query_gpu_memory_mib()
-    while process.poll() is None:
-        if time.monotonic() >= deadline:
-            process.kill()
-            terminate_runpod_if_needed(os.environ)
-            raise TimeoutError("MAX_RUNTIME_MIN exceeded while running TripoSG")
-        peak_mib = max(peak_mib, query_gpu_memory_mib())
-        time.sleep(0.5)
-    if process.returncode != 0:
-        raise subprocess.CalledProcessError(process.returncode, command)
-    return peak_mib * 1024 * 1024
-
-
-def query_gpu_memory_mib() -> int:
-    output = subprocess.check_output(
-        ["nvidia-smi", "--query-gpu=memory.used", "--format=csv,noheader,nounits"],
-        text=True,
-    )
-    values = [int(line.strip()) for line in output.splitlines() if line.strip()]
-    if not values:
-        raise RuntimeError("nvidia-smi returned no GPU memory values")
-    return max(values)
-
-
-def query_gpu_name() -> str:
-    output = subprocess.check_output(
-        ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],
-        text=True,
-    )
-    names = [line.strip() for line in output.splitlines() if line.strip()]
-    if not names:
-        raise RuntimeError("nvidia-smi returned no GPU name")
-    return names[0]
-
-
-def parse_max_runtime_seconds(env: dict[str, str]) -> int:
-    raw_value = env.get("MAX_RUNTIME_MIN")
-    if raw_value is None:
-        return 60 * 60
-    minutes = require_int(raw_value, "MAX_RUNTIME_MIN")
-    if minutes <= 0:
-        raise ValueError("MAX_RUNTIME_MIN must be a positive integer")
-    return minutes * 60
-
-
-def terminate_runpod_if_needed(env: dict[str, str]) -> None:
-    pod_id = env.get("RUNPOD_POD_ID")
-    if not pod_id:
-        return
-    api_key = env.get("RUNPOD_API_KEY")
-    if not api_key:
-        raise ValueError("RUNPOD_API_KEY is required when RUNPOD_POD_ID is set")
-
-    import urllib.request
-
-    request = urllib.request.Request(
-        f"https://rest.runpod.io/v1/pods/{pod_id}",
-        method="DELETE",
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "User-Agent": RUNPOD_USER_AGENT,
-        },
-    )
-    with urllib.request.urlopen(request, timeout=30) as response:
-        if response.status >= 300:
-            raise RuntimeError(f"RunPod termination failed with HTTP {response.status}")
-
-
-def require_string(value: Any, field: str) -> str:
-    if not isinstance(value, str) or not value.strip():
-        raise ValueError(f"{field} must be a non-empty string")
-    return value
-
-
-def require_int(value: Any, field: str) -> int:
-    if isinstance(value, bool):
-        raise ValueError(f"{field} must be an integer")
-    try:
-        return int(value)
-    except (TypeError, ValueError) as exc:
-        raise ValueError(f"{field} must be an integer") from exc
-
-
-def require_infer_arg(value: Any, flag: str) -> None:
-    if value is None:
-        raise ValueError(f"{flag} is required in infer mode")
-
-
-def utc_now() -> str:
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
 if __name__ == "__main__":

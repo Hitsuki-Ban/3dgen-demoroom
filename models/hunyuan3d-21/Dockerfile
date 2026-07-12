@@ -92,4 +92,4 @@ COPY models/common/runner_utils.py /opt/3dgen-runner/runner_utils.py
 COPY models/hunyuan3d-21/runner.py /opt/3dgen-runner/hunyuan3d_21_runner.py
 
 WORKDIR /work
-ENTRYPOINT ["python3", "/opt/3dgen-runner/hunyuan3d_21_runner.py"]
+ENTRYPOINT ["python3", "-m", "bench_harness.container_entrypoint", "--model-id", "hunyuan3d-21", "--runner-path", "/opt/3dgen-runner/hunyuan3d_21_runner.py"]

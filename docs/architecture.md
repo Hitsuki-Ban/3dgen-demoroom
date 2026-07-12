@@ -14,6 +14,7 @@ tasks/(25課題・リファレンス画像)
 
 - ベンチ実行は失敗に強い構成: タスクごとの逐次アップロードにより、Pod が途中で落ちても完了分の成果物と `failure.json` は必ず残る
 - 起動 watchdog(SSH 到達性)・起動テレメトリ(`runpod-startup.json`)・残高ガードで、課金事故を多層防御
+- RunPod の所有権は R2 の強整合な owner object を `launcher -> handoff_pending -> runtime` と `If-Match` CAS し、container runtime の ACK を待って引き継ぐ。timeout/ACK/cleanup の競合も CAS で一人の owner に決着し、RunPod GraphQL の `terminateAfter` を process crash・通信断の hard deadline とする。model runner は Pod を削除せず、task 成果物・`failure.json` は task 単位の staged publish だけで公開する。runtime は SSH/handoff/model の前に旧 terminal status を status-only `starting` PUT で置き換え、runner log を空にする。その後は分離した `/work/runpod-telemetry` のログと `finalizing` status だけを sweep し、単一 status object を terminal `ok`/`failed` にしてから cleanup/DELETE を行う。確定済み runtime owner は cleanup marker の R2 障害時も DELETE を試みるが、不確定な launcher は DELETE を競合させない
 
 ## ビューア(web/)
 

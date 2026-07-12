@@ -22,8 +22,9 @@ from runner_utils import (
     required_env,
     run_with_peak_vram,
     select_tasks,
-    terminate_runpod_if_needed,
+    should_retry_task_error,
     upload_task_increment_if_configured,
+    upload_task_increment_then_raise_timeout,
     utc_now,
     write_license_bundle,
     write_task_failure,
@@ -162,7 +163,6 @@ def main() -> None:
     for task in tasks:
         remaining = max_runtime_seconds - (time.monotonic() - started_at)
         if remaining <= 0:
-            terminate_runpod_if_needed(os.environ)
             raise TimeoutError("MAX_RUNTIME_MIN exceeded before starting next task")
         run_task(task, args.input_root, args.output_root, license_sources, remaining, args.retry_count)
 
@@ -224,7 +224,7 @@ def run_task(
                 shutil.rmtree(work_dir)
             if task_output_dir.exists():
                 shutil.rmtree(task_output_dir)
-            if attempt_index + 1 < MAX_TASK_ATTEMPTS:
+            if should_retry_task_error(exc, attempt_index, MAX_TASK_ATTEMPTS):
                 continue
             write_task_failure(
                 task=task,
@@ -238,6 +238,14 @@ def run_task(
                 started_at=first_started_iso,
                 finished_at=utc_now(),
             )
+            if isinstance(exc, TimeoutError):
+                upload_task_increment_then_raise_timeout(
+                    task_output_dir,
+                    task.id,
+                    os.environ,
+                    exc,
+                    upload=upload_task_increment_if_configured,
+                )
             upload_task_increment_if_configured(task_output_dir, task.id, os.environ)
             return
         else:

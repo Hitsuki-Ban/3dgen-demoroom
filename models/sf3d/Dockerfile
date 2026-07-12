@@ -60,4 +60,4 @@ COPY models/sf3d/runner.py /opt/3dgen-runner/sf3d_runner.py
 COPY models/sf3d/NOTICE.txt /opt/3dgen-runner/sf3d_NOTICE.txt
 
 WORKDIR /work
-ENTRYPOINT ["python3", "/opt/3dgen-runner/sf3d_runner.py"]
+ENTRYPOINT ["python3", "-m", "bench_harness.container_entrypoint", "--model-id", "sf3d", "--runner-path", "/opt/3dgen-runner/sf3d_runner.py"]

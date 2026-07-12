@@ -3,14 +3,20 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
+
 from bench_harness.meta import REQUIRED_META_KEYS
 from bench_harness.tasks import TaskDefinition
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+COMMON_PATH = REPO_ROOT / "models" / "common"
 RUNNER_PATH = REPO_ROOT / "models" / "triposr" / "runner.py"
 MODEL_SPEC_PATH = REPO_ROOT / "models" / "triposr" / "model.json"
 DOCKERFILE_PATH = REPO_ROOT / "models" / "triposr" / "Dockerfile"
+sys.path.insert(0, str(COMMON_PATH))
+
+import runner_utils  # noqa: E402
 
 
 def _load_runner():
@@ -56,6 +62,9 @@ def test_dockerfile_uses_required_cuda_base_and_pins() -> None:
     assert "rembg.new_session()" in dockerfile
     assert "uv pip install --system" in dockerfile
     assert "RUN pip install" not in dockerfile
+    assert "PYTHONPATH=/opt/bench/src" in dockerfile
+    assert "COPY bench/src /opt/bench/src" in dockerfile
+    assert "COPY models/common/runner_utils.py /opt/3dgen-runner/runner_utils.py" in dockerfile
 
 
 def test_build_triposr_command_uses_local_pinned_weights_and_official_preprocessing(tmp_path: Path) -> None:
@@ -142,25 +151,51 @@ def test_prepare_task_output_writes_contract_files(tmp_path: Path) -> None:
     assert (task_output_dir / "raw" / "triposr" / "0" / "mesh.glb").read_bytes() == b"glTF"
 
 
-def test_terminate_runpod_if_needed_sends_harness_user_agent(monkeypatch) -> None:
+def test_run_task_timeout_writes_and_uploads_failure_before_reraising(monkeypatch, tmp_path: Path) -> None:
     runner = _load_runner()
-    captured = {}
+    input_root = tmp_path / "input"
+    output_root = tmp_path / "output"
+    input_root.mkdir()
+    output_root.mkdir()
+    (input_root / "input.png").write_bytes(b"png")
+    calls: list[list[str]] = []
+    uploads: list[str] = []
 
-    class FakeResponse:
-        status = 200
+    def fake_run_with_peak_vram(
+        command: list[str],
+        timeout_seconds: float,
+        timeout_label: str,
+        *,
+        log_path: Path | None = None,
+    ) -> int:
+        calls.append(command)
+        raise runner_utils.RunnerTimeoutError(
+            command=command,
+            timeout_label=timeout_label,
+            output_tail="marching cubes timed out",
+        )
 
-        def __enter__(self):
-            return self
+    def fake_upload(task_output_dir: Path, task_id: str, env: dict[str, str]) -> list[str]:
+        failure = json.loads((task_output_dir / "failure.json").read_text(encoding="utf-8"))
+        assert failure["error_output_tail"] == "marching cubes timed out"
+        assert (task_output_dir / "infer.log").read_text(encoding="utf-8") == "marching cubes timed out\n"
+        uploads.append(task_id)
+        return [f"{task_id}/failure.json", f"{task_id}/infer.log"]
 
-        def __exit__(self, exc_type, exc_value, traceback) -> None:
-            pass
+    monkeypatch.setattr(runner, "run_with_peak_vram", fake_run_with_peak_vram)
+    monkeypatch.setattr(runner, "upload_task_increment_if_configured", fake_upload)
 
-    def fake_urlopen(request, timeout: int):
-        captured["user_agent"] = request.get_header("User-agent")
-        return FakeResponse()
+    with pytest.raises(runner_utils.RunnerTimeoutError):
+        runner.run_task(
+            runner.TaskDefinition(id="cartoon-apple", prompt="apple", image="input.png", seed=20260708),
+            input_root,
+            output_root,
+            timeout_seconds=10,
+        )
 
-    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
-
-    runner.terminate_runpod_if_needed({"RUNPOD_POD_ID": "pod-123", "RUNPOD_API_KEY": "token"})
-
-    assert captured["user_agent"] == "3dgen-demoroom-bench-harness/0.1"
+    failure = json.loads((output_root / "cartoon-apple" / "failure.json").read_text(encoding="utf-8"))
+    assert len(calls) == 1
+    assert uploads == ["cartoon-apple"]
+    assert failure["retry_count"] == 0
+    assert failure["error_type"] == "RunnerTimeoutError"
+    assert (output_root / "cartoon-apple" / "infer.log").is_file()

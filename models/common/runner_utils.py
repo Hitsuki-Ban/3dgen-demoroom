@@ -2,17 +2,14 @@ from __future__ import annotations
 
 import json
 import os
+import signal
 import shutil
 import subprocess
 import time
-import urllib.request
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
-
-
-RUNPOD_USER_AGENT = "3dgen-demoroom-bench-harness/0.1"
+from typing import Any, Callable, NoReturn
 
 
 @dataclass(frozen=True)
@@ -47,6 +44,19 @@ class RunnerSubprocessError(Exception):
 
     def __str__(self) -> str:
         message = f"Command {self.command!r} returned non-zero exit status {self.returncode}."
+        if self.output_tail:
+            return f"{message}\n--- output tail ---\n{self.output_tail}"
+        return message
+
+
+@dataclass(frozen=True)
+class RunnerTimeoutError(TimeoutError):
+    command: list[str]
+    timeout_label: str
+    output_tail: str | None = None
+
+    def __str__(self) -> str:
+        message = f"MAX_RUNTIME_MIN exceeded while running {self.timeout_label}"
         if self.output_tail:
             return f"{message}\n--- output tail ---\n{self.output_tail}"
         return message
@@ -139,6 +149,21 @@ def upload_task_increment_if_configured(task_output_dir: Path, task_id: str, env
     return uploader.upload_run(task_output_dir, task_id)
 
 
+def upload_task_increment_then_raise_timeout(
+    task_output_dir: Path,
+    task_id: str,
+    env: dict[str, str],
+    error: TimeoutError,
+    *,
+    upload: Callable[[Path, str, dict[str, str]], list[str]],
+) -> NoReturn:
+    try:
+        upload(task_output_dir, task_id, env)
+    except BaseException as upload_error:
+        raise error from upload_error
+    raise error
+
+
 def write_task_failure(
     *,
     task: TaskDefinition,
@@ -170,6 +195,7 @@ def write_task_failure(
     output_tail = getattr(error, "output_tail", None)
     if output_tail:
         failure["error_output_tail"] = output_tail
+        (task_output_dir / "infer.log").write_text(output_tail.rstrip() + "\n", encoding="utf-8")
     returncode = getattr(error, "returncode", None)
     if returncode is not None:
         failure["error_returncode"] = returncode
@@ -218,24 +244,40 @@ def run_with_peak_vram(
 ) -> int:
     log_handle = None
     try:
+        process_group_options = _process_group_popen_options()
         if log_path is not None:
             log_path.parent.mkdir(parents=True, exist_ok=True)
             log_handle = log_path.open("w", encoding="utf-8", buffering=1)
-            process = subprocess.Popen(command, stdout=log_handle, stderr=subprocess.STDOUT, text=True)
+            process = subprocess.Popen(
+                command,
+                stdout=log_handle,
+                stderr=subprocess.STDOUT,
+                text=True,
+                **process_group_options,
+            )
         else:
-            process = subprocess.Popen(command)
+            process = subprocess.Popen(command, **process_group_options)
         deadline = time.monotonic() + timeout_seconds
         peak_mib = query_gpu_memory_mib()
         while process.poll() is None:
             if time.monotonic() >= deadline:
-                process.kill()
-                terminate_runpod_if_needed(os.environ)
-                raise TimeoutError(f"MAX_RUNTIME_MIN exceeded while running {timeout_label}")
+                _kill_process_group_and_wait(process)
+                if log_handle is not None:
+                    log_handle.flush()
+                    log_handle.close()
+                    log_handle = None
+                raise RunnerTimeoutError(
+                    command=command,
+                    timeout_label=timeout_label,
+                    output_tail=read_text_tail(log_path) if log_path is not None else None,
+                )
             peak_mib = max(peak_mib, query_gpu_memory_mib())
             time.sleep(0.5)
         if process.returncode != 0:
             if log_handle is not None:
                 log_handle.flush()
+                log_handle.close()
+                log_handle = None
             raise RunnerSubprocessError(
                 returncode=process.returncode,
                 command=command,
@@ -245,6 +287,27 @@ def run_with_peak_vram(
     finally:
         if log_handle is not None:
             log_handle.close()
+
+
+def _process_group_popen_options() -> dict[str, Any]:
+    if os.name == "posix":
+        return {"start_new_session": True}
+    if os.name == "nt":
+        return {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP}
+    raise RuntimeError(f"unsupported subprocess platform: {os.name}")
+
+
+def _kill_process_group_and_wait(process: subprocess.Popen[Any]) -> None:
+    try:
+        if os.name == "posix":
+            os.killpg(process.pid, signal.SIGKILL)
+        elif os.name == "nt":
+            process.kill()
+        else:
+            raise RuntimeError(f"unsupported subprocess platform: {os.name}")
+    except ProcessLookupError:
+        pass
+    process.wait()
 
 
 def read_text_tail(path: Path, max_bytes: int = 12000) -> str:
@@ -275,27 +338,6 @@ def query_gpu_name() -> str:
     if not names:
         raise RuntimeError("nvidia-smi returned no GPU name")
     return names[0]
-
-
-def terminate_runpod_if_needed(env: dict[str, str]) -> None:
-    pod_id = env.get("RUNPOD_POD_ID")
-    if not pod_id:
-        return
-    api_key = env.get("RUNPOD_API_KEY")
-    if not api_key:
-        raise ValueError("RUNPOD_API_KEY is required when RUNPOD_POD_ID is set")
-
-    request = urllib.request.Request(
-        f"https://rest.runpod.io/v1/pods/{pod_id}",
-        method="DELETE",
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "User-Agent": RUNPOD_USER_AGENT,
-        },
-    )
-    with urllib.request.urlopen(request, timeout=30) as response:
-        if response.status >= 300:
-            raise RuntimeError(f"RunPod termination failed with HTTP {response.status}")
 
 
 def require_string(value: Any, field: str) -> str:

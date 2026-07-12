@@ -45,7 +45,7 @@ docker run --rm --gpus all `
   -v ${PWD}\tasks:/work/input:ro `
   -v <local-or-network-weight-root>:/workspace/weights:ro `
   -v ${PWD}\outputs\partcrafter-smoke:/work/output `
-  3dgen/partcrafter:local --task-limit 2
+  3dgen/partcrafter:local runner --task-limit 2
 ```
 
 Expected output per task:
