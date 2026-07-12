@@ -4,7 +4,12 @@
 
 ### ▶ [展示サイトを開く](https://3dgen.hitsuki.space)
 
-<!-- TODO(screenshot-tool): サイトのヒーロースクリーンショット(ギャラリー+3ペイン比較)をここに挿入 -->
+[![課題詳細 — 11 モデルの出力を実測値付きで並べて比較](docs/images/task-detail.png)](https://3dgen.hitsuki.space)
+
+| [![課題ギャラリー(25 課題)](docs/images/gallery.png)](https://3dgen.hitsuki.space) | [![ワイヤーフレーム表示でポリゴン割りを検分](docs/images/viewer-wireframe.png)](https://3dgen.hitsuki.space) |
+|---|---|
+
+<sub>スクリーンショットは `pnpm shots`(Playwright + SwiftShader)で本番サイトから再現可能に生成。</sub>
 
 生成時間・VRAM・ポリゴン数・使用パラメータ・**失敗を含む**全実測データを無修正で公開しています。想定読者はゲームグラフィックスの開発者 —「いま実際にどこまでできるのか」をデモ映像ではなく実物のメッシュで判断するための場です。
 
