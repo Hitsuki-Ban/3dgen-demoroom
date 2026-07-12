@@ -17,7 +17,7 @@ interface Props {
   ) => Promise<THREE.Object3D> | THREE.Object3D;
   badge?: string;
   /** 生成時間・VRAM 等の追加表示(フッター2行目) */
-  extraInfo?: string;
+  extraInfo?: ReactNode;
   /** ヘッダ右端に置く任意 UI(比較チェックボックス等) */
   headerExtra?: ReactNode;
   /** GLB のバイト数(クリックロード判定とサイズ表示に使う) */
