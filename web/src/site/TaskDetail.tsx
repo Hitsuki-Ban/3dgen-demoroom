@@ -10,30 +10,34 @@ import { ViewerPane } from '../viewer/ViewerPane';
 import { ModelCard, ModelFailureCard } from './ModelCard';
 import { ViewerToolbar } from './ViewerToolbar';
 
-/** フッター 2 行目の実測サマリ。VRAM には計測口径ラベル+説明 tooltip を付ける(#72)。
- *  口径が違う値同士の直接比較を防ぐための識別表示で、数値の補正はしない。
- *  tooltip は native title でなく hover/focus で出す要素にする — キーボード・タッチ・
- *  支援技術からも説明(baseline/共存プロセスの扱い)へ到達できるように(PR #82 レビュー指摘) */
+/** フッター 2 行目の実測サマリ。VRAM 値の後ろの小さな「!」マークに hover/focus で
+ *  計測口径の説明を出す(#72)。ラベルのインライン常時表示はしない(オーナー UX FB:
+ *  値の見た目を汚さず、気になった人だけ読めればよい)。tooltip は native title でなく
+ *  focusable 要素+role=tooltip — キーボード・タッチ・支援技術からも到達可能(PR #82) */
 function ResultInfo({ result }: { result: RunResult }) {
   const { wallClockSeconds, peakVramBytes, gpuName } = result.metrics;
   const scope = vramScopeInfo(parseVramMeasurement(result.meta));
   const hintId = useId();
   return (
     <>
-      {wallClockSeconds.toFixed(1)}s /{' '}
+      {wallClockSeconds.toFixed(1)}s / VRAM {(peakVramBytes / 2 ** 30).toFixed(1)}GB
       <span
         tabIndex={0}
+        aria-label="VRAM 計測口径の注記"
         aria-describedby={hintId}
-        className="group relative cursor-help underline decoration-dotted decoration-slate-600 underline-offset-2 focus:outline-none focus-visible:ring-1 focus-visible:ring-sky-500 rounded-sm"
+        className={`group relative ml-0.5 inline-flex h-3.5 w-3.5 cursor-help select-none items-center justify-center rounded-full border text-[10px] leading-none align-text-top focus:outline-none focus-visible:ring-1 focus-visible:ring-sky-500 ${
+          scope.attention
+            ? 'border-red-700 text-red-300'
+            : 'border-slate-600 text-slate-500 hover:text-slate-300'
+        }`}
       >
-        VRAM {(peakVramBytes / 2 ** 30).toFixed(1)}GB
-        <span className="text-slate-600">({scope.label})</span>
+        !
         <span
           id={hintId}
           role="tooltip"
-          className="invisible group-hover:visible group-focus-within:visible pointer-events-none absolute left-0 bottom-full mb-1 z-10 w-64 rounded-md border border-slate-600 bg-slate-900 px-2.5 py-1.5 text-xs leading-relaxed text-slate-300 whitespace-normal"
+          className="invisible group-hover:visible group-focus-within:visible pointer-events-none absolute left-0 bottom-full mb-1 z-10 w-56 rounded-md border border-slate-600 bg-slate-900 px-2.5 py-1.5 text-xs leading-relaxed text-slate-300 whitespace-normal text-left"
         >
-          {scope.hint}
+          <span className="font-medium">{scope.label}</span> — {scope.hint}
         </span>
       </span>{' '}
       / {(result.glbSizeBytes / 2 ** 20).toFixed(1)}MB / {gpuName}
