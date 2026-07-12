@@ -25,6 +25,9 @@ outputs/
 # Generated site manifest
 web/public/manifest.json
 
+# Generated gallery thumbnails (scripts/build-thumbnails.mjs)
+web/public/assets/thumbs/
+
 # Terraform (Cloudflare zone configuration)
 .terraform/
 *.tfstate

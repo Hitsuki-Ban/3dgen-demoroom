@@ -2,6 +2,11 @@ import { render, screen } from '@testing-library/react';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { MODELS } from '../data/models';
 import type { SiteManifest } from '../data/types';
+
+// TaskDetail は ViewerProvider を内包する(#59)が、jsdom に WebGL は無いので
+// ViewerCore を API 互換スタブへ差し替える
+vi.mock('../viewer/ViewerCore', () => import('../test/viewer-core-stub'));
+
 import { TaskDetail } from './TaskDetail';
 
 // focus 表示中に hash で別課題へ移動すると、task-reset effect より先に
@@ -29,9 +34,15 @@ const manifest: SiteManifest = {
 };
 
 beforeEach(() => {
+  // manifest だけ返し、GLB 取得は失敗させる(ペインは error 表示になるだけでテスト対象外)
   vi.stubGlobal(
     'fetch',
-    vi.fn(async () => new Response(JSON.stringify(manifest), { status: 200 })),
+    vi.fn(async (url: RequestInfo | URL) => {
+      if (String(url).includes('manifest.json')) {
+        return new Response(JSON.stringify(manifest), { status: 200 });
+      }
+      throw new TypeError('offline (test)');
+    }),
   );
 });
 

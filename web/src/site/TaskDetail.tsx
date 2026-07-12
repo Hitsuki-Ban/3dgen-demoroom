@@ -2,11 +2,11 @@ import { useEffect, useState } from 'react';
 import { MODELS } from '../data/models';
 import { TASKS } from '../data/tasks';
 import { useManifest } from '../data/useManifest';
-import { isRunResult, type ModelInfo, type RunResult, type TaskInfo } from '../data/types';
+import { isRunResult, type ModelInfo, type RunFailure, type RunResult, type TaskInfo } from '../data/types';
 import { loadModel } from '../viewer/loadModel';
-import { useViewer } from '../viewer/ViewerContext';
+import { ViewerProvider, useViewer } from '../viewer/ViewerContext';
 import { ViewerPane } from '../viewer/ViewerPane';
-import { ModelCard } from './ModelCard';
+import { ModelCard, ModelFailureCard } from './ModelCard';
 import { ViewerToolbar } from './ViewerToolbar';
 
 function formatResultInfo(wallClock: number, peakVram: number, sizeBytes: number, gpu: string): string {
@@ -68,9 +68,19 @@ function ResultPane({
   );
 }
 
-export function TaskDetail({ taskId, onBack }: { taskId: string; onBack: () => void }) {
+/** ViewerProvider(共有 canvas + ViewerCore)は課題詳細のスコープでだけ生成し、
+ *  一覧へ戻ったら unmount で dispose する(#59)。課題切替では remount しない */
+export function TaskDetail(props: { taskId: string; onBack: () => void }) {
+  return (
+    <ViewerProvider>
+      <TaskDetailInner {...props} />
+    </ViewerProvider>
+  );
+}
+
+function TaskDetailInner({ taskId, onBack }: { taskId: string; onBack: () => void }) {
   const task = TASKS.find((t) => t.id === taskId);
-  const results = useManifest().entries.filter(isRunResult);
+  const { status: manifestStatus, manifest } = useManifest();
   const viewer = useViewer();
   /** 大画面比較に選択中のモデル id(最大 2 つ。3 つ目を選ぶと古い方から入れ替え) */
   const [compareSel, setCompareSel] = useState<string[]>([]);
@@ -87,7 +97,12 @@ export function TaskDetail({ taskId, onBack }: { taskId: string; onBack: () => v
 
   if (!task) return null;
 
-  const resultByModel = new Map(results.filter((r) => r.taskId === taskId).map((r) => [r.modelId, r]));
+  // success / failure を分けて持つ: failure は「ベンチ待機中」ではなく「生成失敗」として表示する(#54)
+  const taskEntries = manifest.entries.filter((e) => e.taskId === taskId);
+  const resultByModel = new Map(taskEntries.filter(isRunResult).map((r) => [r.modelId, r]));
+  const failureByModel = new Map(
+    taskEntries.filter((e): e is RunFailure => !isRunResult(e)).map((e) => [e.modelId, e]),
+  );
   const doneCount = resultByModel.size;
 
   const toggleCompare = (id: string) =>
@@ -166,7 +181,11 @@ export function TaskDetail({ taskId, onBack }: { taskId: string; onBack: () => v
         <div>
           <div className="flex items-center justify-between gap-3">
             <h3 className="text-sm font-semibold text-slate-300">
-              モデル別出力({doneCount}/{MODELS.length} 完了)
+              モデル別出力(
+              {manifestStatus === 'loading' && doneCount === 0
+                ? '実測データ読み込み中…'
+                : `${doneCount}/${MODELS.length} 完了`}
+              )
             </h3>
             {compareSel.length === 2 && (
               <button
@@ -181,7 +200,11 @@ export function TaskDetail({ taskId, onBack }: { taskId: string; onBack: () => v
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
             {MODELS.map((m) => {
               const result = resultByModel.get(m.id);
-              if (!result) return <ModelCard key={m.id} model={m} />;
+              if (!result) {
+                const failed = failureByModel.get(m.id);
+                if (failed) return <ModelFailureCard key={m.id} model={m} failure={failed.failure} />;
+                return <ModelCard key={m.id} model={m} />;
+              }
               return (
                 <ResultPane
                   // taskId を key に含めて課題切替時に必ず remount する
