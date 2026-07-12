@@ -33,6 +33,28 @@ pnpm dev
 Worker は R2 metadata より優先して GLB を `model/gltf-binary`、thumbnail を `image/webp`
 として返す。Hunyuan3D 2.1 の地域制限は両方に同じ順序で適用される。
 
+### Production cache 方針
+
+`/run-assets/*` では Workers Caching を有効化せず、Cloudflare へ届いた request は Worker が
+geo 判定してから R2 の条件付き取得 / 単一 Range 取得を実行する。GLB の
+`206 Partial Content` は R2 native Range を正本とし、Cloudflare edge に full `200` を
+保存して slice させない。
+
+Hunyuan3D 2.1 の allowed response (GLB / thumbnail、200 / 206 / 304) は常に
+`Cache-Control: no-store` とし、取得後に別地域へ移動した browser が保存済み response を
+再利用して geo 判定を迂回することも禁止する。manifest の restricted URL は cache-policy
+version を含み、この契約以前の public / immutable URL も現在の UI から再利用しない。
+unrestricted asset だけが immutable / short-lived cache policy を使う。Free plan の
+512 MB cacheable object 上限を超える最大 GLB
+(595,904,276 bytes / 約 568.3 MiB) も R2 native Range で配信する。
+
+`wrangler.jsonc` に `cache.enabled` を追加したり、zone Cache Rule で `/run-assets/*` を
+cacheable にしてはならない。将来変更する場合は geo-restricted path を uncached gateway /
+entrypoint に分離し、allowed / blocked region の cache HIT を含む本番検証を先に行う。
+
+2026-07-12 の production 検証記録と Cloudflare 仕様へのリンクは
+`docs/runs/2026-07-custom-domain.md` を参照。
+
 Workers runtime とローカル R2 binding を使う契約テストは次で実行する。
 
 ```powershell

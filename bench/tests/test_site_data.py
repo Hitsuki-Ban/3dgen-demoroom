@@ -9,6 +9,7 @@ import pytest
 from PIL import Image
 
 from bench_harness.site_data import (
+    _run_asset_url,
     build_site_manifest,
     load_model_ids,
     parse_expected_failures,
@@ -180,6 +181,17 @@ def test_build_site_manifest_emits_valid_thumbnail_with_content_digest(
     entry = manifest["entries"][0]
     digest = hashlib.sha256(VALID_WEBP_320).hexdigest()
     assert entry["thumbUrl"] == f"/run-assets/model-a/task-a/thumb.webp?v={digest}"
+
+
+def test_run_asset_url_includes_hunyuan_cache_policy_version() -> None:
+    assert _run_asset_url("hunyuan3d-21", "task-a", "output.glb") == (
+        "/run-assets/hunyuan3d-21/task-a/output.glb?policy=no-store-v1"
+    )
+    assert _run_asset_url(
+        "hunyuan3d-21", "task-a", "thumb.webp", content_version="abc123"
+    ) == (
+        "/run-assets/hunyuan3d-21/task-a/thumb.webp?v=abc123&policy=no-store-v1"
+    )
 
 
 def test_build_site_manifest_rejects_non_webp_thumbnail(tmp_path: Path) -> None:

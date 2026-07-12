@@ -74,6 +74,51 @@ Globalping の実 HTTP HEAD probes を使い、同じ既存 Hunyuan GLB を JP /
 
 WAF expression は Custom Domain host だけを対象とするため、workers.dev probe は WAF を経由せず Worker の二層目を独立に検査する。両 measurement は各 country の実 probe location と Cloudflare `cf-ray` を記録している。
 
+## Workers Caching / Range 方針の本番検証
+
+Issue [#70](https://github.com/Hitsuki-Ban/3dgen-demoroom/issues/70) の follow-up として、
+#69 merge 後の production deployment `3cce687` を 2026-07-12 に再検証した。
+
+結論は **Workers Caching を有効化せず、R2 native 206 を維持する**。`web/wrangler.jsonc`
+に Workers Caching の `cache.enabled` はなく、Cloudflare API で zone の
+`http_request_cache_settings` ruleset が 0 件であることを確認した。Custom Domain の
+`/run-assets/*` 応答にも `CF-Cache-Status` はなく、同じ full GET / Range を繰り返しても
+edge cache の MISS / HIT には移行しなかった。
+
+unrestricted の `triposr/cartoon-apple/output.glb` で確認した結果:
+
+| Request | 1 回目 | 2 回目 | 主な response metadata |
+|---|---:|---:|---|
+| full GET | 200 | 200 | `Content-Length: 3562436`, strong ETag, `Accept-Ranges: bytes` |
+| `Range: bytes=0-0` | 206 | 206 | `Content-Range: bytes 0-0/3562436`, `Content-Length: 1` |
+| matching `If-None-Match` | 304 | 304 | full GET と同じ strong ETag |
+
+上記 unrestricted GLB は `Cache-Control: public, max-age=31536000, immutable` を維持する。
+一方、Hunyuan3D 2.1 の allowed response は GLB / thumbnail と status (200 / 206 / 304) を
+問わず `Cache-Control: no-store` とする。Workers Caching だけでなく browser / intermediary
+にも保存させないため、許可地域で取得した user agent が別地域へ移動した場合も次の request で
+WAF / Worker の geo 判定を再実行する。manifest URL には `policy=no-store-v1` を付け、変更前の
+一年期 public / immutable response と cache key を分離する。
+
+変更前の Hunyuan3D 2.1 は最新 Custom Domain probe
+([Globalping measurement `2In3xJB1F14K9CPhl00020kN4`](https://globalping.io?measurement=2In3xJB1F14K9CPhl00020kN4))
+で JP 200、DE / GB / KR は zone WAF が 403 を返した。WAF を通らない workers.dev の
+独立 probe は前節の measurement のとおり JP 200、DE / GB / KR 451 + `no-store` で、
+Custom Domain と Worker の二層がそれぞれ機能している。
+
+Workers Caching を有効にすると Range header は Worker 実行前に取り除かれ、full 200 を
+edge が保存・slice し、HIT 時は Worker を実行しない。これは native R2 206 と異なる経路で、
+geo gateway にはそのまま適用できない。また Free / Pro / Business の cacheable object 上限は
+512 MB で、現行最大 GLB 595,904,276 bytes (約 568.3 MiB) は対象外になる。費用上の必須性も
+ないため、現時点で二系統を導入しない。将来 caching を検討する場合は geo-restricted path を
+uncached entrypoint に分離し、allowed / blocked region の MISS→HIT を再検証してから変更する。
+
+確認した Cloudflare 公式仕様 (2026-07-12):
+
+- [Workers Caching configuration / Range requests](https://developers.cloudflare.com/workers/cache/configuration/#range-requests)
+- [Workers Caching per-entrypoint configuration](https://developers.cloudflare.com/workers/cache/configuration/#per-entrypoint-caching)
+- [Default cache behavior / cacheable size limits](https://developers.cloudflare.com/cache/concepts/default-cache-behavior/#cacheable-size-limits)
+
 ### Repository-side validation (2026-07-12)
 
 - HashiCorp 公式 archive と SHA-256 一覧から Terraform `1.15.7` を取得し、checksum 一致を確認した(システム PATH には追加していない)。

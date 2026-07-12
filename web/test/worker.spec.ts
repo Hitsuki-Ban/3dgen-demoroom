@@ -8,6 +8,10 @@ const OBJECT_KEY = `site-data/${MODEL_ID}/${TASK_ID}/output.glb`;
 const ASSET_URL = `https://example.com/run-assets/${MODEL_ID}/${TASK_ID}/output.glb`;
 const THUMB_OBJECT_KEY = `site-data/${MODEL_ID}/${TASK_ID}/thumb.webp`;
 const THUMB_ASSET_URL = `https://example.com/run-assets/${MODEL_ID}/${TASK_ID}/thumb.webp?v=abc123`;
+const RESTRICTED_OBJECT_KEY = 'site-data/hunyuan3d-21/task-one/output.glb';
+const RESTRICTED_ASSET_URL = 'https://example.com/run-assets/hunyuan3d-21/task-one/output.glb';
+const RESTRICTED_THUMB_OBJECT_KEY = 'site-data/hunyuan3d-21/task-one/thumb.webp';
+const RESTRICTED_THUMB_ASSET_URL = 'https://example.com/run-assets/hunyuan3d-21/task-one/thumb.webp';
 const BODY_TEXT = '0123456789';
 const BODY = new TextEncoder().encode(BODY_TEXT);
 const THUMB_BODY_TEXT = 'webp-thumbnail';
@@ -27,6 +31,19 @@ function thumbRequest(headers?: HeadersInit, method = 'GET'): Request {
 
 async function fetchThumb(headers?: HeadersInit, method = 'GET'): Promise<Response> {
   return exports.default.fetch(thumbRequest(headers, method));
+}
+
+function requestFromCountry(url: string, country: string, init?: RequestInit): Request {
+  const request = new Request(url, init);
+  Object.defineProperty(request, 'cf', { value: { country } });
+  return request;
+}
+
+async function fetchFromCountry(url: string, country: string, init?: RequestInit): Promise<Response> {
+  return worker.fetch(requestFromCountry(url, country, init), {
+    ASSETS: env.ASSETS,
+    SITE_DATA: env.SITE_DATA,
+  });
 }
 
 async function responseBodyText(response: Response): Promise<string> {
@@ -108,10 +125,17 @@ beforeAll(async () => {
       cacheControl: 'public, max-age=31536000, immutable',
     },
   });
+  await env.SITE_DATA.put(RESTRICTED_OBJECT_KEY, BODY);
+  await env.SITE_DATA.put(RESTRICTED_THUMB_OBJECT_KEY, THUMB_BODY);
 });
 
 afterAll(async () => {
-  await env.SITE_DATA.delete([OBJECT_KEY, THUMB_OBJECT_KEY]);
+  await env.SITE_DATA.delete([
+    OBJECT_KEY,
+    THUMB_OBJECT_KEY,
+    RESTRICTED_OBJECT_KEY,
+    RESTRICTED_THUMB_OBJECT_KEY,
+  ]);
 });
 
 describe('run asset full responses', () => {
@@ -423,6 +447,26 @@ describe('immutable object version handoff', () => {
 });
 
 describe('routing and policy precedence', () => {
+  it('prevents allowed Hunyuan responses from surviving a later geo decision', async () => {
+    const metadata = await env.SITE_DATA.head(RESTRICTED_OBJECT_KEY);
+    if (!metadata) throw new Error('restricted test object is missing');
+
+    const responses = await Promise.all([
+      fetchFromCountry(RESTRICTED_ASSET_URL, 'JP'),
+      fetchFromCountry(RESTRICTED_ASSET_URL, 'JP', { method: 'HEAD' }),
+      fetchFromCountry(RESTRICTED_ASSET_URL, 'JP', { headers: { Range: 'bytes=0-3' } }),
+      fetchFromCountry(RESTRICTED_ASSET_URL, 'JP', {
+        headers: { 'If-None-Match': metadata.httpEtag },
+      }),
+      fetchFromCountry(RESTRICTED_THUMB_ASSET_URL, 'JP'),
+    ]);
+
+    expect(responses.map((response) => response.status)).toEqual([200, 200, 206, 304, 200]);
+    for (const response of responses) {
+      expect(response.headers.get('Cache-Control')).toBe('no-store');
+    }
+  });
+
   it('returns 451 before object lookup, Range, or conditional evaluation', async () => {
     const forbiddenBucket = new Proxy(env.SITE_DATA, {
       get() {
