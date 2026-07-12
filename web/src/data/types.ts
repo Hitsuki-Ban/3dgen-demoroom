@@ -61,11 +61,14 @@ export interface GeometryStats {
 }
 
 /** meta.json の optional `vram_measurement`(#71 schema)のうち UI が読む部分。
- *  全キーは bench/src/bench_harness/meta.py の VRAM_MEASUREMENT_KEYS が正本 */
+ *  全キーは bench/src/bench_harness/meta.py の VRAM_MEASUREMENT_KEYS が正本。
+ *  known scope では method / flags が scope ごとの canonical 値に固定される
+ *  (検証は data/vramScope.ts の parseVramMeasurement) */
 export interface VramMeasurementMeta {
   scope: string;
-  device_baseline_included?: boolean;
-  co_resident_processes_included?: boolean;
+  method: string;
+  device_baseline_included: boolean;
+  co_resident_processes_included: boolean;
 }
 
 export interface RunResult {
