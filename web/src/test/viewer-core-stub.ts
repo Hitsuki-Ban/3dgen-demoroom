@@ -24,7 +24,11 @@ export class ViewerCore {
     ViewerCore.instances.push(this);
   }
 
-  addPane(_el: HTMLElement, _object: Object3D, _fix?: { x?: number; y?: number; z?: number }): number {
+  /** テストから addPane に渡された orientationFix を検証できるよう記録する */
+  addPaneCalls: Array<{ fix?: { x?: number; y?: number; z?: number } }> = [];
+
+  addPane(_el: HTMLElement, _object: Object3D, fix?: { x?: number; y?: number; z?: number }): number {
+    this.addPaneCalls.push({ fix });
     this.paneCount += 1;
     return this.paneCount;
   }

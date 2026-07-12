@@ -33,7 +33,9 @@ function padChunk(bytes, fill = 0) {
 
 function createTriangleGlb() {
   const binary = Buffer.alloc(80);
-  const positions = [-0.5, -0.5, 0, 0.5, -0.5, 0, 0, 0.5, 0];
+  // Deliberately far from the modeling origin so rotation-after-normalization
+  // would visibly drift or clip the mesh.
+  const positions = [9.5, 4.5, 0, 10.5, 4.5, 0, 10, 5.5, 0];
   const normals = [0, 0, 1, 0, 0, 1, 0, 0, 1];
   positions.forEach((value, index) => binary.writeFloatLE(value, index * 4));
   normals.forEach((value, index) => binary.writeFloatLE(value, 36 + index * 4));
@@ -77,8 +79,8 @@ function createTriangleGlb() {
         componentType: 5126,
         count: 3,
         type: 'VEC3',
-        min: [-0.5, -0.5, 0],
-        max: [0.5, 0.5, 0],
+        min: [9.5, 4.5, 0],
+        max: [10.5, 5.5, 0],
       },
       { bufferView: 1, componentType: 5126, count: 3, type: 'VEC3' },
       { bufferView: 2, componentType: 5123, count: 3, type: 'SCALAR' },
@@ -100,9 +102,29 @@ function createTriangleGlb() {
   return glb;
 }
 
+async function alphaBounds(file) {
+  const { data, info } = await sharp(file, { failOn: 'error' }).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  let minX = info.width;
+  let minY = info.height;
+  let maxX = -1;
+  let maxY = -1;
+  for (let y = 0; y < info.height; y += 1) {
+    for (let x = 0; x < info.width; x += 1) {
+      if (data[(y * info.width + x) * info.channels + 3] === 0) continue;
+      minX = Math.min(minX, x);
+      minY = Math.min(minY, y);
+      maxX = Math.max(maxX, x);
+      maxY = Math.max(maxY, y);
+    }
+  }
+  assert.notEqual(maxX, -1, `${file} must contain visible pixels`);
+  return { centerX: (minX + maxX) / 2, centerY: (minY + maxY) / 2 };
+}
+
 const root = await mkdtemp(path.join(tmpdir(), '3dgen-thumbnail-smoke-'));
 const glbPath = path.join(root, 'triangle.glb');
 const pngPath = path.join(root, 'triangle.png');
+const rotatedPngPath = path.join(root, 'triangle-rotated.png');
 const webpPath = path.join(root, 'triangle.webp');
 await writeFile(glbPath, createTriangleGlb());
 
@@ -114,13 +136,30 @@ try {
     glbPath,
     outputPath: pngPath,
     modelId: 'triposr',
-    taskId: 'thumbnail-smoke',
+    taskId: 'cartoon-apple',
   });
   assert.equal(render.width, 320);
   assert.equal(render.height, 320);
   assert.equal(render.stats.meshes, 1);
   assert.equal(render.stats.triangles, 1);
   assert.match(render.webglRenderer, /SwiftShader/i);
+
+  const session = await renderer.openSession({
+    glbPath,
+    modelId: 'triposr',
+    taskId: 'thumbnail-session-smoke',
+  });
+  try {
+    await session.capture({ outputPath: pngPath, orientationDegrees: { x: 0, y: 0, z: 0 } });
+    await session.capture({ outputPath: rotatedPngPath, orientationDegrees: { x: 0, y: 0, z: 90 } });
+  } finally {
+    await session.close();
+  }
+  assert.notDeepEqual(await readFile(pngPath), await readFile(rotatedPngPath));
+  for (const bounds of [await alphaBounds(pngPath), await alphaBounds(rotatedPngPath)]) {
+    assert.ok(Math.abs(bounds.centerX - 160) <= 24, `alpha bbox x center drifted to ${bounds.centerX}`);
+    assert.ok(Math.abs(bounds.centerY - 160) <= 24, `alpha bbox y center drifted to ${bounds.centerY}`);
+  }
 
   await sharp(pngPath, { failOn: 'error' }).webp(thumbnailRecipe.webp).toFile(webpPath);
   const webp = await readFile(webpPath);

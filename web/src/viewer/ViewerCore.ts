@@ -195,13 +195,36 @@ export class ViewerCore {
       // 回転でバウンディングボックスが変わるので正規化をやり直す
       object.position.set(0, 0, 0);
       object.scale.set(1, 1, 1);
-      normalizeIntoUnitBox(object);
+      pane.maxDim = normalizeIntoUnitBox(object);
     }
     this.emitChange();
   }
 
   getOrientationFixEnabled(): boolean {
     return this.orientationFixEnabled;
+  }
+
+  /** ペインの absolute object-local viewing rotation を適用し、同じ姿勢で再正規化する。 */
+  setPaneOrientationDegrees(id: number, orientation: { x: number; y: number; z: number }): void {
+    const pane = this.panes.get(id);
+    if (!pane) throw new Error(`unknown pane ID: ${id}`);
+    for (const [axis, value] of Object.entries(orientation)) {
+      if (!Number.isFinite(value)) throw new Error(`orientation ${axis} must be finite`);
+    }
+    const degrees = Math.PI / 180;
+    const rotation = new THREE.Euler(
+      orientation.x * degrees,
+      orientation.y * degrees,
+      orientation.z * degrees,
+      'XYZ',
+    );
+    pane.orientationFix = rotation;
+    const object = pane.modelRoot.children.find((child) => !child.userData.isOutline);
+    if (!object) throw new Error(`pane ${id} has no model object`);
+    object.rotation.copy(rotation);
+    object.position.set(0, 0, 0);
+    object.scale.set(1, 1, 1);
+    pane.maxDim = normalizeIntoUnitBox(object);
   }
 
   private changeListeners = new Set<() => void>();

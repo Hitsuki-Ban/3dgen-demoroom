@@ -1,0 +1,3689 @@
+{
+  "schemaVersion": 1,
+  "rotationSpace": "absolute-object-local",
+  "eulerOrder": "XYZ",
+  "cells": {
+    "sf3d/cartoon-apple": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -90,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.9068004212118147,
+        "margin": 0.02729832675203825,
+        "reviewed": true
+      }
+    },
+    "sf3d/crusty-bread-loaf": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 30,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 2 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "sf3d/scifi-supply-crate": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -150,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.8140035459803372,
+        "margin": 0.05925048494066354,
+        "reviewed": true
+      }
+    },
+    "sf3d/ornate-treasure-chest": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -135,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 3 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "sf3d/medieval-longsword": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 60,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 16 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "sf3d/plasma-rifle": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 30,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 2 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "sf3d/victorian-street-lamp": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 45,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 2 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "sf3d/wooden-rocking-chair": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -150,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.5859845166996508,
+        "margin": 0.019511980616840452,
+        "reviewed": true
+      }
+    },
+    "sf3d/chrome-espresso-machine": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -135,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 1 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "sf3d/stained-glass-lantern": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 45,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.9512930422266844,
+        "margin": 0.02519899948606319,
+        "reviewed": true
+      }
+    },
+    "sf3d/fluffy-monster-plush": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -135,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 3 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "sf3d/chained-anchor": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -135,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.7634994872948576,
+        "margin": 0.05934263688664987,
+        "reviewed": true
+      }
+    },
+    "sf3d/potted-monstera": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -135,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 3 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "sf3d/old-oak-tree": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 45,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 2 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "sf3d/modular-dungeon-gate": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -165,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 4 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "sf3d/arcade-cabinet": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -120,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 2 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "sf3d/stylized-hover-bike": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -150,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 3 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "sf3d/rusty-pickup-truck": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -165,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.7982680262594786,
+        "margin": 0.037814002550228265,
+        "reviewed": true
+      }
+    },
+    "sf3d/toon-knight-character": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -150,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.8785000103571222,
+        "margin": 0.02465325150232256,
+        "reviewed": true
+      }
+    },
+    "sf3d/forest-goblin-creature": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -150,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 2 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "sf3d/anime-slime-mascot": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -135,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.9726701472355769,
+        "margin": 0.014305689245299957,
+        "reviewed": true
+      }
+    },
+    "sf3d/anime-katana": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -135,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.6893636324524157,
+        "margin": 0.050794685330394995,
+        "reviewed": true
+      }
+    },
+    "sf3d/anime-ramen-bowl": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -150,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 6 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "sf3d/anime-vending-machine": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -105,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 3 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "sf3d/anime-heroine-character": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -150,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.8580387277178224,
+        "margin": 0.028569896493681024,
+        "reviewed": true
+      }
+    },
+    "triposr/cartoon-apple": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": -90,
+        "y": 0,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 29 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "triposr/crusty-bread-loaf": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 90,
+        "y": -180,
+        "z": -45
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.9309829118022164,
+        "margin": 0.0194998547566394,
+        "reviewed": true
+      }
+    },
+    "triposr/scifi-supply-crate": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": -90,
+        "y": 150,
+        "z": -45
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 5 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "triposr/ornate-treasure-chest": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": -90,
+        "y": 0,
+        "z": -45
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 2 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "triposr/medieval-longsword": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": -90,
+        "y": 0,
+        "z": -45
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 1 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "triposr/plasma-rifle": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 45,
+        "y": -150,
+        "z": 90
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.8202200023303148,
+        "margin": 0.09797117944961964,
+        "reviewed": true
+      }
+    },
+    "triposr/victorian-street-lamp": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": -90,
+        "y": 0,
+        "z": -45
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.8842007666762588,
+        "margin": 0.008282759749647206,
+        "reviewed": true
+      }
+    },
+    "triposr/wooden-rocking-chair": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": -90,
+        "y": 0,
+        "z": -45
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 4 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "triposr/chrome-espresso-machine": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": -90,
+        "y": 0,
+        "z": -45
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 2 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "triposr/stained-glass-lantern": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 90,
+        "y": -180,
+        "z": -45
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.9550819399725956,
+        "margin": 0.15534672786137482,
+        "reviewed": true
+      }
+    },
+    "triposr/fluffy-monster-plush": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": -90,
+        "y": 0,
+        "z": -45
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 2 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "triposr/chained-anchor": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": -90,
+        "y": 0,
+        "z": -45
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.7652153495675278,
+        "margin": 0.07321102156368331,
+        "reviewed": true
+      }
+    },
+    "triposr/potted-monstera": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": -90,
+        "y": 0,
+        "z": -45
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 12 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "triposr/old-oak-tree": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 45,
+        "y": -150,
+        "z": -90
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 177 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "triposr/modular-dungeon-gate": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 45,
+        "y": -150,
+        "z": 90
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 5 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "triposr/arcade-cabinet": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": -90,
+        "y": 0,
+        "z": -45
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 2 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "triposr/stylized-hover-bike": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": -90,
+        "y": 0,
+        "z": -90
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 2 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "triposr/rusty-pickup-truck": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": -90,
+        "y": 0,
+        "z": -90
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 4 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "triposr/toon-knight-character": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": -90,
+        "y": 0,
+        "z": -45
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.8305242249648837,
+        "margin": 0.12170649443572112,
+        "reviewed": true
+      }
+    },
+    "triposr/forest-goblin-creature": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": -90,
+        "y": 0,
+        "z": -45
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 2 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "triposr/anime-slime-mascot": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": -90,
+        "y": 0,
+        "z": -45
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 2 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "triposr/anime-katana": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": -90,
+        "y": 0,
+        "z": -45
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.803300865312806,
+        "margin": 0.17290743539364883,
+        "reviewed": true
+      }
+    },
+    "triposr/anime-ramen-bowl": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 45,
+        "y": -180,
+        "z": 90
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 3 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "triposr/anime-vending-machine": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": -90,
+        "y": -180,
+        "z": -90
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 3 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "triposr/anime-heroine-character": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": -90,
+        "y": 0,
+        "z": -45
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.8549909348249844,
+        "margin": 0.026750567817301785,
+        "reviewed": true
+      }
+    },
+    "trellis1/cartoon-apple": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -150,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.9544586980254719,
+        "margin": 0.039036110674581015,
+        "reviewed": true
+      }
+    },
+    "trellis1/crusty-bread-loaf": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 15,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 5 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "trellis1/scifi-supply-crate": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -60,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 16 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "trellis1/ornate-treasure-chest": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 15,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 2 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "trellis1/medieval-longsword": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 30,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 16 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "trellis1/plasma-rifle": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -15,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.8549101050543282,
+        "margin": 0.023691691868013676,
+        "reviewed": true
+      }
+    },
+    "trellis1/victorian-street-lamp": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 150,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 2 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "trellis1/wooden-rocking-chair": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -60,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.5560950149155938,
+        "margin": 0.0017149850656366095,
+        "reviewed": true
+      }
+    },
+    "trellis1/chrome-espresso-machine": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 15,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.7630152453232908,
+        "margin": 0.00039029154067260485,
+        "reviewed": true
+      }
+    },
+    "trellis1/stained-glass-lantern": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 75,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.9475723918205665,
+        "margin": 0.006424487192385864,
+        "reviewed": true
+      }
+    },
+    "trellis1/fluffy-monster-plush": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -150,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 2 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "trellis1/chained-anchor": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 15,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.8228011497302992,
+        "margin": 0.06300981946080841,
+        "reviewed": true
+      }
+    },
+    "trellis1/potted-monstera": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -120,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 3 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "trellis1/old-oak-tree": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 135,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 5 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "trellis1/modular-dungeon-gate": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -75,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 3 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "trellis1/arcade-cabinet": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 60,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.8665082594281015,
+        "margin": 0.014285999889142587,
+        "reviewed": true
+      }
+    },
+    "trellis1/stylized-hover-bike": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 3 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "trellis1/rusty-pickup-truck": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -15,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 2 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "trellis1/toon-knight-character": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.8876479478230872,
+        "margin": 0.08271798634166061,
+        "reviewed": true
+      }
+    },
+    "trellis1/forest-goblin-creature": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.850100939093515,
+        "margin": 0.04776394481585444,
+        "reviewed": true
+      }
+    },
+    "trellis1/anime-slime-mascot": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 30,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.97483739623436,
+        "margin": 0.022444747834435286,
+        "reviewed": true
+      }
+    },
+    "trellis1/anime-katana": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -165,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 1 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "trellis1/anime-ramen-bowl": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -15,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.9259366717541537,
+        "margin": 0.01008228164064251,
+        "reviewed": true
+      }
+    },
+    "trellis1/anime-vending-machine": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -45,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 3 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "trellis1/anime-heroine-character": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 2 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "3dtopia-xl/cartoon-apple": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 60,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.8391771686247341,
+        "margin": 0.000698947133446759,
+        "reviewed": true
+      }
+    },
+    "3dtopia-xl/crusty-bread-loaf": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 45,
+        "y": -150,
+        "z": 45
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 5 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "3dtopia-xl/scifi-supply-crate": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 30,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 4 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "3dtopia-xl/ornate-treasure-chest": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 30,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 3 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "3dtopia-xl/medieval-longsword": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -150,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 1; source geometry is incomplete, so this is the best available reference-facing orientation",
+        "reviewed": true
+      }
+    },
+    "3dtopia-xl/plasma-rifle": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": -90,
+        "y": -180,
+        "z": -90
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.7369163722316431,
+        "margin": 0.020983702891272604,
+        "reviewed": true
+      }
+    },
+    "3dtopia-xl/victorian-street-lamp": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": -90,
+        "y": -90,
+        "z": -90
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 2 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "3dtopia-xl/wooden-rocking-chair": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 90,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 75 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "3dtopia-xl/chrome-espresso-machine": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 60,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 2 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "3dtopia-xl/stained-glass-lantern": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 30,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.6213180803434123,
+        "margin": 0.04463759135425083,
+        "reviewed": true
+      }
+    },
+    "3dtopia-xl/fluffy-monster-plush": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 60,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.7787964262640734,
+        "margin": 0.07156195088954564,
+        "reviewed": true
+      }
+    },
+    "3dtopia-xl/chained-anchor": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 60,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 3 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "3dtopia-xl/potted-monstera": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": -90,
+        "y": 90,
+        "z": 90
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 88 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "3dtopia-xl/old-oak-tree": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 150,
+        "z": 45
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 149; source geometry is incomplete, so this is the best available reference-facing orientation",
+        "reviewed": true
+      }
+    },
+    "3dtopia-xl/modular-dungeon-gate": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -150,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 4 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "3dtopia-xl/arcade-cabinet": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": -45,
+        "y": -30,
+        "z": 45
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 5 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "3dtopia-xl/stylized-hover-bike": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 30,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.727818637466958,
+        "margin": 0.11722835706871415,
+        "reviewed": true
+      }
+    },
+    "3dtopia-xl/rusty-pickup-truck": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 30,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.7783229879316234,
+        "margin": 0.07131940333337716,
+        "reviewed": true
+      }
+    },
+    "3dtopia-xl/toon-knight-character": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": -45,
+        "y": 60,
+        "z": 45
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 1 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "3dtopia-xl/forest-goblin-creature": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": -45,
+        "y": 60,
+        "z": 45
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 4 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "3dtopia-xl/anime-slime-mascot": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 30,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 4 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "3dtopia-xl/anime-katana": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 45,
+        "y": 120,
+        "z": -90
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.7283191297897168,
+        "margin": 0.12339391246068498,
+        "reviewed": true
+      }
+    },
+    "3dtopia-xl/anime-ramen-bowl": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 45,
+        "y": 30,
+        "z": -45
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 5 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "3dtopia-xl/anime-vending-machine": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": -90,
+        "y": 90,
+        "z": 90
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 1 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "3dtopia-xl/anime-heroine-character": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 30,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.7304571227175409,
+        "margin": 0.06493447534794472,
+        "reviewed": true
+      }
+    },
+    "hunyuan3d-21/cartoon-apple": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 60,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.883585245762021,
+        "margin": 0.061481962588465056,
+        "reviewed": true
+      }
+    },
+    "hunyuan3d-21/crusty-bread-loaf": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 30,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.9860238950573648,
+        "margin": 0.007175935212805129,
+        "reviewed": true
+      }
+    },
+    "hunyuan3d-21/scifi-supply-crate": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 45,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 2 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "hunyuan3d-21/ornate-treasure-chest": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 45,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 2 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "hunyuan3d-21/medieval-longsword": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -165,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.9366633214420446,
+        "margin": 0.00014648437500008882,
+        "reviewed": true
+      }
+    },
+    "hunyuan3d-21/plasma-rifle": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 60,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 2 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "hunyuan3d-21/victorian-street-lamp": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -60,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 2 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "hunyuan3d-21/wooden-rocking-chair": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.5647215198983131,
+        "margin": 0.022514477591894178,
+        "reviewed": true
+      }
+    },
+    "hunyuan3d-21/chrome-espresso-machine": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 15,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 2 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "hunyuan3d-21/stained-glass-lantern": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -105,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 6 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "hunyuan3d-21/fluffy-monster-plush": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 45,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 15 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "hunyuan3d-21/chained-anchor": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 30,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 2 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "hunyuan3d-21/potted-monstera": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 45,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.7117794636244719,
+        "margin": 0.015454914627667016,
+        "reviewed": true
+      }
+    },
+    "hunyuan3d-21/old-oak-tree": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -120,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 3 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "hunyuan3d-21/modular-dungeon-gate": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 30,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 2 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "hunyuan3d-21/arcade-cabinet": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -15,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 10 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "hunyuan3d-21/stylized-hover-bike": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -15,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.7626625715266806,
+        "margin": 0.10596317958231227,
+        "reviewed": true
+      }
+    },
+    "hunyuan3d-21/rusty-pickup-truck": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -15,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 2 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "hunyuan3d-21/toon-knight-character": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.7449129639785579,
+        "margin": 0.039132849424126426,
+        "reviewed": true
+      }
+    },
+    "hunyuan3d-21/forest-goblin-creature": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.8255330381492296,
+        "margin": 0.03988797252502829,
+        "reviewed": true
+      }
+    },
+    "hunyuan3d-21/anime-slime-mascot": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 30,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 6 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "hunyuan3d-21/anime-katana": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 105,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.5439702231611595,
+        "margin": 0.18740565874918752,
+        "reviewed": true
+      }
+    },
+    "hunyuan3d-21/anime-ramen-bowl": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 15,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.8584579031046724,
+        "margin": 0.04888404089206744,
+        "reviewed": true
+      }
+    },
+    "hunyuan3d-21/anime-vending-machine": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 45,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 3 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "hunyuan3d-21/anime-heroine-character": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 15,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.9119929627259016,
+        "margin": 0.02794285214143788,
+        "reviewed": true
+      }
+    },
+    "trellis2/cartoon-apple": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 45,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.9637177179619894,
+        "margin": 0.04210984437634646,
+        "reviewed": true
+      }
+    },
+    "trellis2/crusty-bread-loaf": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 60,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.8483583179801342,
+        "margin": 0.010584932439771877,
+        "reviewed": true
+      }
+    },
+    "trellis2/scifi-supply-crate": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 15,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.9329591541554034,
+        "margin": 0.0019758108748149095,
+        "reviewed": true
+      }
+    },
+    "trellis2/ornate-treasure-chest": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 15,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.8676093513631604,
+        "margin": 0.051371716861567496,
+        "reviewed": true
+      }
+    },
+    "trellis2/medieval-longsword": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -180,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 3 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "trellis2/plasma-rifle": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -15,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 2 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "trellis2/victorian-street-lamp": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.8999346399207285,
+        "margin": 0.0002731672156145448,
+        "reviewed": true
+      }
+    },
+    "trellis2/wooden-rocking-chair": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.5520655138927826,
+        "margin": 0.02248520979860824,
+        "reviewed": true
+      }
+    },
+    "trellis2/chrome-espresso-machine": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 15,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 2 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "trellis2/stained-glass-lantern": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -135,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.9282832467592567,
+        "margin": 0.0017596854531021222,
+        "reviewed": true
+      }
+    },
+    "trellis2/fluffy-monster-plush": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 30,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.8183999583314494,
+        "margin": 0.006213368427271382,
+        "reviewed": true
+      }
+    },
+    "trellis2/chained-anchor": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 15,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.8115799186650687,
+        "margin": 0.04608021346811797,
+        "reviewed": true
+      }
+    },
+    "trellis2/potted-monstera": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -180,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.6375347580213545,
+        "margin": 0.027569330653991586,
+        "reviewed": true
+      }
+    },
+    "trellis2/old-oak-tree": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -135,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.7100304414321486,
+        "margin": 0.03206136900490075,
+        "reviewed": true
+      }
+    },
+    "trellis2/modular-dungeon-gate": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 135,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 5 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "trellis2/arcade-cabinet": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 75,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 1 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "trellis2/stylized-hover-bike": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -15,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.9041410906862155,
+        "margin": 0.11587132898687003,
+        "reviewed": true
+      }
+    },
+    "trellis2/rusty-pickup-truck": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -105,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 1 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "trellis2/toon-knight-character": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 2 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "trellis2/forest-goblin-creature": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 30,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 4 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "trellis2/anime-slime-mascot": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 30,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.9851644533626064,
+        "margin": 0.013941976787331556,
+        "reviewed": true
+      }
+    },
+    "trellis2/anime-katana": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -135,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.7875639394939452,
+        "margin": 0.03249619790113112,
+        "reviewed": true
+      }
+    },
+    "trellis2/anime-ramen-bowl": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -135,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 3 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "trellis2/anime-vending-machine": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 30,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 3 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "trellis2/anime-heroine-character": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 15,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.9255621141523345,
+        "margin": 0.057618190973648176,
+        "reviewed": true
+      }
+    },
+    "step1x-3d/cartoon-apple": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 60,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.9187074574788976,
+        "margin": 0.03534169760338712,
+        "reviewed": true
+      }
+    },
+    "step1x-3d/crusty-bread-loaf": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 30,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 8 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "step1x-3d/scifi-supply-crate": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 15,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 2 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "step1x-3d/ornate-treasure-chest": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 15,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.8883669579378416,
+        "margin": 0.06534573567625912,
+        "reviewed": true
+      }
+    },
+    "step1x-3d/medieval-longsword": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 30,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 5 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "step1x-3d/plasma-rifle": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 75,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.8501557376709307,
+        "margin": 0.005832752054903079,
+        "reviewed": true
+      }
+    },
+    "step1x-3d/victorian-street-lamp": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -45,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 17 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "step1x-3d/wooden-rocking-chair": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.6511094418062489,
+        "margin": 0.03306022026293054,
+        "reviewed": true
+      }
+    },
+    "step1x-3d/chrome-espresso-machine": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 15,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 3 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "step1x-3d/stained-glass-lantern": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -135,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.9400908652465647,
+        "margin": 0.0038638736235120374,
+        "reviewed": true
+      }
+    },
+    "step1x-3d/fluffy-monster-plush": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 30,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.8205824940800849,
+        "margin": 0.038286684458012865,
+        "reviewed": true
+      }
+    },
+    "step1x-3d/chained-anchor": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 15,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.8065898924856891,
+        "margin": 0.07826264945514128,
+        "reviewed": true
+      }
+    },
+    "step1x-3d/potted-monstera": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 30,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 4 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "step1x-3d/old-oak-tree": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -45,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 3 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "step1x-3d/modular-dungeon-gate": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 30,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 5 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "step1x-3d/arcade-cabinet": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 60,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 2 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "step1x-3d/stylized-hover-bike": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 75,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.8941388333100692,
+        "margin": 0.16398831129779523,
+        "reviewed": true
+      }
+    },
+    "step1x-3d/rusty-pickup-truck": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 75,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 2 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "step1x-3d/toon-knight-character": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 15,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.8557173324707666,
+        "margin": 0.05180041223158616,
+        "reviewed": true
+      }
+    },
+    "step1x-3d/forest-goblin-creature": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 4 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "step1x-3d/anime-slime-mascot": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -105,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 3 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "step1x-3d/anime-katana": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 60,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.7061336503419051,
+        "margin": 0.16618273781844306,
+        "reviewed": true
+      }
+    },
+    "step1x-3d/anime-ramen-bowl": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -45,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.9391175318603248,
+        "margin": 0.003525998858229351,
+        "reviewed": true
+      }
+    },
+    "step1x-3d/anime-vending-machine": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 45,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.8665401593071538,
+        "margin": 0.0018578420380395144,
+        "reviewed": true
+      }
+    },
+    "step1x-3d/anime-heroine-character": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 45,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.8822489463401306,
+        "margin": 0.004734145819234481,
+        "reviewed": true
+      }
+    },
+    "pixal3d/cartoon-apple": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -90,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.8665731614649286,
+        "margin": 0.02428590124888752,
+        "reviewed": true
+      }
+    },
+    "pixal3d/crusty-bread-loaf": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -120,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 2 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "pixal3d/scifi-supply-crate": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -135,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 3 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "pixal3d/ornate-treasure-chest": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -120,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 4 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "pixal3d/medieval-longsword": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 45,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 2 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "pixal3d/plasma-rifle": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 30,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.7500606817617713,
+        "margin": 0.007770387838670012,
+        "reviewed": true
+      }
+    },
+    "pixal3d/victorian-street-lamp": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 45,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.8901652934691605,
+        "margin": 0.008112182215644581,
+        "reviewed": true
+      }
+    },
+    "pixal3d/wooden-rocking-chair": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -135,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 2 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "pixal3d/chrome-espresso-machine": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -135,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 2 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "pixal3d/stained-glass-lantern": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 45,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 2 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "pixal3d/fluffy-monster-plush": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -135,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.8035531959644485,
+        "margin": 0.03842161661755383,
+        "reviewed": true
+      }
+    },
+    "pixal3d/chained-anchor": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -135,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 2 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "pixal3d/potted-monstera": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -150,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.6841634013872591,
+        "margin": 0.05501371652888776,
+        "reviewed": true
+      }
+    },
+    "pixal3d/old-oak-tree": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -165,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 4 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "pixal3d/modular-dungeon-gate": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 15,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 4 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "pixal3d/arcade-cabinet": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -60,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 2 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "pixal3d/stylized-hover-bike": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -165,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.766818729011104,
+        "margin": 0.0762469099437253,
+        "reviewed": true
+      }
+    },
+    "pixal3d/rusty-pickup-truck": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -165,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.7851636120700096,
+        "margin": 0.004137752430876662,
+        "reviewed": true
+      }
+    },
+    "pixal3d/toon-knight-character": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -150,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.8246542281027822,
+        "margin": 0.10193355654389347,
+        "reviewed": true
+      }
+    },
+    "pixal3d/forest-goblin-creature": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 75,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 3 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "pixal3d/anime-slime-mascot": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 15,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.9890599947582633,
+        "margin": 0.0024167304001552203,
+        "reviewed": true
+      }
+    },
+    "pixal3d/anime-katana": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -135,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.7995331671198593,
+        "margin": 0.15709055919012394,
+        "reviewed": true
+      }
+    },
+    "pixal3d/anime-ramen-bowl": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -150,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 4 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "pixal3d/anime-vending-machine": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -135,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 1 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "pixal3d/anime-heroine-character": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -135,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 3 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "partcrafter/cartoon-apple": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -165,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 3 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "partcrafter/crusty-bread-loaf": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -180,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 2 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "partcrafter/scifi-supply-crate": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 75,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 2 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "partcrafter/ornate-treasure-chest": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 45,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 9 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "partcrafter/medieval-longsword": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -60,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 4; source geometry is incomplete, so this is the best available reference-facing orientation",
+        "reviewed": true
+      }
+    },
+    "partcrafter/plasma-rifle": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -150,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.28141451180010196,
+        "margin": 0.00688365754034459,
+        "reviewed": true
+      }
+    },
+    "partcrafter/victorian-street-lamp": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 165,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 11; source geometry is incomplete, so this is the best available reference-facing orientation",
+        "reviewed": true
+      }
+    },
+    "partcrafter/wooden-rocking-chair": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -60,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.4819406611702091,
+        "margin": 0.012052049044858626,
+        "reviewed": true
+      }
+    },
+    "partcrafter/chrome-espresso-machine": {
+      "status": "excluded",
+      "reason": "expected-failure-no-glb"
+    },
+    "partcrafter/stained-glass-lantern": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 75,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 15 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "partcrafter/fluffy-monster-plush": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 45,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 2 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "partcrafter/chained-anchor": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 15,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.6719314360897665,
+        "margin": 0.016201731944088027,
+        "reviewed": true
+      }
+    },
+    "partcrafter/potted-monstera": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -165,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 8; source geometry is incomplete, so this is the best available reference-facing orientation",
+        "reviewed": true
+      }
+    },
+    "partcrafter/old-oak-tree": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -150,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 8 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "partcrafter/modular-dungeon-gate": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -135,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 6 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "partcrafter/arcade-cabinet": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 60,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 3 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "partcrafter/stylized-hover-bike": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -15,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 22; source geometry is incomplete, so this is the best available reference-facing orientation",
+        "reviewed": true
+      }
+    },
+    "partcrafter/rusty-pickup-truck": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 135,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.7945642757437986,
+        "margin": 0.07879190568342076,
+        "reviewed": true
+      }
+    },
+    "partcrafter/toon-knight-character": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -135,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 3 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "partcrafter/forest-goblin-creature": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 90,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 6 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "partcrafter/anime-slime-mascot": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 45,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 6 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "partcrafter/anime-katana": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -120,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.7283252943186392,
+        "margin": 0.18161340917516877,
+        "reviewed": true
+      }
+    },
+    "partcrafter/anime-ramen-bowl": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 45,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 11 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "partcrafter/anime-vending-machine": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 30,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 2 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "partcrafter/anime-heroine-character": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 30,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 2 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "triposg/cartoon-apple": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 45,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 2 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "triposg/crusty-bread-loaf": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 30,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 2 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "triposg/scifi-supply-crate": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 3 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "triposg/ornate-treasure-chest": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 15,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.8616104352750718,
+        "margin": 0.02908810585753152,
+        "reviewed": true
+      }
+    },
+    "triposg/medieval-longsword": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 75,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.8080683683502703,
+        "margin": 0.00018669478998023514,
+        "reviewed": true
+      }
+    },
+    "triposg/plasma-rifle": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 75,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.870420360457985,
+        "margin": 0.1470555379991958,
+        "reviewed": true
+      }
+    },
+    "triposg/victorian-street-lamp": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -90,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 4 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "triposg/wooden-rocking-chair": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.5544498343709885,
+        "margin": 0.03152007682212743,
+        "reviewed": true
+      }
+    },
+    "triposg/chrome-espresso-machine": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 3 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "triposg/stained-glass-lantern": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 60,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 2 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "triposg/fluffy-monster-plush": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 30,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.8005355813731013,
+        "margin": 0.00984310451096293,
+        "reviewed": true
+      }
+    },
+    "triposg/chained-anchor": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 15,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.8116188615259161,
+        "margin": 0.050798675567739315,
+        "reviewed": true
+      }
+    },
+    "triposg/potted-monstera": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 30,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 2 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "triposg/old-oak-tree": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 30,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.6330689514536738,
+        "margin": 0.024021800202533417,
+        "reviewed": true
+      }
+    },
+    "triposg/modular-dungeon-gate": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 45,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 6 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "triposg/arcade-cabinet": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 60,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.8828211582596082,
+        "margin": 0.009010480624722539,
+        "reviewed": true
+      }
+    },
+    "triposg/stylized-hover-bike": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 60,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.8248478790538274,
+        "margin": 0.045858115575799774,
+        "reviewed": true
+      }
+    },
+    "triposg/rusty-pickup-truck": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -15,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.8455142346222806,
+        "margin": 0.020185305272809595,
+        "reviewed": true
+      }
+    },
+    "triposg/toon-knight-character": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.8891365808393582,
+        "margin": 0.06768542061738314,
+        "reviewed": true
+      }
+    },
+    "triposg/forest-goblin-creature": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -120,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 3 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "triposg/anime-slime-mascot": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 30,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.9912234573777877,
+        "margin": 0.01337396876051622,
+        "reviewed": true
+      }
+    },
+    "triposg/anime-katana": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 45,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.4308696963606994,
+        "margin": 0.008548063569366215,
+        "reviewed": true
+      }
+    },
+    "triposg/anime-ramen-bowl": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 30,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.9633595388979129,
+        "margin": 0.06572528378244025,
+        "reviewed": true
+      }
+    },
+    "triposg/anime-vending-machine": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 45,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.890680134730461,
+        "margin": 0.002282265254884286,
+        "reviewed": true
+      }
+    },
+    "triposg/anime-heroine-character": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 30,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.9163159274237781,
+        "margin": 0.012449176134934459,
+        "reviewed": true
+      }
+    },
+    "direct3d-s2/cartoon-apple": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 30,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 2 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "direct3d-s2/crusty-bread-loaf": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 2 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "direct3d-s2/scifi-supply-crate": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -75,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 4 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "direct3d-s2/ornate-treasure-chest": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 15,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.8669084593116655,
+        "margin": 0.03548564315764202,
+        "reviewed": true
+      }
+    },
+    "direct3d-s2/medieval-longsword": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -150,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 5 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "direct3d-s2/plasma-rifle": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 75,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.8715714943201697,
+        "margin": 0.028889286006860027,
+        "reviewed": true
+      }
+    },
+    "direct3d-s2/victorian-street-lamp": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 45,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 2 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "direct3d-s2/wooden-rocking-chair": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.5678864836661275,
+        "margin": 0.043739268622461136,
+        "reviewed": true
+      }
+    },
+    "direct3d-s2/chrome-espresso-machine": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 15,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 2 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "direct3d-s2/stained-glass-lantern": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 45,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.9453765942641983,
+        "margin": 0.0004092507962065728,
+        "reviewed": true
+      }
+    },
+    "direct3d-s2/fluffy-monster-plush": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 30,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 2 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "direct3d-s2/chained-anchor": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 15,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.825163578431994,
+        "margin": 0.038762393958277186,
+        "reviewed": true
+      }
+    },
+    "direct3d-s2/potted-monstera": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 30,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 2 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "direct3d-s2/old-oak-tree": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 45,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.6965115350871326,
+        "margin": 0.017344976084623598,
+        "reviewed": true
+      }
+    },
+    "direct3d-s2/modular-dungeon-gate": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -135,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 5 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "direct3d-s2/arcade-cabinet": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 90,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 4 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "direct3d-s2/stylized-hover-bike": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -15,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.842477502442082,
+        "margin": 0.04274269719484436,
+        "reviewed": true
+      }
+    },
+    "direct3d-s2/rusty-pickup-truck": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -15,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 2 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "direct3d-s2/toon-knight-character": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.8913906205627352,
+        "margin": 0.049392833310244244,
+        "reviewed": true
+      }
+    },
+    "direct3d-s2/forest-goblin-creature": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -135,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 5 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "direct3d-s2/anime-slime-mascot": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -150,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 2 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "direct3d-s2/anime-katana": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -15,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "auto",
+        "score": 0.6487738984991324,
+        "margin": 0.13791340428981358,
+        "reviewed": true
+      }
+    },
+    "direct3d-s2/anime-ramen-bowl": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 135,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 4 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "direct3d-s2/anime-vending-machine": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": 30,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 2 to match the reference-facing direction",
+        "reviewed": true
+      }
+    },
+    "direct3d-s2/anime-heroine-character": {
+      "status": "fixed",
+      "rotationDegrees": {
+        "x": 0,
+        "y": -105,
+        "z": 0
+      },
+      "provenance": {
+        "kind": "manual",
+        "reason": "visual review selected rank 4 to match the reference-facing direction",
+        "reviewed": true
+      }
+    }
+  }
+}

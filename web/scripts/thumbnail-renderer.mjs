@@ -12,10 +12,25 @@ import { chromium } from 'playwright';
 import sharp from 'sharp';
 import { createServer as createViteServer } from 'vite';
 
+import { parseOrientationFixes } from './orientation-fixes-lib.mjs';
+import { parseModelRegistry, parseTasks } from './thumbnail-batch-lib.mjs';
+
 const scriptPath = fileURLToPath(import.meta.url);
 const webRoot = path.resolve(path.dirname(scriptPath), '..');
 const require = createRequire(import.meta.url);
 const packageJson = JSON.parse(await readFile(path.join(webRoot, 'package.json'), 'utf8'));
+const [modelRegistryText, tasksText, orientationFixesText] = await Promise.all([
+  readFile(path.join(webRoot, 'src/data/model-registry.json'), 'utf8'),
+  readFile(path.resolve(webRoot, '..', 'tasks/tasks.json'), 'utf8'),
+  readFile(path.join(webRoot, 'src/data/orientation-fixes.json'), 'utf8'),
+]);
+const orientationModelIds = parseModelRegistry(JSON.parse(modelRegistryText));
+const orientationTaskIds = parseTasks(JSON.parse(tasksText));
+const orientationFixes = parseOrientationFixes(orientationFixesText, {
+  modelIds: orientationModelIds,
+  taskIds: orientationTaskIds,
+  expectedFailures: new Set(['partcrafter/chrome-espresso-machine']),
+});
 
 function exactVersion(section, name) {
   const version = packageJson[section]?.[name];
@@ -42,6 +57,10 @@ const recipeSources = [
   'src/viewer/ViewerCore.ts',
   'src/viewer/loadModel.ts',
   'src/data/models.ts',
+  'src/data/model-registry.json',
+  'src/data/orientation-fixes.json',
+  'scripts/orientation-fixes-lib.mjs',
+  '../tasks/tasks.json',
 ];
 
 async function readRecipeSourceHashes() {
@@ -72,7 +91,7 @@ async function assertRecipeSourcesUnchanged() {
  * object plus its explicit backend in the R2 cache fingerprint.
  */
 export const thumbnailRecipe = Object.freeze({
-  version: 1,
+  version: 3,
   width: 320,
   height: 320,
   deviceScaleFactor: 1,
@@ -92,6 +111,7 @@ export const thumbnailRecipe = Object.freeze({
   framing: 'box3-center-max-dimension-unit-box',
   lighting: 'RoomEnvironment-PMREM',
   toneMapping: 'ACESFilmicToneMapping',
+  orientation: { schemaVersion: 1, rotationSpace: 'absolute-object-local', eulerOrder: 'XYZ' },
   webp: { quality: 85, alphaQuality: 100, effort: 6, smartSubsample: true },
   runtime: {
     three: exactVersion('dependencies', 'three'),
@@ -246,76 +266,119 @@ export async function createThumbnailRenderer({ backend = 'swiftshader', timeout
 
   let renderSequence = 0;
   let closed = false;
+  let activeSession = false;
+
+  async function openSession({ glbPath, modelId, taskId }) {
+    if (closed) throw new Error('thumbnail renderer is closed');
+    if (activeSession) throw new Error('thumbnail renderer already has an active model session');
+    if (!/^[a-z0-9-]+$/.test(modelId)) throw new Error(`invalid model ID: ${modelId}`);
+    if (!/^[a-z0-9-]+$/.test(taskId)) throw new Error(`invalid task ID: ${taskId}`);
+    await assertRecipeSourcesUnchanged();
+    const sourceStats = await stat(glbPath);
+    if (!sourceStats.isFile() || sourceStats.size === 0) throw new Error(`GLB is missing or empty: ${glbPath}`);
+
+    renderSequence += 1;
+    activeSession = true;
+    state.active = { path: path.resolve(glbPath), size: sourceStats.size };
+    const page = await browser.newPage({
+      viewport: { width: thumbnailRecipe.width, height: thumbnailRecipe.height },
+      deviceScaleFactor: thumbnailRecipe.deviceScaleFactor,
+    });
+    page.setDefaultTimeout(timeoutMs);
+    const pageErrors = [];
+    page.on('pageerror', (error) => pageErrors.push(error.message));
+
+    let sessionClosed = false;
+    try {
+      const url = new URL('/thumbnail-render.html', serverBaseUrl(httpServer));
+      url.searchParams.set('model', modelId);
+      url.searchParams.set('task', taskId);
+      url.searchParams.set('token', String(renderSequence));
+      const response = await page.goto(url.href, { waitUntil: 'load', timeout: timeoutMs });
+      if (!response?.ok()) throw new Error(`thumbnail render page returned HTTP ${response?.status() ?? 'none'}`);
+      await page.waitForFunction(
+        () => ['ready', 'error'].includes(window.__THUMBNAIL_STATE__?.status),
+        undefined,
+        { timeout: timeoutMs },
+      );
+      const result = await page.evaluate(() => window.__THUMBNAIL_STATE__);
+      if (result.status === 'error') throw new Error(result.message);
+      if (pageErrors.length > 0) throw new Error(`thumbnail page error: ${pageErrors.join('; ')}`);
+      assertWebglBackend(backend, result.webglRenderer);
+
+      return {
+        stats: { meshes: result.meshes, triangles: result.triangles, vertices: result.vertices },
+        webglRenderer: result.webglRenderer,
+        async capture({ outputPath, orientationDegrees }) {
+          if (sessionClosed) throw new Error('thumbnail model session is closed');
+          if (orientationDegrees !== undefined) {
+            await page.evaluate(async (orientation) => {
+              if (!window.__THUMBNAIL_CONTROL__) throw new Error('thumbnail control is unavailable');
+              await window.__THUMBNAIL_CONTROL__.setOrientationDegrees(orientation);
+            }, orientationDegrees);
+          }
+          if (pageErrors.length > 0) throw new Error(`thumbnail page error: ${pageErrors.join('; ')}`);
+          await mkdir(path.dirname(outputPath), { recursive: true });
+          await page.locator(thumbnailRecipe.capture.target).screenshot({
+            path: outputPath,
+            type: thumbnailRecipe.capture.type,
+            omitBackground: thumbnailRecipe.capture.omitBackground,
+            animations: thumbnailRecipe.capture.animations,
+            scale: thumbnailRecipe.capture.scale,
+          });
+          await assertRecipeSourcesUnchanged();
+          const screenshot = await readFile(outputPath);
+          const metadata = await sharp(screenshot, { failOn: 'error' }).metadata();
+          if (
+            metadata.format !== 'png' ||
+            metadata.width !== thumbnailRecipe.width ||
+            metadata.height !== thumbnailRecipe.height
+          ) {
+            throw new Error(
+              `thumbnail screenshot must be ${thumbnailRecipe.width}x${thumbnailRecipe.height} PNG, received ` +
+                `${metadata.format ?? 'unknown'} ${metadata.width ?? '?'}x${metadata.height ?? '?'}`,
+            );
+          }
+          return { width: metadata.width, height: metadata.height };
+        },
+        async close() {
+          if (sessionClosed) return;
+          sessionClosed = true;
+          state.active = null;
+          activeSession = false;
+          await page.close();
+        },
+      };
+    } catch (error) {
+      state.active = null;
+      activeSession = false;
+      await page.close();
+      throw error;
+    }
+  }
+
   return {
     recipe: Object.freeze({ ...thumbnailRecipe, backend }),
+    openSession,
     async render({ glbPath, outputPath, modelId, taskId }) {
-      if (closed) throw new Error('thumbnail renderer is closed');
-      if (!/^[a-z0-9-]+$/.test(modelId)) throw new Error(`invalid model ID: ${modelId}`);
-      if (!/^[a-z0-9-]+$/.test(taskId)) throw new Error(`invalid task ID: ${taskId}`);
-      await assertRecipeSourcesUnchanged();
-      const sourceStats = await stat(glbPath);
-      if (!sourceStats.isFile() || sourceStats.size === 0) throw new Error(`GLB is missing or empty: ${glbPath}`);
-      await mkdir(path.dirname(outputPath), { recursive: true });
-
-      renderSequence += 1;
-      state.active = { path: path.resolve(glbPath), size: sourceStats.size };
-      const page = await browser.newPage({
-        viewport: { width: thumbnailRecipe.width, height: thumbnailRecipe.height },
-        deviceScaleFactor: thumbnailRecipe.deviceScaleFactor,
-      });
-      page.setDefaultTimeout(timeoutMs);
-      const pageErrors = [];
-      page.on('pageerror', (error) => pageErrors.push(error.message));
+      const orientation = orientationFixes.cells[`${modelId}/${taskId}`];
+      if (!orientation) throw new Error(`orientation registry has no cell ${modelId}/${taskId}`);
+      if (orientation.status !== 'fixed') throw new Error(`cannot render excluded orientation cell ${modelId}/${taskId}`);
+      const session = await openSession({ glbPath, modelId, taskId });
       try {
-        const url = new URL('/thumbnail-render.html', serverBaseUrl(httpServer));
-        url.searchParams.set('model', modelId);
-        url.searchParams.set('task', taskId);
-        url.searchParams.set('token', String(renderSequence));
-        const response = await page.goto(url.href, { waitUntil: 'load', timeout: timeoutMs });
-        if (!response?.ok()) throw new Error(`thumbnail render page returned HTTP ${response?.status() ?? 'none'}`);
-        await page.waitForFunction(
-          () => ['ready', 'error'].includes(window.__THUMBNAIL_STATE__?.status),
-          undefined,
-          { timeout: timeoutMs },
-        );
-        const result = await page.evaluate(() => window.__THUMBNAIL_STATE__);
-        if (result.status === 'error') throw new Error(result.message);
-        if (pageErrors.length > 0) throw new Error(`thumbnail page error: ${pageErrors.join('; ')}`);
-        assertWebglBackend(backend, result.webglRenderer);
-
-        await page.locator(thumbnailRecipe.capture.target).screenshot({
-          path: outputPath,
-          type: thumbnailRecipe.capture.type,
-          omitBackground: thumbnailRecipe.capture.omitBackground,
-          animations: thumbnailRecipe.capture.animations,
-          scale: thumbnailRecipe.capture.scale,
-        });
-        await assertRecipeSourcesUnchanged();
-        const screenshot = await readFile(outputPath);
-        const metadata = await sharp(screenshot, { failOn: 'error' }).metadata();
-        if (
-          metadata.format !== 'png' ||
-          metadata.width !== thumbnailRecipe.width ||
-          metadata.height !== thumbnailRecipe.height
-        ) {
-          throw new Error(
-            `thumbnail screenshot must be ${thumbnailRecipe.width}x${thumbnailRecipe.height} PNG, received ` +
-              `${metadata.format ?? 'unknown'} ${metadata.width ?? '?'}x${metadata.height ?? '?'}`,
-          );
-        }
+        const capture = await session.capture({ outputPath, orientationDegrees: orientation.rotationDegrees });
         return {
-          width: metadata.width,
-          height: metadata.height,
-          webglRenderer: result.webglRenderer,
-          stats: { meshes: result.meshes, triangles: result.triangles, vertices: result.vertices },
+          ...capture,
+          webglRenderer: session.webglRenderer,
+          stats: session.stats,
         };
       } finally {
-        state.active = null;
-        await page.close();
+        await session.close();
       }
     },
     async close() {
       if (closed) return;
+      if (activeSession) throw new Error('close the active thumbnail model session before closing the renderer');
       closed = true;
       state.active = null;
       await closeRendererResources(browser, httpServer, viteServer);
@@ -332,10 +395,14 @@ function parseLocalArguments(argv) {
     else if (argument === '--input') parsed.input = argv[++index];
     else if (argument === '--output') parsed.output = argv[++index];
     else if (argument === '--model') parsed.modelId = argv[++index];
+    else if (argument === '--task') parsed.taskId = argv[++index];
     else throw new Error(`unknown thumbnail renderer argument: ${argument}`);
   }
-  for (const name of ['input', 'output', 'modelId']) {
-    if (!parsed[name]) throw new Error(`--${name === 'modelId' ? 'model' : name} is required`);
+  for (const name of ['input', 'output', 'modelId', 'taskId']) {
+    if (!parsed[name]) {
+      const flag = name === 'modelId' ? 'model' : name === 'taskId' ? 'task' : name;
+      throw new Error(`--${flag} is required`);
+    }
   }
   if (path.extname(parsed.output).toLowerCase() !== '.webp') throw new Error('--output must end in .webp');
   return parsed;
@@ -350,7 +417,7 @@ async function localMain() {
       glbPath: path.resolve(args.input),
       outputPath: tempPng,
       modelId: args.modelId,
-      taskId: 'local-preview',
+      taskId: args.taskId,
     });
     await mkdir(path.dirname(path.resolve(args.output)), { recursive: true });
     const screenshot = await readFile(tempPng);
