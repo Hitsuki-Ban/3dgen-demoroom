@@ -34,7 +34,7 @@
 
 ### 注意点・改善余地
 
-- **Worker Free の日次上限(10 万 req)超過時は [Cloudflare Error 1027](https://developers.cloudflare.com/workers/platform/limits/)**: fail-closed 設定では error page、fail-open では Worker を bypass(当サイトでは `/run-assets/*` に Worker 以外の配信経路が無いため、いずれでも GLB 配信は実質停止)。1 万人/日が見えたら **先に Workers Paid($5)へ** — 静的部分は落ちないが体験が壊れるため
+- **`/run-assets/*` は Static Assets の `run_worker_first` パスなので、Worker Free の日次上限(10 万 req)超過時は HTTP 429**([Static Assets billing & limitations](https://developers.cloudflare.com/workers/static-assets/billing-and-limitations/): "these requests will receive a 429 (Too Many Requests) response instead of falling back to static asset serving")。静的アセット(HTML/JS/画像/manifest)は quota 非消費で配信が続くが、GLB 配信は止まる。1 万人/日が見えたら **先に Workers Paid($5)へ** — 静的部分は落ちないが体験が壊れるため
 - Worker の CPU 制限(Free 10ms/呼び出し)は R2→クライアントのストリーミングパススルーでは実測上問題になりにくいが、巨大 GLB で余裕を見るなら Paid(30s CPU)が安全側
 - `runs/` 37GiB は生の実行成果物。保管料の内訳(decimal GB 換算): 現状 Standard ~$0.58/月 → runs/ を Infrequent Access へ移すと残り Standard 8.8GB は無料枠内・IA 保管 ~$0.40/月で、**月差はわずか ~$0.17**。一方 IA には条件が多い — 10GB 無料枠は Standard のみ、取り出し $0.01/GB、Class B $0.90/M、最低保管 30 日、そして**移行操作(`LifecycleStorageTierTransition`)自体が IA Class A($9/M、無料枠対象外、100 万単位への切り上げ課金)**。全 bucket 3,721 objects でも一時費用 ~$9 となり、**回収に 4〜5 年**かかる。**結論: この規模で IA 移行は割に合わない。削減するなら不要成果物の剪定一択**
 - deploy 1 回あたりのコスト: R2 sync の GET ~900 + PUT 数十 → 無視できる規模
