@@ -155,12 +155,17 @@ export function ViewerPane({
           }`}
         >
           {!loaded && previewImage && (
-            // 未ロード時のプレビュー: 何の課題かを最低限確認できるようリファレンス画像を薄く敷く
+            // 未ロード時のプレビュー: モデル出力のサムネイル(無ければリファレンス画像)を薄く敷く。
+            // ロード済みの操作可能なペインと見分けがつくよう減光+軽いブラーは維持する。
+            // geo 制限(451)等で画像が取れない場合は壊れ画像を出さずに消す
             <img
               src={previewImage}
               alt=""
               aria-hidden
-              className="absolute inset-0 w-full h-full object-contain opacity-25 blur-[1px] pointer-events-none"
+              onError={(e) => {
+                e.currentTarget.style.display = 'none';
+              }}
+              className="absolute inset-0 w-full h-full object-contain opacity-40 blur-[1px] pointer-events-none"
             />
           )}
           {needsClick && !accepted && (

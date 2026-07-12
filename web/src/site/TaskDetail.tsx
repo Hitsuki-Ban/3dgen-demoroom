@@ -56,7 +56,9 @@ function ResultPane({
       downloadUrl={result.glbUrl}
       metaJson={JSON.stringify(result.meta, null, 2)}
       orientationFix={m.orientationFix}
-      previewImage={task.referenceImage}
+      // 未ロード/クリックロードのプレビューは、このモデル自身の出力サムネイル(#66/#73)を優先。
+      // 古い manifest や失敗直後の再発行などで thumbUrl が無いセルはリファレンス画像に落とす
+      previewImage={result.thumbUrl ?? task.referenceImage}
       loadObject={makeLoadObject(result)}
       extraInfo={formatResultInfo(
         result.metrics.wallClockSeconds,
