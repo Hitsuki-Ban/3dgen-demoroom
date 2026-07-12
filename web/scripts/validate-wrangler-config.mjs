@@ -19,11 +19,16 @@ export function validateWranglerConfig(configPath) {
   if (config.preview_urls !== false) {
     throw new Error('wrangler config must explicitly keep preview URLs disabled');
   }
+  const customDomainRoute = config.routes?.[0];
+  const customDomainKeys = customDomainRoute && typeof customDomainRoute === 'object'
+    ? Object.keys(customDomainRoute).sort()
+    : [];
   if (
     !Array.isArray(config.routes)
     || config.routes.length !== 1
-    || config.routes[0]?.pattern !== '3dgen.hitsuki.space'
-    || config.routes[0]?.custom_domain !== true
+    || customDomainRoute?.pattern !== '3dgen.hitsuki.space'
+    || customDomainRoute?.custom_domain !== true
+    || JSON.stringify(customDomainKeys) !== JSON.stringify(['custom_domain', 'pattern'])
   ) {
     throw new Error('wrangler config must declare only the exact 3dgen.hitsuki.space Custom Domain route');
   }

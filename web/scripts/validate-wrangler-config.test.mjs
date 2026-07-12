@@ -51,3 +51,18 @@ test('rejects a different or additional Custom Domain route', (context) => {
   assert.throws(() => validateWranglerConfig(differentTarget), /only the exact 3dgen\.hitsuki\.space/);
   assert.throws(() => validateWranglerConfig(additionalTarget), /only the exact 3dgen\.hitsuki\.space/);
 });
+
+
+test('rejects Custom Domain state and preview overrides', (context) => {
+  const disabledTarget = writeMutatedConfig(context, (source) => source.replace(
+    '"custom_domain": true',
+    '"custom_domain": true, "enabled": false',
+  ));
+  const previewsTarget = writeMutatedConfig(context, (source) => source.replace(
+    '"custom_domain": true',
+    '"custom_domain": true, "previews_enabled": true',
+  ));
+
+  assert.throws(() => validateWranglerConfig(disabledTarget), /only the exact 3dgen\.hitsuki\.space/);
+  assert.throws(() => validateWranglerConfig(previewsTarget), /only the exact 3dgen\.hitsuki\.space/);
+});
