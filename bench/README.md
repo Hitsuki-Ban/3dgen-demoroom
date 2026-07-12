@@ -28,7 +28,7 @@ uv run pytest
 uv run bench-harness tasks-validate ../tasks/tasks.json
 uv run bench-harness output-validate <path-to-task-output-dir>
 uv run bench-harness upload-local <source-dir> <target-root> runs/<model>/<gpu>/<timestamp>
-uv run bench-harness upload-s3 <source-dir> s3://3dgen-runs/runs/<model>/<gpu>/<timestamp>
+uv run bench-harness upload-s3 <top-level-telemetry-dir> s3://3dgen-runs/runs/<model>/<gpu>/<timestamp>
 uv run bench-harness runpod-pods
 ```
 
@@ -37,6 +37,55 @@ uv run bench-harness runpod-pods
 - `R2_ENDPOINT`
 - `R2_ACCESS_KEY_ID`
 - `R2_SECRET_ACCESS_KEY`
+
+### Task publish protocol
+
+Runner task uploads configured by `RUNPOD_INCREMENTAL_S3_TARGET` use a recoverable publish protocol:
+
+1. Validate the local success or failure contract with `bench_harness.meta`, including GLB structure,
+   the declared license, and exact `runs/<model-id>/.../<task-id>` target IDs. Acquire a persistent
+   per-task R2 lock before reading or mutating canonical state: create it with conditional
+   `PutObject If-None-Match: *`, or compare-and-swap a `released` lock to `owned` with the prior ETag
+   in `PutObject If-Match`. Every state transition writes a fresh transition ID in the body, preventing
+   protocol-level ETag reuse.
+2. Upload every file to a unique `.publish-staging/<id>/` prefix with SHA-256 user metadata, then
+   verify its size and SHA metadata round-trip with `HeadObject`. The SHA value is local provenance
+   metadata; `HeadObject` does not download or independently hash remote object bytes.
+3. Copy the previous canonical task prefix to `.publish-backup/<id>/` and verify the backup before
+   mutating canonical keys.
+4. Remove the previous `meta.json`/`failure.json` marker, copy non-marker files, remove stale files,
+   and copy the new marker last. Any catchable interruption in this mutation window attempts to restore
+   the complete previous prefix from backup before propagating the original error.
+5. Delete staging and backup only after the new marker is committed. Cleanup failure is reported as
+   a committed publish with explicit residual prefixes; it does not roll back the valid new result.
+   Release the task lock only after canonical state is known to be valid, using the owned ETag to
+   compare-and-swap `owned` to `released`. The protocol never deletes lock objects, so a delayed old
+   release cannot delete a newer owner's lock. Rollback failure or hard process loss leaves the state
+   `owned` so another writer cannot overwrite the recovery evidence.
+
+R2 has no multi-object rename. This protocol relies on its supported S3 `HeadObject`, `CopyObject`,
+conditional `PutObject`, source copy conditions, user metadata, and per-object read-after-write consistency.
+Confirmed 2026-07-12:
+
+- [R2 S3 API compatibility](https://developers.cloudflare.com/r2/api/s3/api/)
+- [R2 consistency](https://developers.cloudflare.com/r2/reference/consistency/)
+- [R2 conditional copy semantics](https://developers.cloudflare.com/r2/api/s3/extensions/)
+- [S3 `HeadObject`](https://docs.aws.amazon.com/boto3/latest/reference/services/s3/client/head_object.html)
+
+This is not a multi-object transaction or reader snapshot. The conditional task lock enforces one repository
+writer, but readers must not build a publication snapshot concurrently with a task commit. A missing marker
+means publish-in-progress and must be skipped/retried; reading a marker once does not pin the other keys to that
+generation. Run snapshot validation only after the publisher returns. These guarantees apply to direct R2
+S3/Workers-binding reads, not a custom-domain cache, whose invalidation is a separate deployment concern.
+
+Catchable Python/S3 failures restore the backup before returning. A hard process or host termination during
+the marker-free commit window cannot run rollback; `.publish-backup/<id>/`, `.publish-staging/<id>/`, and the
+retained `.publish-locks/<task-id>.json` are then the manual recovery evidence. Verify/restore canonical state
+before conditionally transitioning that exact owned ETag to `released`. Do not delete or overwrite the lock.
+
+`bench-harness upload-s3` without a relative task name accepts top-level startup/final telemetry files only.
+The RunPod launcher writes those files under `/work/runpod-telemetry`; task outputs stay under `/work/output`
+and must never enter this direct-upload path.
 
 RunPod launch commands additionally require `RUNPOD_API_KEY`:
 
@@ -112,7 +161,7 @@ The local 12GB RTX 4070 Ti validation gate is for lightweight runners first. Tri
 - Cloud benchmark launches require an explicit RunPod `--network-volume-id`, `--data-center-id`, and `--startup-timeout-min`. The launcher writes `networkVolumeId`, constrains pod placement to the same single data center, mounts the volume at `/workspace`, and injects `/workspace/weights/...` model paths instead of using baked image weight layers.
 - After pod creation, the launcher polls `GET /pods/<id>` until the pod has `publicIp`, a port mapping for container SSH port `22`, and a reachable mapped TCP port. If startup exceeds `--startup-timeout-min`, it terminates the pod before the container-side watchdog can start.
 - The launcher injects `RUNPOD_API_KEY` plus the three R2 environment variables into the pod so the runner can self-terminate and upload before exit.
-- The pod command writes `runpod-status.json`, uploads the output directory even if the model runner exits non-zero, and then attempts best-effort self-termination. Upload/status failures take precedence over the runner exit code because a missing R2 report is an infrastructure failure, not a model result.
+- The runner publishes each task through the staged task protocol. The pod command writes `runpod-status.json`, uploads only the isolated telemetry directory even if the model runner exits non-zero, and then attempts best-effort self-termination. Upload/status failures take precedence over the runner exit code because a missing R2 report is an infrastructure failure, not a model result.
 - CLI output strips RunPod `env` fields before printing pod responses. Do not use raw RunPod pod JSON in reports because it can contain injected secrets.
 - TripoSG and PartCrafter retry each failed task once; after the retry fails, they write `failure.json` instead of aborting the whole 25-task batch.
 

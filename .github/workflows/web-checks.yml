@@ -1,0 +1,53 @@
+name: web checks
+
+on:
+  pull_request:
+    paths:
+      - "web/**"
+      - ".github/workflows/web-checks.yml"
+      - ".github/workflows/deploy.yml"
+  push:
+    branches: [main]
+    paths:
+      - "web/**"
+      - ".github/workflows/web-checks.yml"
+      - ".github/workflows/deploy.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+
+      - name: Install dependencies
+        working-directory: web
+        run: pnpm install --frozen-lockfile
+
+      - name: Test web UI and configuration
+        working-directory: web
+        run: pnpm test
+
+      - name: Test Worker asset responses
+        working-directory: web
+        run: pnpm test:worker
+
+      - name: Type-check and build web assets
+        working-directory: web
+        run: pnpm exec tsc -p tsconfig.json && pnpm exec vite build
+
+      - name: Bundle Worker without deploying
+        working-directory: web
+        run: pnpm exec wrangler deploy --dry-run --outdir "$RUNNER_TEMP/wrangler-dry-run"

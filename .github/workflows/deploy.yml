@@ -59,6 +59,10 @@ jobs:
           web/public/manifest.json
           --expected-failure partcrafter/chrome-espresso-machine
 
+      - name: Test Worker asset responses
+        working-directory: web
+        run: pnpm test:worker
+
       - name: Build
         working-directory: web
         run: pnpm build
