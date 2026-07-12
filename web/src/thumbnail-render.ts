@@ -1,4 +1,3 @@
-import * as THREE from 'three';
 import { MODELS } from './data/models';
 import { ViewerCore } from './viewer/ViewerCore';
 import { loadModel } from './viewer/loadModel';
@@ -15,9 +14,16 @@ type ThumbnailState =
     }
   | { status: 'error'; message: string };
 
+type OrientationDegrees = { x: number; y: number; z: number };
+
+interface ThumbnailControl {
+  setOrientationDegrees(orientation: OrientationDegrees): Promise<void>;
+}
+
 declare global {
   interface Window {
     __THUMBNAIL_STATE__: ThumbnailState;
+    __THUMBNAIL_CONTROL__?: ThumbnailControl;
   }
 }
 
@@ -29,13 +35,11 @@ function requiredElement<T extends HTMLElement>(selector: string): T {
   return element;
 }
 
-function applyDefaultOrientation(object: THREE.Object3D, modelId: string): void {
+function defaultOrientation(modelId: string): OrientationDegrees {
   const model = MODELS.find((candidate) => candidate.id === modelId);
   if (!model) throw new Error(`unknown model ID: ${modelId}`);
   const fix = model.orientationFix;
-  if (!fix) return;
-  const degrees = Math.PI / 180;
-  object.rotation.set((fix.x ?? 0) * degrees, (fix.y ?? 0) * degrees, (fix.z ?? 0) * degrees);
+  return { x: fix?.x ?? 0, y: fix?.y ?? 0, z: fix?.z ?? 0 };
 }
 
 function animationFrame(): Promise<void> {
@@ -54,14 +58,20 @@ async function renderThumbnail(): Promise<void> {
 
   const core = new ViewerCore(canvas);
   const object = await loadModel(`/__thumbnail/model.glb?token=${encodeURIComponent(window.location.search)}`);
-  applyDefaultOrientation(object, modelId);
   const paneId = core.addPane(pane, object);
+
+  window.__THUMBNAIL_CONTROL__ = {
+    async setOrientationDegrees(orientation) {
+      core.setPaneOrientationDegrees(paneId, orientation);
+      await animationFrame();
+      await animationFrame();
+    },
+  };
 
   // ViewerCore registers its render-loop callback before these callbacks. Two
   // observed animation frames therefore guarantee at least one completed pane
   // render without relying on a wall-clock sleep.
-  await animationFrame();
-  await animationFrame();
+  await window.__THUMBNAIL_CONTROL__.setOrientationDegrees(defaultOrientation(modelId));
 
   const stats = core.getStats(paneId);
   const context = core.renderer.getContext();
