@@ -31,6 +31,10 @@ jobs:
         working-directory: web
         run: pnpm install --frozen-lockfile
 
+      - name: Web tests
+        working-directory: web
+        run: pnpm test
+
       - name: Sync benchmark results from R2
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
