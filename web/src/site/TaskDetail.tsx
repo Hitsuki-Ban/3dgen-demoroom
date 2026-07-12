@@ -4,7 +4,7 @@ import { TASKS } from '../data/tasks';
 import { useManifest } from '../data/useManifest';
 import { isRunResult, type ModelInfo, type RunResult, type TaskInfo } from '../data/types';
 import { loadModel } from '../viewer/loadModel';
-import { useViewer } from '../viewer/ViewerContext';
+import { ViewerProvider, useViewer } from '../viewer/ViewerContext';
 import { ViewerPane } from '../viewer/ViewerPane';
 import { ModelCard } from './ModelCard';
 import { ViewerToolbar } from './ViewerToolbar';
@@ -68,7 +68,17 @@ function ResultPane({
   );
 }
 
-export function TaskDetail({ taskId, onBack }: { taskId: string; onBack: () => void }) {
+/** ViewerProvider(共有 canvas + ViewerCore)は課題詳細のスコープでだけ生成し、
+ *  一覧へ戻ったら unmount で dispose する(#59)。課題切替では remount しない */
+export function TaskDetail(props: { taskId: string; onBack: () => void }) {
+  return (
+    <ViewerProvider>
+      <TaskDetailInner {...props} />
+    </ViewerProvider>
+  );
+}
+
+function TaskDetailInner({ taskId, onBack }: { taskId: string; onBack: () => void }) {
   const task = TASKS.find((t) => t.id === taskId);
   const results = useManifest().entries.filter(isRunResult);
   const viewer = useViewer();

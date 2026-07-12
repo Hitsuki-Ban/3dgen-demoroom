@@ -1,13 +1,15 @@
-import { useEffect, useState } from 'react';
-import { ViewerProvider } from './viewer/ViewerContext';
+import { Suspense, lazy, useEffect, useState } from 'react';
 import { MODELS } from './data/models';
 import { TASKS } from './data/tasks';
 import { useManifest } from './data/useManifest';
 import { isRunResult } from './data/types';
 import { TaskGallery } from './site/TaskGallery';
-import { TaskDetail } from './site/TaskDetail';
 import { ModelsOverview } from './site/ModelsOverview';
 import { MethodNote } from './site/MethodNote';
+
+// Viewer(three.js 一式)は課題詳細でしか使わないため別チャンクへ分離する(#59)。
+// homepage では WebGL context / canvas / RAF を一切作らない
+const TaskDetail = lazy(() => import('./site/TaskDetail').then((m) => ({ default: m.TaskDetail })));
 
 const REPO_URL = 'https://github.com/Hitsuki-Ban/3dgen-demoroom';
 
@@ -79,20 +81,20 @@ export default function App() {
   };
 
   return (
-    <ViewerProvider>
-      <div id="app-content" className="max-w-6xl mx-auto px-4">
-        <Hero />
-        {selectedTask ? (
+    <div id="app-content" className="max-w-6xl mx-auto px-4">
+      <Hero />
+      {selectedTask ? (
+        <Suspense fallback={<p className="pt-10 text-sm text-slate-400">ビューアを読み込み中…</p>}>
           <TaskDetail taskId={selectedTask} onBack={() => selectTask(null)} />
-        ) : (
-          <>
-            <TaskGallery onSelect={selectTask} />
-            <ModelsOverview />
-            <MethodNote />
-          </>
-        )}
-        <Footer />
-      </div>
-    </ViewerProvider>
+        </Suspense>
+      ) : (
+        <>
+          <TaskGallery onSelect={selectTask} />
+          <ModelsOverview />
+          <MethodNote />
+        </>
+      )}
+      <Footer />
+    </div>
   );
 }
